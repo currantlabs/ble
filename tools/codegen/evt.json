@@ -1,0 +1,327 @@
+{
+        "Events": [
+                {
+                        "Name": "Disconnection Complete",
+                        "Spec": "Vol 2, Part E, 7.7.5",
+                        "Code": "0x05",
+                        "Param": [
+                                {
+                                        "Status": "uint8"
+                                },
+                                {
+                                        "Connection Handle": "uint16"
+                                },
+                                {
+                                        "Reason": "uint8"
+                                }
+                        ],
+                        "DefaultUnmarshaller": true
+                },
+                {
+                        "Name": "Encryption Change",
+                        "Spec": "Vol 2, Part E, 7.7.8",
+                        "Code": "0x08",
+                        "Param": [
+                                {
+                                        "Status": "uint8"
+                                },
+                                {
+                                        "Connection Handle": "uint16"
+                                },
+                                {
+                                        "Encryption Enabled": "uint8"
+                                }
+                        ],
+                        "DefaultUnmarshaller": true
+                },
+                {
+                        "Name": "Read Remote Version Information Complete",
+                        "Spec": "Vol 2, Part E, 7.7.12",
+                        "Code": "0x0C",
+                        "Param": [
+                                {
+                                        "Status": "uint8"
+                                },
+                                {
+                                        "Connection Handle": "uint16"
+                                },
+                                {
+                                        "Version": "uint8"
+                                },
+                                {
+                                        "Manufacturer Name": "uint16"
+                                },
+                                {
+                                        "Subversion": "uint16"
+                                }
+                        ],
+                        "DefaultUnmarshaller": true
+                },
+                {
+                        "Name": "Command Complete",
+                        "Spec": "Vol 2, Part E, 7.7.14",
+                        "Code": "0x0E",
+                        "Param": [
+                                {
+                                        "Num HCI Command Packets": "uint8"
+                                },
+                                {
+                                        "Command Opcode": "uint16"
+                                },
+                                {
+                                        "Return Parameters": "[]byte"
+                                }
+                        ],
+                        "DefaultUnmarshaller": false
+                },
+                {
+                        "Name": "Command Status",
+                        "Spec": "Vol 2, Part E, 7.7.15",
+                        "Code": "0x0F",
+                        "Param": [
+                                {
+                                        "Status": "uint8"
+                                },
+                                {
+                                        "Num HCI Command Packets": "uint8"
+                                },
+                                {
+                                        "Command Opcode": "uint16"
+                                }
+                        ],
+                        "DefaultUnmarshaller": true
+                },
+                {
+                        "Name": "Hardware Error",
+                        "Spec": "Vol 2, Part E, 7.7.16",
+                        "Code": "0x10",
+                        "Param": [
+                                {
+                                        "Hardware Code": "uint8"
+                                }
+                        ],
+                        "DefaultUnmarshaller": true
+                },
+                {
+                        "Name": "Number Of Completed Packets",
+                        "Spec": "Vol 2, Part E, 7.7.19",
+                        "Code": "0x13",
+                        "Param": [
+                                {
+                                        "Number Of Handles": "uint8"
+                                },
+                                {
+                                        "Connection Handle": "[]uint16"
+                                },
+                                {
+                                        "HC Num Of Completed Packets": "[]uint16"
+                                }
+                        ],
+                        "DefaultUnmarshaller": false
+                },
+                {
+                        "Name": "Data Buffer Overflow",
+                        "Spec": "Vol 2, Part E, 7.7.26",
+                        "Code": "0x1A",
+                        "Param": [
+                                {
+                                        "Link Type": "uint8"
+                                }
+                        ],
+                        "DefaultUnmarshaller": true
+                },
+                {
+                        "Name": "Encryption Key Refresh Complete",
+                        "Spec": "Vol 2, Part E, 7.7.39",
+                        "Code": "0x30",
+                        "Param": [
+                                {
+                                        "Status": "uint8"
+                                },
+                                {
+                                        "Connection Handle": "uint16"
+                                }
+                        ],
+                        "DefaultUnmarshaller": true
+                },
+                {
+                        "Name": "LE Connection Complete",
+                        "Spec": "Vol 2, Part E, 7.7.65.1",
+                        "Code": "0x3E",
+                        "SubCode": "0x01",
+                        "Param": [
+                                {
+                                        "Subevent Code": "uint8"
+                                },
+                                {
+                                        "Status": "uint8"
+                                },
+                                {
+                                        "Connection Handle": "uint16"
+                                },
+                                {
+                                        "Role": "uint8"
+                                },
+                                {
+                                        "Peer Address Type": "uint8"
+                                },
+                                {
+                                        "Peer Address": "[6]byte"
+                                },
+                                {
+                                        "Conn Interval": "uint16"
+                                },
+                                {
+                                        "Conn Latency": "uint16"
+                                },
+                                {
+                                        "Supervision Timeout": "uint16"
+                                },
+                                {
+                                        "Master Clock Accuracy": "uint8"
+                                }
+                        ],
+                        "DefaultUnmarshaller": true
+                },
+                {
+                        "Name": "LE Advertising Report",
+                        "Spec": "Vol 2, Part E, 7.7.65.2",
+                        "Code": "0x3E",
+                        "SubCode": "0x02",
+                        "Param": [
+                                {
+                                        "Subevent Code": "uint8"
+                                },
+                                {
+                                        "Num Reports": "uint8"
+                                },
+                                {
+                                        "Event Type": "[]uint8"
+                                },
+                                {
+                                        "Address Type": "[]uint8"
+                                },
+                                {
+                                        "Address": "[][6]byte"
+                                },
+                                {
+                                        "Length": "[]uint8"
+                                },
+                                {
+                                        "Data": "[][]byte"
+                                },
+                                {
+                                        "RSSI": "[]int8"
+                                }
+                        ],
+                        "DefaultUnmarshaller": false
+                },
+                {
+                        "Name": "LE Connection Update Complete",
+                        "Spec": "Vol 2, Part E, 7.7.65.3",
+                        "Code": "0x0E",
+                        "SubCode": "0x03",
+                        "Param": [
+                                {
+                                        "Subevent Code": "uint8"
+                                },
+                                {
+                                        "Status": "uint8"
+                                },
+                                {
+                                        "Connection Handle": "uint16"
+                                },
+                                {
+                                        "Conn Interval": "uint16"
+                                },
+                                {
+                                        "Conn Latency": "uint16"
+                                },
+                                {
+                                        "Supervision Timeout": "uint16"
+                                }
+                        ],
+                        "DefaultUnmarshaller": true
+                },
+                {
+                        "Name": "LE Read Remote Used Features Complete",
+                        "Spec": "Vol 2, Part E, 7.7.65.4",
+                        "Code": "0x3E",
+                        "SubCode": "0x04",
+                        "Param": [
+                                {
+                                        "Subevent Code": "uint8"
+                                },
+                                {
+                                        "Status": "uint8"
+                                },
+                                {
+                                        "Connection Handle": "uint16"
+                                },
+                                {
+                                        "LE Features": "uint64"
+                                }
+                        ],
+                        "DefaultUnmarshaller": true
+                },
+                {
+                        "Name": "LE Long Term Key Request",
+                        "Spec": "Vol 2, Part E, 7.7.65.5",
+                        "Code": "0x3E",
+                        "SubCode": "0x05",
+                        "Param": [
+                                {
+                                        "Subevent Code": "uint8"
+                                },
+                                {
+                                        "Connection Handle": "uint16"
+                                },
+                                {
+                                        "Random Number": "uint64"
+                                },
+                                {
+                                        "Encryption Diversifier": "uint16"
+                                }
+                        ],
+                        "DefaultUnmarshaller": true
+                },
+                {
+                        "Name": "LE Remote Connection Parameter Request",
+                        "Spec": "Vol 2, Part E, 7.7.65.6",
+                        "Code": "0x3E",
+                        "SubCode": "0x06",
+                        "Param": [
+                                {
+                                        "Subevent Code": "uint8"
+                                },
+                                {
+                                        "Connection Handle": "uint16"
+                                },
+                                {
+                                        "Interval Min": "uint16"
+                                },
+                                {
+                                        "Interval Max": "uint16"
+                                },
+                                {
+                                        "Latency": "uint16"
+                                },
+                                {
+                                        "Timeout": "uint16"
+                                }
+                        ],
+                        "DefaultUnmarshaller": true
+                },
+                {
+                        "Name": "Authenticated Payload Timeout Expired",
+                        "Spec": "Vol 2, Part E, 7.7.75",
+                        "Code": "0x57",
+                        "Param": [
+                                {
+                                        "Connection Handle": "uint16"
+                                }
+                        ],
+                        "DefaultUnmarshaller": true
+                }
+        ]
+}

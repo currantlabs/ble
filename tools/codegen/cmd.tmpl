@@ -1,0 +1,29 @@
+// {{esc .Name}} {{printf "implements %s (%s|%s) [%s]" .Name .OGF .OCF .Spec}}
+type {{esc .Name}} struct {
+{{range .Param}}{{range $k, $v := .}}{{printf "\t%s\t%s\n" (esc $k) $v}}{{end}}{{end}}
+}
+
+func (c *{{esc .Name}}) String() string {
+	return {{printf "\"%s (%s|%s)\"" .Name .OGF .OCF}}
+}
+
+// OpCode returns the opcode of the command.
+func (c *{{esc .Name}}) OpCode() int { return {{printf "%s<<10 | %s" .OGF .OCF}} }
+
+// Len returns the length of the command.
+func (c *{{esc .Name}}) Len() int { return {{.Len}} }
+{{if ge .Len 0}}
+// Marshal serializes the command parameters into binary form.
+func (c *{{esc .Name}}) Marshal(b []byte) error {
+	return marshal(c, b)
+}
+{{end}}
+{{if .Return}}
+// {{esc .Name}}RP returns the return parameter of {{.Name}}
+type {{esc .Name}}RP struct {
+{{range .Return}}{{range $k, $v := .}}{{printf "\t%s\t%s\n" (esc $k) $v}}{{end}}{{end}}
+}
+// Unmarshal de-serializes the binary data and stores the result in the receiver.
+func (c *{{esc .Name}}RP) Unmarshal(b []byte) error {
+	return unmarshal(c, b)
+}{{end}}

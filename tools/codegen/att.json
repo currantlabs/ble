@@ -1,0 +1,431 @@
+{
+        "Atts": [
+                {
+                        "Name": "Error Response",
+                        "Spec": "Vol 3, Part E, 3.4.1.1",
+                        "Code": "0x01",
+                        "Param": [
+                                {
+                                        "Attribute Opcode": "uint8"
+                                },
+                                {
+                                        "Request Opcode In Error": "uint8"
+                                },
+                                {
+                                        "Attribute In Error": "uint16"
+                                },
+                                {
+                                        "Error Code": "uint8"
+                                }
+                        ]
+                },
+                {
+                        "Name": "Exchange MTU Request",
+                        "Spec": "Vol 3, Part E, 3.4.2.1",
+                        "Code": "0x02",
+                        "Param": [
+                                {
+                                        "Attribute Opcode": "uint8"
+                                },
+                                {
+                                        "Client Rx MTU": "uint16"
+                                }
+                        ]
+                },
+                {
+                        "Name": "Exchange MTU Response",
+                        "Spec": "Vol 3, Part E, 3.4.2.2",
+                        "Code": "0x03",
+                        "Param": [
+                                {
+                                        "Attribute Opcode": "uint8"
+                                },
+                                {
+                                        "Server Rx MTU": "uint16"
+                                }
+                        ]
+                },
+                {
+                        "Name": "Find Information Request",
+                        "Spec": "Vol 3, Part E, 3.4.3.1",
+                        "Code": "0x04",
+                        "Param": [
+                                {
+                                        "Attribute Opcode": "uint8"
+                                },
+                                {
+                                        "Starting Handle": "uint16"
+                                },
+                                {
+                                        "Ending Handle": "uint16"
+                                }
+                        ]
+                },
+                {
+                        "Name": "Find Information Response",
+                        "Spec": "Vol 3, Part E, 3.4.3.2",
+                        "Code": "0x05",
+                        "Param": [
+                                {
+                                        "Attribute Opcode": "uint8"
+                                },
+                                {
+                                        "Format": "uint8"
+                                },
+                                {
+                                        "Information Data": "[]byte"
+                                }
+                        ]
+                },
+                {
+                        "Name": "Find By Type Value Request",
+                        "Spec": "Vol 3, Part E, 3.4.3.3",
+                        "Code": "0x06",
+                        "Param": [
+                                {
+                                        "Attribute Opcode": "uint8"
+                                },
+                                {
+                                        "Starting Handle": "uint16"
+                                },
+                                {
+                                        "Ending Handle": "uint16"
+                                },
+                                {
+                                        "Attribute Type": "uint16"
+                                },
+                                {
+                                        "Attribute Value": "[]byte"
+                                }
+                        ]
+                },
+                {
+                        "Name": "Find By Type Value Response",
+                        "Spec": "Vol 3, Part E, 3.4.3.4",
+                        "Code": "0x07",
+                        "Param": [
+                                {
+                                        "Attribute Opcode": "uint8"
+                                },
+                                {
+                                        "Handle Information List": "[]byte"
+                                }
+                        ]
+                },
+                {
+                        "Name": "Read By Type Request",
+                        "Spec": "Vol 3, Part E, 3.4.4.1",
+                        "Code": "0x08",
+                        "Param": [
+                                {
+                                        "Attribute Opcode": "uint8"
+                                },
+                                {
+                                        "Starting Handle": "uint16"
+                                },
+                                {
+                                        "Ending Handle": "uint16"
+                                },
+                                {
+                                        "Attribute Type": "[]byte"
+                                }
+                        ]
+                },
+                {
+                        "Name": "Read By Type Response",
+                        "Spec": "Vol 3, Part E, 3.4.4.2",
+                        "Code": "0x09",
+                        "Param": [
+                                {
+                                        "Attribute Opcode": "uint8"
+                                },
+                                {
+                                        "Length": "uint8"
+                                },
+                                {
+                                        "Attribute Data List": "[]byte"
+                                }
+                        ]
+                },
+                {
+                        "Name": "Read Request",
+                        "Spec": "Vol 3, Part E, 3.4.4.3",
+                        "Code": "0x0A",
+                        "Param": [
+                                {
+                                        "Attribute Opcode": "uint8"
+                                },
+                                {
+                                        "Attribute Handle": "uint16"
+                                }
+                        ]
+                },
+                {
+                        "Name": "Read Response",
+                        "Spec": "Vol 3, Part E, 3.4.4.4",
+                        "Code": "0x0B",
+                        "Param": [
+                                {
+                                        "Attribute Opcode": "uint8"
+                                },
+                                {
+                                        "Attribute Value": "[]byte"
+                                }
+                        ]
+                },
+                {
+                        "Name": "Read Blob Request",
+                        "Spec": "Vol 3, Part E, 3.4.4.5",
+                        "Code": "0x0C",
+                        "Param": [
+                                {
+                                        "Attribute Opcode": "uint8"
+                                },
+                                {
+                                        "Attribute Handle": "uint16"
+                                },
+                                {
+                                        "Value Offset": "uint16"
+                                }
+                        ]
+                },
+                {
+                        "Name": "Read Blob Response",
+                        "Spec": "Vol 3, Part E, 3.4.4.6",
+                        "Code": "0x0D",
+                        "Param": [
+                                {
+                                        "Attribute Opcode": "uint8"
+                                },
+                                {
+                                        "Part Attribute Value": "[]byte"
+                                }
+                        ]
+                },
+                {
+                        "Name": "Read Multiple Request",
+                        "Spec": "Vol 3, Part E, 3.4.4.7",
+                        "Code": "0x0E",
+                        "Param": [
+                                {
+                                        "Attribute Opcode": "uint8"
+                                },
+                                {
+                                        "Set Of Handles": "[]byte"
+                                }
+                        ]
+                },
+                {
+                        "Name": "Read Multiple Response",
+                        "Spec": "Vol 3, Part E, 3.4.4.8",
+                        "Code": "0x0F",
+                        "Param": [
+                                {
+                                        "Attribute Opcode": "uint8"
+                                },
+                                {
+                                        "Set Of Values": "[]byte"
+                                }
+                        ]
+                },
+                {
+                        "Name": "Read By Group Type Request",
+                        "Spec": "Vol 3, Part E, 3.4.4.9",
+                        "Code": "0x10",
+                        "Param": [
+                                {
+                                        "Attribute Opcode": "uint8"
+                                },
+                                {
+                                        "Starting Handle": "uint16"
+                                },
+                                {
+                                        "Ending Handle": "uint16"
+                                },
+                                {
+                                        "Attribute Group Type": "[]byte"
+                                }
+                        ]
+                },
+                {
+                        "Name": "Read By Group Type Response",
+                        "Spec": "Vol 3, Part E, 3.4.4.10",
+                        "Code": "0x11",
+                        "Param": [
+                                {
+                                        "Attribute Opcode": "uint8"
+                                },
+                                {
+                                        "Length": "uint8"
+                                },
+                                {
+                                        "Attribute Data List": "[]byte"
+                                }
+                        ]
+                },
+                {
+                        "Name": "Write Request",
+                        "Spec": "Vol 3, Part E, 3.4.5.1",
+                        "Code": "0x12",
+                        "Param": [
+                                {
+                                        "Attribute Opcode": "uint8"
+                                },
+                                {
+                                        "Attribute Handle": "uint16"
+                                },
+                                {
+                                        "Attribute Value": "[]byte"
+                                }
+                        ]
+                },
+                {
+                        "Name": "Write Response",
+                        "Spec": "Vol 3, Part E, 3.4.5.2",
+                        "Code": "0x13",
+                        "Param": [
+                                {
+                                        "Attribute Opcode": "uint8"
+                                }
+                        ]
+                },
+                {
+                        "Name": "Write Command",
+                        "Spec": "Vol 3, Part E, 3.4.5.3",
+                        "Code": "0x52",
+                        "Param": [
+                                {
+                                        "Attribute Opcode": "uint8"
+                                },
+                                {
+                                        "Attribute Handle": "uint16"
+                                },
+                                {
+                                        "Attribute Value": "[]byte"
+                                }
+                        ]
+                },
+                {
+                        "Name": "Signed Write Command",
+                        "Spec": "Vol 3, Part E, 3.4.5.4",
+                        "Code": "0xD2",
+                        "Param": [
+                                {
+                                        "Attribute Opcode": "uint8"
+                                },
+                                {
+                                        "Attribute Handle": "uint16"
+                                },
+                                {
+                                        "Attribute Value": "[]byte"
+                                },
+                                {
+                                        "Authentication Signature": "[12]byte"
+                                }
+                        ]
+                },
+                {
+                        "Name": "Prepare Write Request",
+                        "Spec": "Vol 3, Part E, 3.4.6.1",
+                        "Code": "0x16",
+                        "Param": [
+                                {
+                                        "Attribute Opcode": "uint8"
+                                },
+                                {
+                                        "Attribute Handle": "uint16"
+                                },
+                                {
+                                        "Value Offset": "uint16"
+                                },
+                                {
+                                        "Part Attribute Value": "[]byte"
+                                }
+                        ]
+                },
+                {
+                        "Name": "Prepare Write Response",
+                        "Spec": "Vol 3, Part E, 3.4.6.2",
+                        "Code": "0x17",
+                        "Param": [
+                                {
+                                        "Attribute Opcode": "uint8"
+                                },
+                                {
+                                        "Attribute Handle": "uint16"
+                                },
+                                {
+                                        "Value Offset": "uint16"
+                                },
+                                {
+                                        "Part Attribute Value": "[]byte"
+                                }
+                        ]
+                },
+                {
+                        "Name": "Execute Write Request",
+                        "Spec": "Vol 3, Part E, 3.4.6.3",
+                        "Code": "0x18",
+                        "Param": [
+                                {
+                                        "Attribute Opcode": "uint8"
+                                },
+                                {
+                                        "Flags": "uint8"
+                                }
+                        ]
+                },
+                {
+                        "Name": "Execute Write Response",
+                        "Spec": "Vol 3, Part E, 3.4.6.4",
+                        "Code": "0x19",
+                        "Param": [
+                                {
+                                        "Attribute Opcode": "uint8"
+                                }
+                        ]
+                },
+                {
+                        "Name": "Handle Value Notification",
+                        "Spec": "Vol 3, Part E, 3.4.7.1",
+                        "Code": "0x1B",
+                        "Param": [
+                                {
+                                        "Attribute Opcode": "uint8"
+                                },
+                                {
+                                        "Attribute Handle": "uint16"
+                                },
+                                {
+                                        "Attribute Value": "[]byte"
+                                }
+                        ]
+                },
+                {
+                        "Name": "Handle Value Indication",
+                        "Spec": "Vol 3, Part E, 3.4.7.2",
+                        "Code": "0x1D",
+                        "Param": [
+                                {
+                                        "Attribute Opcode": "uint8"
+                                },
+                                {
+                                        "Attribute Handle": "uint16"
+                                },
+                                {
+                                        "Attribute Value": "[]byte"
+                                }
+                        ]
+                },
+                {
+                        "Name": "Handle Value Confirmation",
+                        "Spec": "Vol 3, Part E, 3.4.7.3",
+                        "Code": "0x1E",
+                        "Param": [
+                                {
+                                        "Attribute Opcode": "uint8"
+                                }
+                        ]
+                }
+        ]
+}

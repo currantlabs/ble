@@ -1,0 +1,10 @@
+{{reset}}{{$n := (esc .Name)}}const {{$n}}Code = {{.Code}}
+{{if .SubCode}}
+const {{esc .Name}}SubCode = {{.SubCode}}
+{{end}}
+// {{esc .Name}} implements {{.Name}} ({{.Code}}{{if .SubCode}}:{{.SubCode}}{{end}}) [{{.Spec}}]. {{$c := .Code}}
+type {{$n}} []byte
+{{if .DefaultUnmarshaller}}
+{{range .Param}} {{range $k, $v := .}} {{getter $n $c (esc $k) $v}} {{end}}
+{{end}}
+{{end}}

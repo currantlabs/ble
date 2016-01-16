@@ -1,0 +1,1246 @@
+{
+        "LinkControl": [
+                {
+                        "Name": "Disconnect",
+                        "Spec": "Vol 2, Part E, 7.1.6",
+                        "OGF": "0x01",
+                        "OCF": "0x0006",
+                        "Len": 3,
+                        "Param": [
+                                {
+                                        "Connection Handle": "uint16"
+                                },
+                                {
+                                        "Reason": "uint8"
+                                }
+                        ],
+                        "Return": [],
+                        "Events": [
+                                "Command Status"
+                        ]
+                },
+                {
+                        "Name": "Read Remote Version Information",
+                        "Spec": "Vol 2, Part E, 7.1.23",
+                        "OGF": "0x01",
+                        "OCF": "0x001D",
+                        "Len": 2,
+                        "Param": [
+                                {
+                                        "Connection Handle": "uint16"
+                                }
+                        ],
+                        "Return": [],
+                        "Events": [
+                                "Command Status",
+                                "Read Remote Version Information Complete"
+                        ]
+                }
+        ],
+        "LinkPolicy": [
+                {
+                        "Name": "Write Default Link Policy Settings",
+                        "Spec": "Vol 2, Part E, 7.2.12",
+                        "OGF": "0x02",
+                        "OCF": "0x000D",
+                        "Len": 2,
+                        "Param": [
+                                {
+                                        "Default Link Policy Settings": "uint16"
+                                }
+                        ],
+                        "Return": [
+                                {
+                                        "Status": "uint8"
+                                }
+                        ],
+                        "Events": [
+                                "Command Complete"
+                        ]
+                }
+        ],
+        "HostControl": [
+                {
+                        "Name": "Set Event Mask",
+                        "Spec": "Vol 2, Part E, 7.3.1",
+                        "OGF": "0x03",
+                        "OCF": "0x0001",
+                        "Len": 8,
+                        "Param": [
+                                {
+                                        "Event Mask": "uint64"
+                                }
+                        ],
+                        "Return": [
+                                {
+                                        "Status": "uint8"
+                                }
+                        ],
+                        "Events": [
+                                "Command Complete"
+                        ]
+                },
+                {
+                        "Name": "Reset",
+                        "Spec": "Vol 2, Part E, 7.3.2",
+                        "OGF": "0x03",
+                        "OCF": "0x003",
+                        "Len": 0,
+                        "Param": [],
+                        "Return": [
+                                {
+                                        "Status": "uint8"
+                                }
+                        ],
+                        "Events": [
+                                "Command Complete"
+                        ]
+                },
+                {
+                        "Name": "Write Page Timeout",
+                        "Spec": "Vol 2, Part E, 7.3.16",
+                        "OGF": "0x03",
+                        "OCF": "0x0018",
+                        "Len": 2,
+                        "Param": [
+                                {
+                                        "Page Timeout": "uint16"
+                                }
+                        ],
+                        "Return": [
+                                {
+                                        "Status": "uint8"
+                                }
+                        ],
+                        "Events": [
+                                "Command Complete"
+                        ]
+                },
+                {
+                        "Name": "Write Class Of Device",
+                        "Spec": "Vol 2, Part E, 7.3.26",
+                        "OGF": "0x03",
+                        "OCF": "0x0024",
+                        "Len": 3,
+                        "Param": [
+                                {
+                                        "ClassOfDevice": "[3]byte"
+                                }
+                        ],
+                        "Return": [
+                                {
+                                        "Status": "uint8"
+                                }
+                        ],
+                        "Events": [
+                                "Command Complete"
+                        ]
+                },
+                {
+                        "Name": "Read Transmit Power Level",
+                        "Spec": "Vol 2, Part E, 7.3.35",
+                        "OGF": "0x03",
+                        "OCF": "0x002D",
+                        "Len": 3,
+                        "Param": [
+                                {
+                                        "Connection Handle": "uint16"
+                                },
+                                {
+                                        "Type": "uint8"
+                                }
+                        ],
+                        "Return": [
+                                {
+                                        "Status": "uint8"
+                                },
+                                {
+                                        "Connection Handle": "uint16"
+                                }
+                        ],
+                        "Events": [
+                                "Command Complete"
+                        ]
+                },
+                {
+                        "Name": "Host Buffer Size",
+                        "Spec": "Vol 2, Part E, 7.3.39",
+                        "OGF": "0x03",
+                        "OCF": "0x0033",
+                        "Len": 7,
+                        "Param": [
+                                {
+                                        "Host ACL Data Packet Length": "uint16"
+                                },
+                                {
+                                        "Host Synchronous Data Packet Length": "uint8"
+                                },
+                                {
+                                        "Host Total Num ACL Data Packets": "uint16"
+                                },
+                                {
+                                        "Host Total Num Synchronous Data Packets": "uint16"
+                                }
+                        ],
+                        "Return": [
+                                {
+                                        "Status": "uint8"
+                                }
+                        ],
+                        "Events": [
+                                "Command Complete"
+                        ]
+                },
+                {
+                        "Name": "Host Number Of Completed Packets",
+                        "Spec": "Vol 2, Part E, 7.3.40",
+                        "OGF": "0x03",
+                        "OCF": "0x0035",
+                        "Len": -1,
+                        "Param": [
+                                {
+                                        "Number Of Handles": "uint8"
+                                },
+                                {
+                                        "Connection Handle": "[]uint16"
+                                },
+                                {
+                                        "Host Num Of Completed Packets": "[]uint16"
+                                }
+                        ],
+                        "Return": [],
+                        "Events": []
+                },
+                {
+                        "Name": "Set Event Mask Page 2",
+                        "Spec": "Vol 2, Part E, 7.3.69",
+                        "OGF": "0x03",
+                        "OCF": "0x0063",
+                        "Len": 8,
+                        "Param": [
+                                {
+                                        "Event Mask Page2": "uint64"
+                                }
+                        ],
+                        "Return": [
+                                {
+                                        "Status": "uint8"
+                                }
+                        ],
+                        "Events": [
+                                "Command Complete"
+                        ]
+                },
+                {
+                        "Name": "Write LE Host Support",
+                        "Spec": "Vol 2, Part E, 7.3.79",
+                        "OGF": "0x03",
+                        "OCF": "0x006D",
+                        "Len": 2,
+                        "Param": [
+                                {
+                                        "LE Supported Host": "uint8"
+                                },
+                                {
+                                        "Simultaneous LE Host": "uint8"
+                                }
+                        ],
+                        "Return": [
+                                {
+                                        "Status": "uint8"
+                                }
+                        ],
+                        "Events": [
+                                "Command Complete"
+                        ]
+                },
+                {
+                        "Name": "Read Authenticated Payload Timeout",
+                        "Spec": "Vol 2, Part E, 7.3.93",
+                        "OGF": "0x03",
+                        "OCF": "0x007B",
+                        "Len": 2,
+                        "Param": [
+                                {
+                                        "Connection Handle": "uint16"
+                                }
+                        ],
+                        "Return": [
+                                {
+                                        "Status": "uint8"
+                                },
+                                {
+                                        "Connection Handle": "uint16"
+                                },
+                                {
+                                        "Authenticated Payload Timeout": "uint16"
+                                }
+                        ],
+                        "Events": [
+                                "Command Complete"
+                        ]
+                },
+                {
+                        "Name": "Write Authenticated Payload Timeout",
+                        "Spec": "Vol 2, Part E, 7.3.94",
+                        "OGF": "0x01",
+                        "OCF": "0x007C",
+                        "Len": 4,
+                        "Param": [
+                                {
+                                        "Connection Handle": "uint16"
+                                },
+                                {
+                                        "Authenticated Payload Timeout": "uint16"
+                                }
+                        ],
+                        "Return": [
+                                {
+                                        "Status": "uint8"
+                                },
+                                {
+                                        "Connection Handle": "uint16"
+                                }
+                        ],
+                        "Events": [
+                                "Command Status",
+                                "Read Remote Version Information Complete"
+                        ]
+                }
+        ],
+        "InfoParam": [
+                {
+                        "Name": "Read Local Version Information",
+                        "Spec": "Vol 2, Part E, 7.4.1",
+                        "OGF": "0x04",
+                        "OCF": "0x0001",
+                        "Len": 0,
+                        "Param": [],
+                        "Return": [
+                                {
+                                        "Status": "uint8"
+                                },
+                                {
+                                        "HCI Version": "uint8"
+                                },
+                                {
+                                        "HCI Revision": "uint16"
+                                },
+                                {
+                                        "LMP/PAM Version": "uint8"
+                                },
+                                {
+                                        "Manufacturer Name": "uint16"
+                                },
+                                {
+                                        "LMP/PAM Subversion": "uint16"
+                                }
+                        ],
+                        "Events": [
+                                "Command Complete"
+                        ]
+                },
+                {
+                        "Name": "Read Local Supported Commands",
+                        "Spec": "Vol 2, Part E, 7.4.2",
+                        "OGF": "0x04",
+                        "OCF": "0x0002",
+                        "Len": 0,
+                        "Param": [],
+                        "Return": [
+                                {
+                                        "Status": "uint8"
+                                },
+                                {
+                                        "Supporteds": "uint64"
+                                }
+                        ],
+                        "Events": [
+                                "Command Complete"
+                        ]
+                },
+                {
+                        "Name": "Read Local Supported Features",
+                        "Spec": "Vol 2, Part E, 7.4.3",
+                        "OGF": "0x04",
+                        "OCF": "0x0003",
+                        "Len": 0,
+                        "Param": [],
+                        "Return": [
+                                {
+                                        "Status": "uint8"
+                                },
+                                {
+                                        "LMP Features": "uint64"
+                                }
+                        ],
+                        "Events": [
+                                "Command Complete"
+                        ]
+                },
+                {
+                        "Name": "Read Buffer Size",
+                        "Spec": "Vol 2, Part E, 7.4.5",
+                        "OGF": "0x04",
+                        "OCF": "0x0005",
+                        "Len": 0,
+                        "Param": [],
+                        "Return": [
+                                {
+                                        "Status": "uint8"
+                                },
+                                {
+                                        "HC ACL Data Packet Length": "uint16"
+                                },
+                                {
+                                        "HC Synchronous Data Packet Length": "uint8"
+                                },
+                                {
+                                        "HC Total Num ACL Data Packets": "uint16"
+                                },
+                                {
+                                        "HC Total Num Synchronous Data Packets": "uint16"
+                                }
+                        ],
+                        "Events": [
+                                "Command Complete"
+                        ]
+                },
+                {
+                        "Name": "Read BD_ADDR",
+                        "Spec": "Vol 2, Part E, 7.4.6",
+                        "OGF": "0x04",
+                        "OCF": "0x0009",
+                        "Len": 0,
+                        "Param": [],
+                        "Return": [
+                                {
+                                        "Status": "uint8"
+                                },
+                                {
+                                        "BDADDR": "[6]byte"
+                                }
+                        ],
+                        "Events": [
+                                "Command Complete"
+                        ]
+                }
+        ],
+        "StatusParam": [
+                {
+                        "Name": "Read RSSI",
+                        "Spec": "Vol 2, Part E, 7.5.4",
+                        "OGF": "0x05",
+                        "OCF": "0x0005",
+                        "Len": 2,
+                        "Param": [
+                                {
+                                        "Handle": "uint16"
+                                }
+                        ],
+                        "Return": [
+                                {
+                                        "Status": "uint8"
+                                },
+                                {
+                                        "Connection Handle": "uint16"
+                                },
+                                {
+                                        "RSSI": "int8"
+                                }
+                        ],
+                        "Events": [
+                                "Command Complete"
+                        ]
+                }
+        ],
+        "LEControl": [
+                {
+                        "Name": "LE Set Event Mask",
+                        "Spec": "Vol 2, Part E, 7.8.1",
+                        "OGF": "0x08",
+                        "OCF": "0x0001",
+                        "Len": 8,
+                        "Param": [
+                                {
+                                        "LE Event Mask": "uint64"
+                                }
+                        ],
+                        "Return": [
+                                {
+                                        "Status": "uint8"
+                                }
+                        ],
+                        "Events": [
+                                "Command Complete"
+                        ]
+                },
+                {
+                        "Name": "LE Read Buffer Size",
+                        "Spec": "Vol 2, Part E, 7.8.2",
+                        "OGF": "0x08",
+                        "OCF": "0x0002",
+                        "Len": 0,
+                        "Param": [],
+                        "Return": [
+                                {
+                                        "Status": "uint8"
+                                },
+                                {
+                                        "HC LE Data Packet Length": "uint16"
+                                },
+                                {
+                                        "HC Total Num LE Data Packets": "uint8"
+                                }
+                        ],
+                        "Events": [
+                                "Command Complete"
+                        ]
+                },
+                {
+                        "Name": "LE Read Local Supported Features",
+                        "Spec": "Vol 2, Part E, 7.8.3",
+                        "OGF": "0x08",
+                        "OCF": "0x0003",
+                        "Len": 0,
+                        "Param": [],
+                        "Return": [
+                                {
+                                        "Status": "uint8"
+                                },
+                                {
+                                        "LE Features": "uint64"
+                                }
+                        ],
+                        "Events": [
+                                "Command Complete"
+                        ]
+                },
+                {
+                        "Name": "LE Set Random Address",
+                        "Spec": "Vol 2, Part E, 7.8.4",
+                        "OGF": "0x08",
+                        "OCF": "0x0005",
+                        "Len": 6,
+                        "Param": [
+                                {
+                                        "RandomAddress": "[6]byte"
+                                }
+                        ],
+                        "Return": [
+                                {
+                                        "Status": "uint8"
+                                }
+                        ],
+                        "Events": [
+                                "Command Complete"
+                        ]
+                },
+                {
+                        "Name": "LE Set Advertising Parameters",
+                        "Spec": "Vol 2, Part E, 7.8.5",
+                        "OGF": "0x08",
+                        "OCF": "0x0006",
+                        "Len": 15,
+                        "Param": [
+                                {
+                                        "Advertising Interval Min": "uint16"
+                                },
+                                {
+                                        "Advertising Interval Max": "uint16"
+                                },
+                                {
+                                        "Advertising Type": "uint8"
+                                },
+                                {
+                                        "Own Address Type": "uint8"
+                                },
+                                {
+                                        "Direct Address Type": "uint8"
+                                },
+                                {
+                                        "Direct Address": "[6]byte"
+                                },
+                                {
+                                        "Advertising Channel Map": "uint8"
+                                },
+                                {
+                                        "Advertising Filter Policy": "uint8"
+                                }
+                        ],
+                        "Return": [
+                                {
+                                        "Status": "uint8"
+                                }
+                        ],
+                        "Events": [
+                                "Command Complete"
+                        ]
+                },
+                {
+                        "Name": "LE Read Advertising Channel Tx Power",
+                        "Spec": "Vol 2, Part E, 7.8.6",
+                        "OGF": "0x08",
+                        "OCF": "0x0007",
+                        "Len": 0,
+                        "Param": [],
+                        "Return": [
+                                {
+                                        "Status": "uint8"
+                                },
+                                {
+                                        "Transmit Power Level": "uint8"
+                                }
+                        ],
+                        "Events": [
+                                "Command Complete"
+                        ]
+                },
+                {
+                        "Name": "LE Set Advertising Data",
+                        "Spec": "Vol 2, Part E, 7.8.7",
+                        "OGF": "0x08",
+                        "OCF": "0x0008",
+                        "Len": 32,
+                        "Param": [
+                                {
+                                        "Advertising Data Length": "uint8"
+                                },
+                                {
+                                        "Advertising Data": "[31]byte"
+                                }
+                        ],
+                        "Return": [
+                                {
+                                        "Status": "uint8"
+                                },
+                                {
+                                        "HC LE Data Packet Length": "uint16"
+                                },
+                                {
+                                        "HC Total Num LE Data Packets": "uint8"
+                                }
+                        ],
+                        "Events": [
+                                "Command Complete"
+                        ]
+                },
+                {
+                        "Name": "LE Set Scan Response Data",
+                        "Spec": "Vol 2, Part E, 7.8.8",
+                        "OGF": "0x08",
+                        "OCF": "0x0009",
+                        "Len": 32,
+                        "Param": [
+                                {
+                                        "Scan Response Data Length": "uint8"
+                                },
+                                {
+                                        "Scan Response Data": "[31]byte"
+                                }
+                        ],
+                        "Return": [
+                                {
+                                        "Status": "uint8"
+                                }
+                        ],
+                        "Events": [
+                                "Command Complete"
+                        ]
+                },
+                {
+                        "Name": "LE Set Advertise Enable",
+                        "Spec": "Vol 2, Part E, 7.8.9",
+                        "OGF": "0x08",
+                        "OCF": "0x000A",
+                        "Len": 1,
+                        "Param": [
+                                {
+                                        "Advertising Enable": "uint8"
+                                }
+                        ],
+                        "Return": [
+                                {
+                                        "Status": "uint8"
+                                }
+                        ],
+                        "Events": [
+                                "Command Complete"
+                        ]
+                },
+                {
+                        "Name": "LE Set Scan Parameters",
+                        "Spec": "Vol 2, Part E, 7.8.10",
+                        "OGF": "0x08",
+                        "OCF": "0x000B",
+                        "Len": 7,
+                        "Param": [
+                                {
+                                        "LE Scan Type": "uint8"
+                                },
+                                {
+                                        "LE Scan Interval": "uint16"
+                                },
+                                {
+                                        "LE Scan Window": "uint16"
+                                },
+                                {
+                                        "Own Address Type": "uint8"
+                                },
+                                {
+                                        "Scanning Filter Policy": "uint8"
+                                }
+                        ],
+                        "Return": [
+                                {
+                                        "Status": "uint8"
+                                }
+                        ],
+                        "Events": [
+                                "Command Complete"
+                        ]
+                },
+                {
+                        "Name": "LE Set Scan Enable",
+                        "Spec": "Vol 2, Part E, 7.8.11",
+                        "OGF": "0x08",
+                        "OCF": "0x000C",
+                        "Len": 2,
+                        "Param": [
+                                {
+                                        "LE Scan Enable": "uint8"
+                                },
+                                {
+                                        "Filter Duplicates": "uint8"
+                                }
+                        ],
+                        "Return": [
+                                {
+                                        "Status": "uint8"
+                                }
+                        ],
+                        "Events": [
+                                "Command Complete",
+                                "LE Advertising Report"
+                        ]
+                },
+                {
+                        "Name": "LE Create Connection",
+                        "Spec": "Vol 2, Part E, 7.8.12",
+                        "OGF": "0x08",
+                        "OCF": "0x000D",
+                        "Len": 25,
+                        "Param": [
+                                {
+                                        "LE Scan Interval": "uint16"
+                                },
+                                {
+                                        "LE Scan Window": "uint16"
+                                },
+                                {
+                                        "Initiator Filter Policy": "uint8"
+                                },
+                                {
+                                        "Peer Address Type": "uint8"
+                                },
+                                {
+                                        "Peer Address": "[6]byte"
+                                },
+                                {
+                                        "Own Address Type": "uint8"
+                                },
+                                {
+                                        "Conn Interval Min": "uint16"
+                                },
+                                {
+                                        "Conn Interval Max": "uint16"
+                                },
+                                {
+                                        "Conn Latency": "uint16"
+                                },
+                                {
+                                        "Supervision Timeout": "uint16"
+                                },
+                                {
+                                        "Minimum CE Length": "uint16"
+                                },
+                                {
+                                        "Maximum CE Length": "uint16"
+                                }
+                        ],
+                        "Return": [],
+                        "Events": [
+                                "Command Status",
+                                "LE Connection Complete"
+                        ]
+                },
+                {
+                        "Name": "LE Create Connection Cancel",
+                        "Spec": "Vol 2, Part E, 7.8.13",
+                        "OGF": "0x08",
+                        "OCF": "0x000E",
+                        "Len": 0,
+                        "Param": [],
+                        "Return": [
+                                {
+                                        "Status": "uint8"
+                                }
+                        ],
+                        "Events": [
+                                "Command Complete",
+                                "LE Connection Complete"
+                        ]
+                },
+                {
+                        "Name": "LE Read White List Size",
+                        "Spec": "Vol 2, Part E, 7.8.14",
+                        "OGF": "0x08",
+                        "OCF": "0x000F",
+                        "Len": 0,
+                        "Param": [],
+                        "Return": [
+                                {
+                                        "Status": "uint8"
+                                },
+                                {
+                                        "White List Size": "uint8"
+                                }
+                        ],
+                        "Events": [
+                                "Command Complete"
+                        ]
+                },
+                {
+                        "Name": "LE Clear White List",
+                        "Spec": "Vol 2, Part E, 7.8.15",
+                        "OGF": "0x08",
+                        "OCF": "0x0010",
+                        "Len": 0,
+                        "Param": [],
+                        "Return": [
+                                {
+                                        "Status": "uint8"
+                                }
+                        ],
+                        "Events": [
+                                "Command Complete"
+                        ]
+                },
+                {
+                        "Name": "LE Add Device To White List",
+                        "Spec": "Vol 2, Part E, 7.8.16",
+                        "OGF": "0x08",
+                        "OCF": "0x0011",
+                        "Len": 7,
+                        "Param": [
+                                {
+                                        "Address Type": "uint8"
+                                },
+                                {
+                                        "Address": "[6]byte"
+                                }
+                        ],
+                        "Return": [
+                                {
+                                        "Status": "uint8"
+                                }
+                        ],
+                        "Events": [
+                                "Command Complete"
+                        ]
+                },
+                {
+                        "Name": "LE Remove Device From White List",
+                        "Spec": "Vol 2, Part E, 7.8.17",
+                        "OGF": "0x08",
+                        "OCF": "0x0012",
+                        "Len": 7,
+                        "Param": [
+                                {
+                                        "Address Type": "uint8"
+                                },
+                                {
+                                        "Address": "[6]byte"
+                                }
+                        ],
+                        "Return": [
+                                {
+                                        "Status": "uint8"
+                                }
+                        ],
+                        "Events": [
+                                "Command Complete"
+                        ]
+                },
+                {
+                        "Name": "LE Connection Update",
+                        "Spec": "Vol 2, Part E, 7.8.18",
+                        "OGF": "0x08",
+                        "OCF": "0x0013",
+                        "Len": 14,
+                        "Param": [
+                                {
+                                        "Connection Handle": "uint16"
+                                },
+                                {
+                                        "Conn Interval Min": "uint16"
+                                },
+                                {
+                                        "Conn Interval Max": "uint16"
+                                },
+                                {
+                                        "Conn Latency": "uint16"
+                                },
+                                {
+                                        "Supervision Timeout": "uint16"
+                                },
+                                {
+                                        "Minimum CE Length": "uint16"
+                                },
+                                {
+                                        "Maximum CE Length": "uint16"
+                                }
+                        ],
+                        "Return": [],
+                        "Events": [
+                                "Command Status",
+                                "LE Connection Update Complete"
+                        ]
+                },
+                {
+                        "Name": "LE Set Host Channel Classification",
+                        "Spec": "Vol 2, Part E, 7.8.19",
+                        "OGF": "0x08",
+                        "OCF": "0x0014",
+                        "Len": 5,
+                        "Param": [
+                                {
+                                        "Channel Map": "[5]byte"
+                                }
+                        ],
+                        "Return": [
+                                {
+                                        "Status": "uint8"
+                                }
+                        ],
+                        "Events": [
+                                "Command Complete"
+                        ]
+                },
+                {
+                        "Name": "LE Read Channel Map",
+                        "Spec": "Vol 2, Part E, 7.8.20",
+                        "OGF": "0x08",
+                        "OCF": "0x0015",
+                        "Len": 2,
+                        "Param": [
+                                {
+                                        "Connection Handle": "uint16"
+                                }
+                        ],
+                        "Return": [
+                                {
+                                        "Status": "uint8"
+                                },
+                                {
+                                        "Connection Handle": "uint16"
+                                },
+                                {
+                                        "Channel Map": "[5]byte"
+                                }
+                        ],
+                        "Events": [
+                                "Command Complete"
+                        ]
+                },
+                {
+                        "Name": "LE Read Remote Used Features",
+                        "Spec": "Vol 2, Part E, 7.8.21",
+                        "OGF": "0x08",
+                        "OCF": "0x0016",
+                        "Len": 2,
+                        "Param": [
+                                {
+                                        "Connection Handle": "uint16"
+                                }
+                        ],
+                        "Return": [],
+                        "Events": [
+                                "Command Status",
+                                "LE Read Remote Used Features Complete"
+                        ]
+                },
+                {
+                        "Name": "LE Encrypt",
+                        "Spec": "Vol 2, Part E, 7.8.22",
+                        "OGF": "0x08",
+                        "OCF": "0x0017",
+                        "Len": 32,
+                        "Param": [
+                                {
+                                        "Key": "[16]byte"
+                                },
+                                {
+                                        "Plaintext Data": "[16]byte"
+                                }
+                        ],
+                        "Return": [
+                                {
+                                        "Status": "uint8"
+                                },
+                                {
+                                        "Encrypted Data": "[16]byte"
+                                }
+                        ],
+                        "Events": [
+                                "Command Complete"
+                        ]
+                },
+                {
+                        "Name": "LE Rand",
+                        "Spec": "Vol 2, Part E, 7.8.23",
+                        "OGF": "0x08",
+                        "OCF": "0x0018",
+                        "Len": 0,
+                        "Param": [],
+                        "Return": [
+                                {
+                                        "Status": "uint8"
+                                },
+                                {
+                                        "Random Number": "uint64"
+                                }
+                        ],
+                        "Events": [
+                                "Command Complete"
+                        ]
+                },
+                {
+                        "Name": "LE Start Encryption",
+                        "Spec": "Vol 2, Part E, 7.8.24",
+                        "OGF": "0x08",
+                        "OCF": "0x0019",
+                        "Len": 28,
+                        "Param": [
+                                {
+                                        "Connection Handle": "uint16"
+                                },
+                                {
+                                        "Random Number": "uint64"
+                                },
+                                {
+                                        "Encrypted Diversifier": "uint16"
+                                },
+                                {
+                                        "Long Term Key": "[16]byte"
+                                }
+                        ],
+                        "Return": [],
+                        "Events": [
+                                "Command Status",
+                                "Encryption Change",
+                                "Encryption Key Refresh Complete"
+                        ]
+                },
+                {
+                        "Name": "LE Long Term Key Request Reply",
+                        "Spec": "Vol 2, Part E, 7.8.25",
+                        "OGF": "0x08",
+                        "OCF": "0x001A",
+                        "Len": 18,
+                        "Param": [
+                                {
+                                        "Connection Handle": "uint16"
+                                },
+                                {
+                                        "Long Term Key": "[16]byte"
+                                }
+                        ],
+                        "Return": [
+                                {
+                                        "Status": "uint8"
+                                },
+                                {
+                                        "Connection Handle": "uint16"
+                                }
+                        ],
+                        "Events": [
+                                "Command Complete"
+                        ]
+                },
+                {
+                        "Name": "LE Long Term Key Request Negative Reply",
+                        "Spec": "Vol 2, Part E, 7.8.26",
+                        "OGF": "0x08",
+                        "OCF": "0x001B",
+                        "Len": 2,
+                        "Param": [
+                                {
+                                        "Connection Handle": "uint16"
+                                }
+                        ],
+                        "Return": [
+                                {
+                                        "Status": "uint8"
+                                },
+                                {
+                                        "Connection Handle": "uint16"
+                                }
+                        ],
+                        "Events": [
+                                "Command Complete"
+                        ]
+                },
+                {
+                        "Name": "LE Read Supported States",
+                        "Spec": "Vol 2, Part E, 7.8.27",
+                        "OGF": "0x08",
+                        "OCF": "0x001C",
+                        "Len": 0,
+                        "Param": [],
+                        "Return": [
+                                {
+                                        "Status": "uint8"
+                                },
+                                {
+                                        "LE States": "uint64"
+                                }
+                        ],
+                        "Events": [
+                                "Command Complete"
+                        ]
+                },
+                {
+                        "Name": "LE Receiver Test",
+                        "Spec": "Vol 2, Part E, 7.8.28",
+                        "OGF": "0x08",
+                        "OCF": "0x001D",
+                        "Len": 1,
+                        "Param": [
+                                {
+                                        "RX Channel": "uint8"
+                                }
+                        ],
+                        "Return": [
+                                {
+                                        "Status": "uint8"
+                                }
+                        ],
+                        "Events": [
+                                "Command Complete"
+                        ]
+                },
+                {
+                        "Name": "LE Transmitter Test",
+                        "Spec": "Vol 2, Part E, 7.8.29",
+                        "OGF": "0x08",
+                        "OCF": "0x001E",
+                        "Len": 3,
+                        "Param": [
+                                {
+                                        "TX Channel": "uint8"
+                                },
+                                {
+                                        "Length Of Test Data": "uint8"
+                                },
+                                {
+                                        "Packet Payload": "uint8"
+                                }
+                        ],
+                        "Return": [
+                                {
+                                        "Status": "uint8"
+                                }
+                        ],
+                        "Events": [
+                                "Command Complete"
+                        ]
+                },
+                {
+                        "Name": "LE Test End",
+                        "Spec": "Vol 2, Part E, 7.8.30",
+                        "OGF": "0x08",
+                        "OCF": "0x001F",
+                        "Len": 0,
+                        "Param": [],
+                        "Return": [
+                                {
+                                        "Status": "uint8"
+                                },
+                                {
+                                        "Number Of Packats": "uint16"
+                                }
+                        ],
+                        "Events": [
+                                "Command Complete"
+                        ]
+                },
+                {
+                        "Name": "LE Remote Connection Parameter Request Reply",
+                        "Spec": "Vol 2, Part E, 7.8.31",
+                        "OGF": "0x08",
+                        "OCF": "0x0020",
+                        "Len": 14,
+                        "Param": [
+                                {
+                                        "Connection Handle": "uint16"
+                                },
+                                {
+                                        "Interval Min": "uint16"
+                                },
+                                {
+                                        "Interval Max": "uint16"
+                                },
+                                {
+                                        "Latency": "uint16"
+                                },
+                                {
+                                        "Timeout": "uint16"
+                                },
+                                {
+                                        "Minimum CE Length": "uint16"
+                                },
+                                {
+                                        "Maximum CE Length": "uint16"
+                                }
+                        ],
+                        "Return": [
+                                {
+                                        "Status": "uint8"
+                                },
+                                {
+                                        "Connection Handle": "uint16"
+                                }
+                        ],
+                        "Events": [
+                                "Command Complete"
+                        ]
+                },
+                {
+                        "Name": "LE Remote Connection Parameter Request Negative Reply",
+                        "Spec": "Vol 2, Part E, 7.8.32",
+                        "OGF": "0x08",
+                        "OCF": "0x0021",
+                        "Len": 3,
+                        "Param": [
+                                {
+                                        "Connection Handle": "uint16"
+                                },
+                                {
+                                        "Reason": "uint8"
+                                }
+                        ],
+                        "Return": [
+                                {
+                                        "Status": "uint8"
+                                },
+                                {
+                                        "Connection Handle": "uint16"
+                                }
+                        ],
+                        "Events": [
+                                "Command Complete"
+                        ]
+                }
+        ]
+}

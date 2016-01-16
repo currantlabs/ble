@@ -1,0 +1,137 @@
+{
+        "Signals": [
+                {
+                        "Name": "Command Reject",
+                        "Spec": "Vol 3, Part A, 4.1",
+                        "Code": "0x01",
+                        "Fields": [
+                                {
+                                        "Reason": "uint16"
+                                },
+                                {
+                                        "Data": "[]byte"
+                                }
+                        ],
+                        "Type": "Request"
+                },
+                {
+                        "Name": "Disconnect Request",
+                        "Spec": "Vol 3, Part A, 4.6",
+                        "Code": "0x06",
+                        "Fields": [
+                                {
+                                        "Destination CID": "uint16"
+                                },
+                                {
+                                        "Source CID": "uint16"
+                                }
+                        ],
+                        "Type": "Request"
+                },
+                {
+                        "Name": "Disconnect Response",
+                        "Spec": "Vol 3, Part A, 4.7",
+                        "Code": "0x07",
+                        "Fields": [
+                                {
+                                        "Destination CID": "uint16"
+                                },
+                                {
+                                        "Source CID": "uint16"
+                                }
+                        ],
+                        "Type": "Response"
+                },
+                {
+                        "Name": "Connection Parameter Update Request",
+                        "Spec": "Vol 3, Part A, 4.20",
+                        "Code": "0x12",
+                        "Fields": [
+                                {
+                                        "Interval Min": "uint16"
+                                },
+                                {
+                                        "Interval Max": "uint16"
+                                },
+                                {
+                                        "Slave Latency": "uint16"
+                                },
+                                {
+                                        "Timeout Multiplier": "uint16"
+                                }
+                        ],
+                        "Type": "Request"
+                },
+                {
+                        "Name": "Connection Parameter Update Response",
+                        "Spec": "Vol 3, Part A, 4.21",
+                        "Code": "0x13",
+                        "Fields": [
+                                {
+                                        "Result": "uint16"
+                                }
+                        ],
+                        "Type": "Response"
+                },
+                {
+                        "Name": "LE Credit Based Connection Request",
+                        "Spec": "Vol 3, Part A, 4.22",
+                        "Code": "0x14",
+                        "Fields": [
+                                {
+                                        "LE_PSM": "uint16"
+                                },
+                                {
+                                        "Source CID": "uint16"
+                                },
+                                {
+                                        "MTU": "uint16"
+                                },
+                                {
+                                        "MPS": "uint16"
+                                },
+                                {
+                                        "Initial Credits": "uint16"
+                                }
+                        ],
+                        "Type": "Request"
+                },
+                {
+                        "Name": "LE Credit Based Connection Response",
+                        "Spec": "Vol 3, Part A, 4.23",
+                        "Code": "0x15",
+                        "Fields": [
+                                {
+                                        "Destination CID": "uint16"
+                                },
+                                {
+                                        "MTU": "uint16"
+                                },
+                                {
+                                        "MPS": "uint16"
+                                },
+                                {
+                                        "Initial Credits CID": "uint16"
+                                },
+                                {
+                                        "Result": "uint16"
+                                }
+                        ],
+                        "Type": "Response"
+                },
+                {
+                        "Name": "LE Flow Control Credit",
+                        "Spec": "Vol 3, Part A, 4.24",
+                        "Code": "0x16",
+                        "Fields": [
+                                {
+                                        "CID": "uint16"
+                                },
+                                {
+                                        "Credits": "uint16"
+                                }
+                        ],
+                        "Type": "Request"
+                }
+        ]
+}
