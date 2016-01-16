@@ -1,0 +1,18 @@
+// {{esc .Name}} implements {{.Name}} ({{.Code}}{{if .SubCode}}:{{.SubCode}}{{end}}) [{{.Spec}}].
+type {{esc .Name}} struct {
+{{range .Param}}{{range $k, $v := .}}{{printf "\t%s\t%s\n" (esc $k) $v}}{{end}}{{end}}}
+// Code returns the event code of the command.
+func (e {{esc .Name}}) Code() int { return {{.Code}} }
+{{if .SubCode}}
+// SubCode returns the subevent code of the command.
+func (e {{esc .Name}}) SubCode() int {
+	return {{.SubCode}}
+}{{end}}
+{{if .DefaultUnmarshaller}}
+// Unmarshal de-serializes the binary data and stores the result in the receiver.
+func (e *{{esc .Name}}) Unmarshal(b []byte) error {
+	return unmarshal(e, b)
+}{{end}}
+func (e {{esc .Name}}) String() string {
+	return "{{.Name}} ({{.Code}}{{if .SubCode}}:{{.SubCode}}{{end}})"
+}
