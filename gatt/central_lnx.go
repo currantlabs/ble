@@ -1,7 +1,10 @@
 package gatt
 
 import (
+	"bytes"
 	"encoding/binary"
+	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/currantlabs/bt"
@@ -68,38 +71,38 @@ func (c *central) loop() {
 	}
 }
 
-// handleReq dispatches a raw request from the central shim
-// to an appropriate handler, based on its type.
-// It panics if len(b) == 0.
 func (c *central) handleReq(b []byte) []byte {
 	var resp []byte
-	switch reqType, req := b[0], b[1:]; reqType {
-	case attOpMtuReq:
-		resp = c.handleMTU(req)
-	case attOpFindInfoReq:
-		resp = c.handleFindInfo(req)
-	case attOpFindByTypeValueReq:
-		resp = c.handleFindByTypeValue(req)
-	case attOpReadByTypeReq:
-		resp = c.handleReadByType(req)
-	case attOpReadReq:
-		resp = c.handleRead(req)
-	case attOpReadBlobReq:
-		resp = c.handleReadBlob(req)
-	case attOpReadByGroupReq:
-		resp = c.handleReadByGroup(req)
-	case attOpWriteReq, attOpWriteCmd:
-		resp = c.handleWrite(reqType, req)
-	case attOpReadMultiReq, attOpPrepWriteReq, attOpExecWriteReq, attOpSignedWriteCmd:
+	switch reqType := b[0]; reqType {
+	case ExchangeMTURequestCode:
+		resp = c.handleMTU(b)
+	case FindInformationRequestCode:
+		resp = c.handleFindInfo(b)
+	case FindByTypeValueRequestCode:
+		resp = c.handleFindByTypeValue(b)
+	case ReadByTypeRequestCode:
+		resp = c.handleReadByType(b)
+	case ReadRequestCode:
+		resp = c.handleRead(b)
+	case ReadBlobRequestCode:
+		resp = c.handleReadBlob(b)
+	case ReadByGroupTypeRequestCode:
+		resp = c.handleReadByGroup(b)
+	case WriteRequestCode, WriteCommandCode:
+		resp = c.handleWrite(reqType, b)
+	case ReadMultipleRequestCode,
+		PrepareWriteRequestCode,
+		ExecuteWriteRequestCode,
+		SignedWriteCommandCode:
 		fallthrough
 	default:
-		resp = attErrorRsp(reqType, 0x0000, attEcodeReqNotSupp)
+		resp = NewErrorResponse(reqType, 0x0000, ErrReqNotSupp)
 	}
 	return resp
 }
 
-func (c *central) handleMTU(b []byte) []byte {
-	c.txMTU = binary.LittleEndian.Uint16(b[:2])
+func (c *central) handleMTU(r ExchangeMTURequest) []byte {
+	c.txMTU = r.ClientRxMTU()
 	if c.txMTU < 23 {
 		c.txMTU = 23
 	}
@@ -108,105 +111,93 @@ func (c *central) handleMTU(b []byte) []byte {
 	}
 	c.l2conn.SetTxMTU(int(c.txMTU))
 	c.l2conn.SetRxMTU(int(c.rxMTU))
-	return []byte{attOpMtuRsp, uint8(c.rxMTU), uint8(c.rxMTU >> 8)}
+	rsp := ExchangeMTUResponse(make([]byte, 3))
+	rsp.SetAttributeOpcode()
+	rsp.SetServerRxMTU(c.txMTU)
+	return rsp
 }
 
-// REQ: FindInfoReq(0x04), StartHandle, EndHandle
-// RSP: FindInfoRsp(0x05), UUIDFormat, Handle, UUID, Handle, UUID, ...
-func (c *central) handleFindInfo(b []byte) []byte {
-	start, end := readHandleRange(b[:4])
+func (c *central) handleFindInfo(r FindInformationRequest) []byte {
+	rsp := FindInformationResponse(make([]byte, c.txMTU))
+	rsp.SetAttributeOpcode()
+	buf := bytes.NewBuffer(rsp.InformationData())
+	buf.Reset()
 
-	w := newL2capWriter(c.txMTU)
-	w.WriteByteFit(attOpFindInfoRsp)
-
-	uuidLen := -1
-	for _, a := range c.attrs.Subrange(start, end) {
-		if uuidLen == -1 {
-			uuidLen = a.typ.Len()
-			if uuidLen == 2 {
-				w.WriteByteFit(0x01) // TODO: constants for 16bit vs 128bit uuid magic numbers here
-			} else {
-				w.WriteByteFit(0x02)
+	for _, a := range c.attrs.Subrange(r.StartingHandle(), r.EndingHandle()) {
+		if rsp.Format() == 0 {
+			rsp.SetFormat(0x01)
+			if a.typ.Len() == 16 {
+				rsp.SetFormat(0x02)
 			}
 		}
-		if a.typ.Len() != uuidLen {
+		if rsp.Format() == 0x01 && a.typ.Len() != 2 {
 			break
 		}
-		w.Chunk()
-		w.WriteUint16Fit(a.h)
-		w.WriteUUIDFit(a.typ)
-		if ok := w.Commit(); !ok {
+		if rsp.Format() == 0x02 && a.typ.Len() != 16 {
 			break
 		}
+		if buf.Len()+2+a.typ.Len() > buf.Cap() {
+			break
+		}
+		binary.Write(buf, binary.LittleEndian, a.h)
+		binary.Write(buf, binary.LittleEndian, a.typ)
 	}
 
-	if uuidLen == -1 {
-		return attErrorRsp(attOpFindInfoReq, start, attEcodeAttrNotFound)
+	if rsp.Format() == 0 {
+		return NewErrorResponse(r.AttributeOpcode(), r.StartingHandle(), ErrAttrNotFound)
 	}
-	return w.Bytes()
+	return rsp[:2+buf.Len()]
 }
 
-// REQ: FindByTypeValueReq(0x06), StartHandle, EndHandle, Type(UUID), Value
-// RSP: FindByTypeValueRsp(0x07), AttrHandle, GroupEndHandle, AttrHandle, GroupEndHandle, ...
-func (c *central) handleFindByTypeValue(b []byte) []byte {
-	start, end := readHandleRange(b[:4])
-	t := UUID{b[4:6]}
-	u := UUID{b[6:]}
-
-	// Only support the ATT ReadByGroupReq for GATT Primary Service Discovery.
-	// More sepcifically, the "Discover Primary Services By Service UUID" sub-procedure
-	if !t.Equal(attrPrimaryServiceUUID) {
-		return attErrorRsp(attOpFindByTypeValueReq, start, attEcodeAttrNotFound)
+func (c *central) handleFindByTypeValue(r FindByTypeValueRequest) []byte {
+	if !UUID16(r.AttributeType()).Equal(attrPrimaryServiceUUID) {
+		return NewErrorResponse(r.AttributeOpcode(), r.StartingHandle(), ErrAttrNotFound)
 	}
 
-	w := newL2capWriter(c.txMTU)
-	w.WriteByteFit(attOpFindByTypeValueRsp)
+	rsp := FindByTypeValueResponse(make([]byte, c.txMTU))
+	rsp.SetAttributeOpcode()
+	buf := bytes.NewBuffer(rsp.HandleInformationList())
+	buf.Reset()
 
-	var wrote bool
-	for _, a := range c.attrs.Subrange(start, end) {
+	for _, a := range c.attrs.Subrange(r.StartingHandle(), r.EndingHandle()) {
 		if !a.typ.Equal(attrPrimaryServiceUUID) {
 			continue
 		}
-		if !(UUID{a.value}.Equal(u)) {
+		if !(UUID(a.value).Equal(UUID(r.AttributeValue()))) {
 			continue
 		}
 		s := a.pvt.(*Service)
-		w.Chunk()
-		w.WriteUint16Fit(s.h)
-		w.WriteUint16Fit(s.endh)
-		if ok := w.Commit(); !ok {
+		if buf.Len()+4 > buf.Cap() {
 			break
 		}
-		wrote = true
+		binary.Write(buf, binary.LittleEndian, s.h)
+		binary.Write(buf, binary.LittleEndian, s.endh)
 	}
-	if !wrote {
-		return attErrorRsp(attOpFindByTypeValueReq, start, attEcodeAttrNotFound)
+	if buf.Len() == 0 {
+		return NewErrorResponse(r.AttributeOpcode(), r.StartingHandle(), ErrAttrNotFound)
 	}
 
-	return w.Bytes()
+	return rsp[:1+buf.Len()]
 }
 
-// REQ: ReadByType(0x08), StartHandle, EndHandle, Type(UUID)
-// RSP: ReadByType(0x09), LenOfEachDataField, DataField, DataField, ...
-func (c *central) handleReadByType(b []byte) []byte {
-	start, end := readHandleRange(b[:4])
-	t := UUID{b[4:]}
-
-	w := newL2capWriter(c.txMTU)
-	w.WriteByteFit(attOpReadByTypeRsp)
-	uuidLen := -1
-	for _, a := range c.attrs.Subrange(start, end) {
-		if !a.typ.Equal(t) {
+func (c *central) handleReadByType(r ReadByTypeRequest) []byte {
+	rsp := ReadByTypeResponse(make([]byte, c.txMTU))
+	rsp.SetAttributeOpcode()
+	buf := bytes.NewBuffer(rsp.AttributeDataList())
+	buf.Reset()
+	dlen := 0
+	for _, a := range c.attrs.Subrange(r.StartingHandle(), r.EndingHandle()) {
+		if !a.typ.Equal(UUID(r.AttributeType())) {
 			continue
 		}
 		if (a.secure&CharRead) != 0 && c.security > securityLow {
-			return attErrorRsp(attOpReadByTypeReq, start, attEcodeAuthentication)
+			return NewErrorResponse(r.AttributeOpcode(), r.StartingHandle(), ErrAuthentication)
 		}
 		v := a.value
 		if v == nil {
 			rsp := newResponseWriter(int(c.txMTU - 1))
-			req := &ReadRequest{
-				Request: Request{Central: c},
+			req := &Request{
+				Central: c,
 				Cap:     int(c.txMTU - 1),
 				Offset:  0,
 			}
@@ -217,48 +208,51 @@ func (c *central) handleReadByType(b []byte) []byte {
 			}
 			v = rsp.bytes()
 		}
-		if uuidLen == -1 {
-			uuidLen = len(v)
-			w.WriteByteFit(byte(uuidLen) + 2)
-		}
-		if len(v) != uuidLen {
+		if dlen == 0 {
+			dlen = 2 + len(v)
+			if dlen > 255 {
+				dlen = 255
+			}
+			if dlen > buf.Cap() {
+				dlen = buf.Cap()
+			}
+			rsp.SetLength(uint8(dlen))
+		} else if 2+len(v) != dlen {
 			break
 		}
-		w.Chunk()
-		w.WriteUint16Fit(a.h)
-		w.WriteFit(v)
-		if ok := w.Commit(); !ok {
-			break
-		}
+		binary.Write(buf, binary.LittleEndian, a.h)
+		binary.Write(buf, binary.LittleEndian, v[:dlen-2])
 	}
-	if uuidLen == -1 {
-		return attErrorRsp(attOpReadByTypeReq, start, attEcodeAttrNotFound)
+	if dlen == 0 {
+		return NewErrorResponse(r.AttributeOpcode(), r.StartingHandle(), ErrAttrNotFound)
 	}
-	return w.Bytes()
+	return rsp[:2+buf.Len()]
 }
 
-// REQ: ReadReq(0x0A), Handle
-// RSP: ReadRsp(0x0B), Value
-func (c *central) handleRead(b []byte) []byte {
-	h := binary.LittleEndian.Uint16(b)
-	a, ok := c.attrs.At(h)
+func (c *central) handleRead(r ReadRequest) []byte {
+	a, ok := c.attrs.At(r.AttributeHandle())
 	if !ok {
-		return attErrorRsp(attOpReadReq, h, attEcodeInvalidHandle)
+		return NewErrorResponse(r.AttributeOpcode(), r.AttributeHandle(), ErrInvalidHandle)
 	}
 	if a.props&CharRead == 0 {
-		return attErrorRsp(attOpReadReq, h, attEcodeReadNotPerm)
+		return NewErrorResponse(r.AttributeOpcode(), r.AttributeHandle(), ErrReadNotPerm)
 	}
 	if a.secure&CharRead != 0 && c.security > securityLow {
-		return attErrorRsp(attOpReadReq, h, attEcodeAuthentication)
+		return NewErrorResponse(r.AttributeOpcode(), r.AttributeHandle(), ErrAuthentication)
 	}
+
+	rsp := ReadResponse(make([]byte, c.txMTU))
+	rsp.SetAttributeOpcode()
+	buf := bytes.NewBuffer(rsp.AttributeValue())
+	buf.Reset()
 	v := a.value
 	if v == nil {
-		req := &ReadRequest{
-			Request: Request{Central: c},
-			Cap:     int(c.txMTU - 1),
+		req := &Request{
+			Central: c,
+			Cap:     buf.Cap(),
 			Offset:  0,
 		}
-		rsp := newResponseWriter(int(c.txMTU - 1))
+		rsp := newResponseWriter(buf.Cap())
 		if c, ok := a.pvt.(*Characteristic); ok {
 			c.rhandler.ServeRead(rsp, req)
 		} else if d, ok := a.pvt.(*Descriptor); ok {
@@ -267,113 +261,114 @@ func (c *central) handleRead(b []byte) []byte {
 		v = rsp.bytes()
 	}
 
-	w := newL2capWriter(c.txMTU)
-	w.WriteByteFit(attOpReadRsp)
-	w.Chunk()
-	w.WriteFit(v)
-	w.CommitFit()
-	return w.Bytes()
+	if len(v) > buf.Cap() {
+		v = v[:buf.Cap()]
+	}
+	binary.Write(buf, binary.LittleEndian, v)
+	return rsp[:1+buf.Len()]
 }
 
-// FIXME: check this, untested, might be broken
-func (c *central) handleReadBlob(b []byte) []byte {
-	h := binary.LittleEndian.Uint16(b)
-	offset := binary.LittleEndian.Uint16(b[2:])
-	a, ok := c.attrs.At(h)
+func (c *central) handleReadBlob(r ReadBlobRequest) []byte {
+	a, ok := c.attrs.At(r.AttributeHandle())
 	if !ok {
-		return attErrorRsp(attOpReadBlobReq, h, attEcodeInvalidHandle)
+		return NewErrorResponse(r.AttributeOpcode(), r.AttributeHandle(), ErrInvalidHandle)
 	}
 	if a.props&CharRead == 0 {
-		return attErrorRsp(attOpReadBlobReq, h, attEcodeReadNotPerm)
+		return NewErrorResponse(r.AttributeOpcode(), r.AttributeHandle(), ErrReadNotPerm)
 	}
 	if a.secure&CharRead != 0 && c.security > securityLow {
-		return attErrorRsp(attOpReadBlobReq, h, attEcodeAuthentication)
+		return NewErrorResponse(r.AttributeOpcode(), r.AttributeHandle(), ErrAuthentication)
 	}
+
+	rsp := ReadBlobResponse(make([]byte, c.txMTU))
+	rsp.SetAttributeOpcode()
+	buf := bytes.NewBuffer(rsp.PartAttributeValue())
+	buf.Reset()
+
 	v := a.value
 	if v == nil {
-		req := &ReadRequest{
-			Request: Request{Central: c},
-			Cap:     int(c.txMTU - 1),
-			Offset:  int(offset),
+		req := &Request{
+			Central: c,
+			Cap:     buf.Cap(),
+			Offset:  int(r.ValueOffset()),
 		}
-		rsp := newResponseWriter(int(c.txMTU - 1))
+		rsp := newResponseWriter(buf.Cap())
 		if c, ok := a.pvt.(*Characteristic); ok {
 			c.rhandler.ServeRead(rsp, req)
 		} else if d, ok := a.pvt.(*Descriptor); ok {
 			d.rhandler.ServeRead(rsp, req)
 		}
 		v = rsp.bytes()
-		offset = 0 // the server has already adjusted for the offset
+	} else {
+		if len(a.value) < int(r.ValueOffset()) {
+			return NewErrorResponse(r.AttributeOpcode(), r.AttributeHandle(), ErrInvalidOffset)
+		}
 	}
-	w := newL2capWriter(c.txMTU)
-	w.WriteByteFit(attOpReadBlobRsp)
-	w.Chunk()
-	w.WriteFit(v)
-	if ok := w.ChunkSeek(offset); !ok {
-		return attErrorRsp(attOpReadBlobReq, h, attEcodeInvalidOffset)
+
+	if len(v) > buf.Cap() {
+		v = v[:buf.Cap()]
 	}
-	w.CommitFit()
-	return w.Bytes()
+	binary.Write(buf, binary.LittleEndian, v)
+	return rsp[:1+buf.Len()]
 }
 
-func (c *central) handleReadByGroup(b []byte) []byte {
-	start, end := readHandleRange(b)
-	t := UUID{b[4:]}
-
-	// Only support the ATT ReadByGroupReq for GATT Primary Service Discovery.
-	// More specifically, the "Discover All Primary Services" sub-procedure.
-	if !t.Equal(attrPrimaryServiceUUID) {
-		return attErrorRsp(attOpReadByGroupReq, start, attEcodeUnsuppGrpType)
+func (c *central) handleReadByGroup(r ReadByGroupTypeRequest) []byte {
+	if !attrPrimaryServiceUUID.Equal(UUID(r.AttributeGroupType())) {
+		return NewErrorResponse(r.AttributeOpcode(), r.StartingHandle(), ErrUnsuppGrpType)
 	}
 
-	w := newL2capWriter(c.txMTU)
-	w.WriteByteFit(attOpReadByGroupRsp)
-	uuidLen := -1
-	for _, a := range c.attrs.Subrange(start, end) {
+	rsp := ReadByGroupTypeResponse(make([]byte, c.txMTU))
+	rsp.SetAttributeOpcode()
+	buf := bytes.NewBuffer(rsp.AttributeDataList())
+	buf.Reset()
+
+	dlen := 0
+	for _, a := range c.attrs.Subrange(r.StartingHandle(), r.EndingHandle()) {
 		if !a.typ.Equal(attrPrimaryServiceUUID) {
 			continue
 		}
-		if uuidLen == -1 {
-			uuidLen = len(a.value)
-			w.WriteByteFit(byte(uuidLen + 4))
-		}
-		if uuidLen != len(a.value) {
-			break
-		}
 		s := a.pvt.(*Service)
-		w.Chunk()
-		w.WriteUint16Fit(s.h)
-		w.WriteUint16Fit(s.endh)
-		w.WriteFit(a.value)
-		if ok := w.Commit(); !ok {
+		v := a.value
+		if dlen == 0 {
+			dlen = 4 + len(v)
+			if dlen > 255 {
+				dlen = 255
+			}
+			if dlen > buf.Cap() {
+				dlen = buf.Cap()
+			}
+			rsp.SetLength(uint8(dlen))
+		} else if 4+len(v) != dlen {
 			break
 		}
+		binary.Write(buf, binary.LittleEndian, s.h)
+		binary.Write(buf, binary.LittleEndian, s.endh)
+		binary.Write(buf, binary.LittleEndian, v[:dlen-4])
 	}
-	if uuidLen == -1 {
-		return attErrorRsp(attOpReadByGroupReq, start, attEcodeAttrNotFound)
+	if dlen == 0 {
+		return NewErrorResponse(r.AttributeOpcode(), r.StartingHandle(), ErrAttrNotFound)
 	}
-	return w.Bytes()
+	return rsp[:2+buf.Len()]
 }
 
-func (c *central) handleWrite(reqType byte, b []byte) []byte {
-	h := binary.LittleEndian.Uint16(b[:2])
-	value := b[2:]
+func (c *central) handleWrite(reqType byte, r WriteRequest) []byte {
+	value := r.AttributeValue()
 
-	a, ok := c.attrs.At(h)
+	a, ok := c.attrs.At(r.AttributeHandle())
 	if !ok {
-		return attErrorRsp(reqType, h, attEcodeInvalidHandle)
+		return NewErrorResponse(reqType, r.AttributeHandle(), ErrInvalidHandle)
 	}
 
-	noRsp := reqType == attOpWriteCmd
+	noRsp := reqType == WriteCommandCode
 	charFlag := CharWrite
 	if noRsp {
 		charFlag = CharWriteNR
 	}
 	if a.props&charFlag == 0 {
-		return attErrorRsp(reqType, h, attEcodeWriteNotPerm)
+		return NewErrorResponse(reqType, r.AttributeHandle(), ErrWriteNotPerm)
 	}
 	if a.secure&charFlag == 0 && c.security > securityLow {
-		return attErrorRsp(reqType, h, attEcodeAuthentication)
+		return NewErrorResponse(reqType, r.AttributeHandle(), ErrAuthentication)
 	}
 
 	// Props of Service and Characteristic declration are read only.
@@ -390,12 +385,12 @@ func (c *central) handleWrite(reqType byte, b []byte) []byte {
 		if noRsp {
 			return nil
 		}
-		return []byte{attOpWriteRsp}
+		return []byte{WriteResponseCode}
 	}
 
 	// CCC/descriptor write
 	if len(value) != 2 {
-		return attErrorRsp(reqType, h, attEcodeInvalAttrValueLen)
+		return NewErrorResponse(reqType, r.AttributeHandle(), ErrInvalAttrValueLen)
 	}
 	ccc := binary.LittleEndian.Uint16(value)
 	// char := a.pvt.(*Descriptor).char
@@ -407,19 +402,20 @@ func (c *central) handleWrite(reqType byte, b []byte) []byte {
 	if noRsp {
 		return nil
 	}
-	return []byte{attOpWriteRsp}
+	return []byte{WriteResponseCode}
 }
 
 func (c *central) sendNotification(a *attr, data []byte) (int, error) {
-	w := newL2capWriter(c.txMTU)
-	w.WriteByteFit(attOpHandleNotify)
-	w.WriteUint16Fit(a.pvt.(*Descriptor).char.vh)
-	w.WriteFit(data)
-	return c.l2conn.Write(w.Bytes())
-}
-
-func readHandleRange(b []byte) (start, end uint16) {
-	return binary.LittleEndian.Uint16(b), binary.LittleEndian.Uint16(b[2:])
+	rsp := HandleValueNotification(make([]byte, c.txMTU))
+	rsp.SetAttributeOpcode()
+	rsp.SetAttributeHandle(a.pvt.(*Descriptor).char.vh)
+	buf := bytes.NewBuffer(rsp.AttributeValue())
+	buf.Reset()
+	if len(data) > buf.Cap() {
+		data = data[:buf.Cap()]
+	}
+	buf.Write(data)
+	return c.l2conn.Write(rsp[:3+buf.Len()])
 }
 
 func (c *central) startNotify(a *attr, maxlen int) {
@@ -443,3 +439,65 @@ func (c *central) stopNotify(a *attr) {
 		delete(c.notifiers, a.h)
 	}
 }
+
+type notifier struct {
+	central *central
+	a       *attr
+	maxlen  int
+	donemu  sync.RWMutex
+	done    bool
+}
+
+func newNotifier(c *central, a *attr, maxlen int) *notifier {
+	return &notifier{central: c, a: a, maxlen: maxlen}
+}
+
+func (n *notifier) Write(b []byte) (int, error) {
+	n.donemu.RLock()
+	defer n.donemu.RUnlock()
+	if n.done {
+		return 0, errors.New("central stopped notifications")
+	}
+	return n.central.sendNotification(n.a, b)
+}
+
+func (n *notifier) Cap() int {
+	return n.maxlen
+}
+
+func (n *notifier) Done() bool {
+	n.donemu.RLock()
+	defer n.donemu.RUnlock()
+	return n.done
+}
+
+func (n *notifier) stop() {
+	n.donemu.Lock()
+	n.done = true
+	n.donemu.Unlock()
+}
+
+// responseWriter is the default implementation of ResponseWriter.
+type responseWriter struct {
+	capacity int
+	buf      *bytes.Buffer
+	status   byte
+}
+
+func newResponseWriter(c int) *responseWriter {
+	return &responseWriter{
+		capacity: c,
+		buf:      new(bytes.Buffer),
+		status:   StatusSuccess,
+	}
+}
+
+func (w *responseWriter) Write(b []byte) (int, error) {
+	if avail := w.capacity - w.buf.Len(); avail < len(b) {
+		return 0, fmt.Errorf("requested write %d bytes, %d available", len(b), avail)
+	}
+	return w.buf.Write(b)
+}
+
+func (w *responseWriter) SetStatus(status byte) { w.status = status }
+func (w *responseWriter) bytes() []byte         { return w.buf.Bytes() }

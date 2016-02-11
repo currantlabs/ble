@@ -13,15 +13,11 @@ const (
 // http://godoc.org/golang.org/x/net/context
 type Request struct {
 	Central Central
+	Cap     int // maximum allowed reply length
+	Offset  int // request value offset
 }
 
-// A ReadRequest is a characteristic read request from a connected device.
-type ReadRequest struct {
-	Request
-	Cap    int // maximum allowed reply length
-	Offset int // request value offset
-}
-
+// Property ...
 type Property int
 
 // Characteristic property flags (spec 3.3.3.1)
@@ -116,7 +112,7 @@ func (s *Service) SetEndHandle(endh uint16) { s.endh = endh }
 // SetCharacteristics sets the Characteristics of the service.
 func (s *Service) SetCharacteristics(chars []*Characteristic) { s.chars = chars }
 
-// Characteristic returns the contained characteristic of this service.
+// Characteristics returns the contained characteristic of this service.
 func (s *Service) Characteristics() []*Characteristic { return s.chars }
 
 // A Characteristic is a BLE characteristic.
@@ -229,7 +225,6 @@ func (c *Characteristic) SetValue(b []byte) {
 		panic("charactristic has been configured with a read handler")
 	}
 	c.props |= CharRead
-	// c.secure |= CharRead
 	c.value = make([]byte, len(b))
 	copy(c.value, b)
 }
@@ -243,12 +238,11 @@ func (c *Characteristic) HandleRead(h ReadHandler) {
 		panic("charactristic has been configured with a static value")
 	}
 	c.props |= CharRead
-	// c.secure |= CharRead
 	c.rhandler = h
 }
 
 // HandleReadFunc calls HandleRead(ReadHandlerFunc(f)).
-func (c *Characteristic) HandleReadFunc(f func(rsp ResponseWriter, req *ReadRequest)) {
+func (c *Characteristic) HandleReadFunc(f func(rsp ResponseWriter, req *Request)) {
 	c.HandleRead(ReadHandlerFunc(f))
 }
 
@@ -259,7 +253,6 @@ func (c *Characteristic) HandleReadFunc(f func(rsp ResponseWriter, req *ReadRequ
 // HandleWrite must be called before the containing service is added to a server.
 func (c *Characteristic) HandleWrite(h WriteHandler) {
 	c.props |= CharWrite | CharWriteNR
-	// c.secure |= CharWrite | CharWriteNR
 	c.whandler = h
 }
 
@@ -303,10 +296,6 @@ func (c *Characteristic) HandleNotify(h NotifyHandler) {
 func (c *Characteristic) HandleNotifyFunc(f func(r Request, n Notifier)) {
 	c.HandleNotify(NotifyHandlerFunc(f))
 }
-
-// TODO
-// func (c *Characteristic) SubscribedCentrals() []Central{
-// }
 
 // Descriptor is a BLE descriptor
 type Descriptor struct {
@@ -362,7 +351,6 @@ func (d *Descriptor) SetValue(b []byte) {
 		panic("descriptor has been configured with a read handler")
 	}
 	d.props |= CharRead
-	// d.secure |= CharRead
 	d.value = make([]byte, len(b))
 	copy(d.value, b)
 }
@@ -375,12 +363,11 @@ func (d *Descriptor) HandleRead(h ReadHandler) {
 		panic("descriptor has been configured with a static value")
 	}
 	d.props |= CharRead
-	// d.secure |= CharRead
 	d.rhandler = h
 }
 
 // HandleReadFunc calls HandleRead(ReadHandlerFunc(f)).
-func (d *Descriptor) HandleReadFunc(f func(rsp ResponseWriter, req *ReadRequest)) {
+func (d *Descriptor) HandleReadFunc(f func(rsp ResponseWriter, req *Request)) {
 	d.HandleRead(ReadHandlerFunc(f))
 }
 
@@ -389,7 +376,6 @@ func (d *Descriptor) HandleReadFunc(f func(rsp ResponseWriter, req *ReadRequest)
 // HandleWrite must be called before the containing service is added to a server.
 func (d *Descriptor) HandleWrite(h WriteHandler) {
 	d.props |= CharWrite | CharWriteNR
-	// d.secure |= CharWrite | CharWriteNR
 	d.whandler = h
 }
 

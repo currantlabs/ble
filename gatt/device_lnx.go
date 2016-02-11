@@ -39,8 +39,8 @@ func NewDevice(opts ...Option) (Device, error) {
 		chkLE:   true, // Check if the device supports LE.
 
 		advParam: &cmd.LESetAdvertisingParameters{
-			AdvertisingIntervalMin:  0x800,     // [0x0800]: 0.625 ms * 0x0800 = 1280.0 ms
-			AdvertisingIntervalMax:  0x800,     // [0x0800]: 0.625 ms * 0x0800 = 1280.0 ms
+			AdvertisingIntervalMin:  0x010,     // [0x0800]: 0.625 ms * 0x0800 = 1280.0 ms
+			AdvertisingIntervalMax:  0x010,     // [0x0800]: 0.625 ms * 0x0800 = 1280.0 ms
 			AdvertisingType:         0x00,      // [0x00]: ADV_IND, 0x01: DIRECT(HIGH), 0x02: SCAN, 0x03: NONCONN, 0x04: DIRECT(LOW)
 			OwnAddressType:          0x00,      // [0x00]: public, 0x01: random
 			DirectAddressType:       0x00,      // [0x00]: public, 0x01: random
@@ -107,17 +107,11 @@ func (d *device) handleCentral(l2c bt.Conn) {
 }
 
 func (d *device) handlePeripheral(l2c bt.Conn) {
-	p := &peripheral{
-		d:      d,
-		l2conn: l2c,
-		reqc:   make(chan message),
-		quitc:  make(chan struct{}),
-		sub:    newSubscriber(),
-	}
+	p := newPeripheral(d, l2c)
 	if d.peripheralConnected != nil {
 		go d.peripheralConnected(p, nil)
 	}
-	p.loop()
+	p.c.Loop()
 	if d.peripheralDisconnected != nil {
 		d.peripheralDisconnected(p, nil)
 	}
@@ -145,8 +139,6 @@ func (d *device) handleLEAdvertisingReport(b []byte) {
 	}
 
 	for _, r := range e.Reports {
-		// log.Printf("EventType %d, AddressType %d, Address %s, RSSI %d, Data [% X]",
-		// 	r.EventType, r.AddressType, r.Address, r.RSSI, r.Data)
 		adv := &Advertisement{}
 		adv.unmarshall(r.Data)
 		adv.Connectable = r.EventType&0x01 == 0x01
@@ -262,7 +254,7 @@ func (d *device) AdvertiseIBeacon(u UUID, major, minor uint16, pwr int8) error {
 	b := make([]byte, 23)
 	b[0] = 0x02                               // Data type: iBeacon
 	b[1] = 0x15                               // Data length: 21 bytes
-	copy(b[2:], reverse(u.b))                 // Big endian
+	copy(b[2:], reverse(u))                   // Big endian
 	binary.BigEndian.PutUint16(b[18:], major) // Big endian
 	binary.BigEndian.PutUint16(b[20:], minor) // Big endian
 	b[22] = uint8(pwr)                        // Measured Tx Power
@@ -291,9 +283,8 @@ func (d *device) Connect(p Peripheral) {
 
 func (d *device) CancelConnection(p Peripheral) {
 	pp := p.(*peripheral)
-	// d.hci.Send(&cmd.LECreateConnectionCancel{}, nil)
 	d.hci.Send(&cmd.Disconnect{
-		ConnectionHandle: pp.l2conn.Parameters().ConnectionHandle,
+		ConnectionHandle: pp.c.conn.Parameters().ConnectionHandle,
 		Reason:           0x13,
 	}, nil)
 }

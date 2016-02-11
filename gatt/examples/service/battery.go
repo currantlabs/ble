@@ -7,7 +7,7 @@ func NewBatteryService() *gatt.Service {
 	s := gatt.NewService(gatt.UUID16(0x180F))
 	c := s.AddCharacteristic(gatt.UUID16(0x2A19))
 	c.HandleReadFunc(
-		func(rsp gatt.ResponseWriter, req *gatt.ReadRequest) {
+		func(rsp gatt.ResponseWriter, req *gatt.Request) {
 			rsp.Write([]byte{lv})
 			lv--
 		})

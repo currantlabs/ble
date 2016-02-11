@@ -9,17 +9,13 @@ import (
 )
 
 // A UUID is a BLE UUID.
-type UUID struct {
-	// Hide the bytes, so that we can enforce that they have length 2 or 16,
-	// and that they are immutable. This simplifies the code and API.
-	b []byte
-}
+type UUID []byte
 
 // UUID16 converts a uint16 (such as 0x1800) to a UUID.
 func UUID16(i uint16) UUID {
 	b := make([]byte, 2)
 	binary.LittleEndian.PutUint16(b, i)
-	return UUID{b}
+	return UUID(b)
 }
 
 // ParseUUID parses a standard-format UUID string, such
@@ -28,12 +24,12 @@ func ParseUUID(s string) (UUID, error) {
 	s = strings.Replace(s, "-", "", -1)
 	b, err := hex.DecodeString(s)
 	if err != nil {
-		return UUID{}, err
+		return nil, err
 	}
 	if err := lenErr(len(b)); err != nil {
-		return UUID{}, err
+		return nil, err
 	}
-	return UUID{reverse(b)}, nil
+	return UUID(reverse(b)), nil
 }
 
 // MustParseUUID parses a standard-format UUID string,
@@ -57,19 +53,13 @@ func lenErr(n int) error {
 
 // Len returns the length of the UUID, in bytes.
 // BLE UUIDs are either 2 or 16 bytes.
-func (u UUID) Len() int {
-	return len(u.b)
-}
+func (u UUID) Len() int { return len(u) }
 
 // String hex-encodes a UUID.
-func (u UUID) String() string {
-	return fmt.Sprintf("%x", reverse(u.b))
-}
+func (u UUID) String() string { return fmt.Sprintf("%X", reverse(u)) }
 
 // Equal returns a boolean reporting whether v represent the same UUID as u.
-func (u UUID) Equal(v UUID) bool {
-	return bytes.Equal(u.b, v.b)
-}
+func (u UUID) Equal(v UUID) bool { return bytes.Equal(u, v) }
 
 // UUIDContains returns a boolean reporting whether u is in the slice s.
 func UUIDContains(s []UUID, u UUID) bool {

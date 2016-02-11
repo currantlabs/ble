@@ -97,7 +97,7 @@ func generateServiceAttributes(s *Service, h uint16, last bool) (uint16, []attr)
 	a := attr{
 		h:     h,
 		typ:   attrPrimaryServiceUUID,
-		value: s.uuid.b,
+		value: s.uuid,
 		props: CharRead,
 		pvt:   s,
 	}
@@ -125,7 +125,7 @@ func generateCharAttributes(c *Characteristic, h uint16) (uint16, []attr) {
 	ca := attr{
 		h:     c.h,
 		typ:   attrCharacteristicUUID,
-		value: append([]byte{byte(c.props), byte(c.vh), byte((c.vh) >> 8)}, c.uuid.b...),
+		value: append([]byte{byte(c.props), byte(c.vh), byte((c.vh) >> 8)}, c.uuid...),
 		props: c.props,
 		pvt:   c,
 	}

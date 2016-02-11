@@ -82,16 +82,16 @@ func (a *Advertisement) unmarshall(b []byte) error {
 	// Utility function for creating a list of uuids.
 	uuidList := func(u []UUID, d []byte, w int) []UUID {
 		for len(d) > 0 {
-			u = append(u, UUID{d[:w]})
+			u = append(u, UUID(d[:w]))
 			d = d[w:]
 		}
 		return u
 	}
 
 	serviceDataList := func(sd []ServiceData, d []byte, w int) []ServiceData {
-		serviceData := ServiceData {UUID{d[:w]}, make([]byte, len(d) - w)}
-                copy(serviceData.Data, d[2:])
-                return append(sd, serviceData)
+		serviceData := ServiceData{UUID(d[:w]), make([]byte, len(d)-w)}
+		copy(serviceData.Data, d[2:])
+		return append(sd, serviceData)
 	}
 
 	for len(b) > 0 {
@@ -228,13 +228,13 @@ func (a *AdvPacket) AppendUUIDFit(uu []UUID) bool {
 		}
 		switch l = u.Len(); {
 		case l == 2 && fit:
-			a.AppendField(typeAllUUID16, u.b)
+			a.AppendField(typeAllUUID16, u)
 		case l == 16 && fit:
-			a.AppendField(typeAllUUID128, u.b)
+			a.AppendField(typeAllUUID128, u)
 		case l == 2 && !fit:
-			a.AppendField(typeSomeUUID16, u.b)
+			a.AppendField(typeSomeUUID16, u)
 		case l == 16 && !fit:
-			a.AppendField(typeSomeUUID128, u.b)
+			a.AppendField(typeSomeUUID128, u)
 		}
 	}
 	return fit
