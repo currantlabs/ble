@@ -62,7 +62,7 @@ func onPeriphConnected(p gatt.Peripheral, err error) {
 	}
 
 	for _, s := range ss {
-		msg := "Service: " + s.UUID().String()
+		msg := "Service: " + s.UUID.String()
 		if len(s.Name()) > 0 {
 			msg += " (" + s.Name() + ")"
 		}
@@ -76,15 +76,15 @@ func onPeriphConnected(p gatt.Peripheral, err error) {
 		}
 
 		for _, c := range cs {
-			msg := "  Characteristic  " + c.UUID().String()
+			msg := "  Characteristic  " + c.UUID.String()
 			if len(c.Name()) > 0 {
 				msg += " (" + c.Name() + ")"
 			}
-			msg += "\n    properties    " + c.Properties().String()
+			msg += "\n    properties    " + c.Property.String()
 			fmt.Println(msg)
 
 			// Read the characteristic, if possible.
-			if (c.Properties() & gatt.CharRead) != 0 {
+			if (c.Property & gatt.CharRead) != 0 {
 				b, err := p.ReadCharacteristic(c)
 				if err != nil {
 					fmt.Printf("Failed to read characteristic, err: %s\n", err)
@@ -101,7 +101,7 @@ func onPeriphConnected(p gatt.Peripheral, err error) {
 			}
 
 			for _, d := range ds {
-				msg := "  Descriptor      " + d.UUID().String()
+				msg := "  Descriptor      " + d.UUID.String()
 				if len(d.Name()) > 0 {
 					msg += " (" + d.Name() + ")"
 				}
@@ -117,7 +117,7 @@ func onPeriphConnected(p gatt.Peripheral, err error) {
 			}
 
 			// Subscribe the characteristic, if possible.
-			if (c.Properties() & (gatt.CharNotify | gatt.CharIndicate)) != 0 {
+			if (c.Property & (gatt.CharNotify | gatt.CharIndicate)) != 0 {
 				f := func(c *gatt.Characteristic, b []byte, err error) {
 					fmt.Printf("notified: % X | %q\n", b, b)
 				}

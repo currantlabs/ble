@@ -56,7 +56,7 @@ func (p *peripheral) DiscoverServices(filter []UUID) ([]*Service, error) {
 			endh := binary.LittleEndian.Uint16(b[2:4])
 			u := UUID(b[4:length])
 			if filter == nil || UUIDContains(filter, u) {
-				p.svcs = append(p.svcs, &Service{uuid: u, h: h, endh: endh})
+				p.svcs = append(p.svcs, &Service{UUID: u, h: h, endh: endh})
 			}
 			if endh == 0xFFFF {
 				return p.svcs, nil
@@ -78,7 +78,7 @@ func (p *peripheral) DiscoverCharacteristics(filter []UUID, s *Service) ([]*Char
 	for !done {
 		length, b, err := p.c.ReadByType(start, s.endh, attrCharacteristicUUID)
 		if err == ErrAttrNotFound {
-			return s.chars, nil
+			return s.Characteristics, nil
 		} else if err != nil {
 			return nil, err
 		}
@@ -87,9 +87,9 @@ func (p *peripheral) DiscoverCharacteristics(filter []UUID, s *Service) ([]*Char
 			props := Property(b[2])
 			vh := binary.LittleEndian.Uint16(b[3:5])
 			u := UUID(b[5:length])
-			c := &Characteristic{uuid: u, svc: s, props: props, h: h, vh: vh}
+			c := &Characteristic{UUID: u, svc: s, Property: props, h: h, vh: vh}
 			if filter == nil || UUIDContains(filter, u) {
-				s.chars = append(s.chars, c)
+				s.Characteristics = append(s.Characteristics, c)
 			}
 			if lastChar != nil {
 				lastChar.endh = c.h - 1
@@ -100,10 +100,10 @@ func (p *peripheral) DiscoverCharacteristics(filter []UUID, s *Service) ([]*Char
 			b = b[length:]
 		}
 	}
-	if len(s.chars) > 1 {
-		s.chars[len(s.chars)-1].endh = s.endh
+	if len(s.Characteristics) > 1 {
+		s.Characteristics[len(s.Characteristics)-1].endh = s.endh
 	}
-	return s.chars, nil
+	return s.Characteristics, nil
 }
 
 func (p *peripheral) DiscoverDescriptors(filter []UUID, c *Characteristic) ([]*Descriptor, error) {
@@ -116,7 +116,7 @@ func (p *peripheral) DiscoverDescriptors(filter []UUID, c *Characteristic) ([]*D
 
 		fmt, b, err := p.c.FindInformation(start, c.endh)
 		if err == ErrAttrNotFound {
-			return c.descs, nil
+			return c.Descriptors, nil
 		} else if err != nil {
 			return nil, err
 		}
@@ -127,9 +127,9 @@ func (p *peripheral) DiscoverDescriptors(filter []UUID, c *Characteristic) ([]*D
 		for len(b) != 0 {
 			h := binary.LittleEndian.Uint16(b[:2])
 			u := UUID(b[2:length])
-			d := &Descriptor{uuid: u, h: h, char: c}
+			d := &Descriptor{UUID: u, h: h, char: c}
 			if filter == nil || UUIDContains(filter, u) {
-				c.descs = append(c.descs, d)
+				c.Descriptors = append(c.Descriptors, d)
 			}
 			if u.Equal(attrClientCharacteristicConfigUUID) {
 				c.cccd = d
@@ -139,7 +139,7 @@ func (p *peripheral) DiscoverDescriptors(filter []UUID, c *Characteristic) ([]*D
 			b = b[length:]
 		}
 	}
-	return c.descs, nil
+	return c.Descriptors, nil
 }
 
 func (p *peripheral) ReadCharacteristic(c *Characteristic) ([]byte, error) {

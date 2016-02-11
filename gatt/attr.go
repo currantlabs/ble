@@ -97,14 +97,14 @@ func generateServiceAttributes(s *Service, h uint16, last bool) (uint16, []attr)
 	a := attr{
 		h:     h,
 		typ:   attrPrimaryServiceUUID,
-		value: s.uuid,
+		value: s.UUID,
 		props: CharRead,
 		pvt:   s,
 	}
 	aa := []attr{a}
 	h++
 
-	for _, c := range s.Characteristics() {
+	for _, c := range s.Characteristics {
 		var a []attr
 		h, a = generateCharAttributes(c, h)
 		aa = append(aa, a...)
@@ -125,21 +125,21 @@ func generateCharAttributes(c *Characteristic, h uint16) (uint16, []attr) {
 	ca := attr{
 		h:     c.h,
 		typ:   attrCharacteristicUUID,
-		value: append([]byte{byte(c.props), byte(c.vh), byte((c.vh) >> 8)}, c.uuid...),
-		props: c.props,
+		value: append([]byte{byte(c.Property), byte(c.vh), byte((c.vh) >> 8)}, c.UUID...),
+		props: c.Property,
 		pvt:   c,
 	}
 	va := attr{
 		h:     c.vh,
-		typ:   c.uuid,
+		typ:   c.UUID,
 		value: c.value,
-		props: c.props,
+		props: c.Property,
 		pvt:   c,
 	}
 	h += 2
 
 	aa := []attr{ca, va}
-	for _, d := range c.descs {
+	for _, d := range c.Descriptors {
 		aa = append(aa, generateDescAttributes(d, h))
 		h++
 	}
@@ -151,9 +151,9 @@ func generateDescAttributes(d *Descriptor, h uint16) attr {
 	d.h = h
 	a := attr{
 		h:     h,
-		typ:   d.uuid,
+		typ:   d.UUID,
 		value: d.value,
-		props: d.props,
+		props: d.Property,
 		pvt:   d,
 	}
 	return a

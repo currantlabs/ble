@@ -62,8 +62,8 @@ func (p Property) String() (result string) {
 
 // A Service is a BLE service.
 type Service struct {
-	uuid  UUID
-	chars []*Characteristic
+	UUID            UUID
+	Characteristics []*Characteristic
 
 	h    uint16
 	endh uint16
@@ -71,46 +71,38 @@ type Service struct {
 
 // NewService creates and initialize a new Service using u as it's UUID.
 func NewService(u UUID) *Service {
-	return &Service{uuid: u}
+	return &Service{UUID: u}
 }
 
 // AddCharacteristic adds a characteristic to a service.
 // AddCharacteristic panics if the service already contains another
 // characteristic with the same UUID.
 func (s *Service) AddCharacteristic(u UUID) *Characteristic {
-	for _, c := range s.chars {
-		if c.uuid.Equal(u) {
-			panic("service already contains a characteristic with uuid " + u.String())
+	for _, c := range s.Characteristics {
+		if c.UUID.Equal(u) {
+			panic("service already contains a characteristic with UUID " + u.String())
 		}
 	}
-	c := &Characteristic{uuid: u, svc: s}
-	s.chars = append(s.chars, c)
+	c := &Characteristic{UUID: u, svc: s}
+	s.Characteristics = append(s.Characteristics, c)
 	return c
 }
-
-// UUID returns the UUID of the service.
-func (s *Service) UUID() UUID { return s.uuid }
 
 // Name returns the specificatin name of the service according to its UUID.
 // If the UUID is not assigne, Name returns an empty string.
 func (s *Service) Name() string {
-	return knownServices[s.uuid.String()].Name
+	return knownServices[s.UUID.String()].Name
 }
-
-// SetCharacteristics sets the Characteristics of the service.
-func (s *Service) SetCharacteristics(chars []*Characteristic) { s.chars = chars }
-
-// Characteristics returns the contained characteristic of this service.
-func (s *Service) Characteristics() []*Characteristic { return s.chars }
 
 // A Characteristic is a BLE characteristic.
 type Characteristic struct {
-	uuid   UUID
-	props  Property // enabled properties
-	secure Property // security enabled properties
+	UUID        UUID
+	Property    Property // enabled properties
+	Descriptors []*Descriptor
+
 	svc    *Service
 	cccd   *Descriptor
-	descs  []*Descriptor
+	secure Property // enabled properties
 
 	value []byte
 
@@ -125,56 +117,35 @@ type Characteristic struct {
 }
 
 // NewCharacteristic creates and returns a Characteristic.
-func NewCharacteristic(u UUID, s *Service, props Property, h uint16, vh uint16) *Characteristic {
+func NewCharacteristic(u UUID, s *Service, Property Property, h uint16, vh uint16) *Characteristic {
 	c := &Characteristic{
-		uuid:  u,
-		svc:   s,
-		props: props,
-		h:     h,
-		vh:    vh,
+		UUID:     u,
+		svc:      s,
+		Property: Property,
+		h:        h,
+		vh:       vh,
 	}
 
 	return c
 }
 
-// Descriptor returns the Descriptor of the characteristic.
-func (c *Characteristic) Descriptor() *Descriptor { return c.cccd }
-
-// SetDescriptor sets the Descriptor of the characteristic.
-func (c *Characteristic) SetDescriptor(cccd *Descriptor) { c.cccd = cccd }
-
-// SetDescriptors sets the list of Descriptor of the characteristic.
-func (c *Characteristic) SetDescriptors(descs []*Descriptor) { c.descs = descs }
-
-// UUID returns the UUID of the characteristic.
-func (c *Characteristic) UUID() UUID { return c.uuid }
-
 // Name returns the specificatin name of the characteristic.
 // If the UUID is not assigned, Name returns empty string.
 func (c *Characteristic) Name() string {
-	return knownCharacteristics[c.uuid.String()].Name
+	return knownCharacteristics[c.UUID.String()].Name
 }
-
-// Service returns the containing service of this characteristic.
-func (c *Characteristic) Service() *Service { return c.svc }
-
-// Properties returns the properties of this characteristic.
-func (c *Characteristic) Properties() Property { return c.props }
-
-// Descriptors returns the contained descriptors of this characteristic.
-func (c *Characteristic) Descriptors() []*Descriptor { return c.descs }
 
 // AddDescriptor adds a descriptor to a characteristic.
 // AddDescriptor panics if the characteristic already contains another
 // descriptor with the same UUID.
 func (c *Characteristic) AddDescriptor(u UUID) *Descriptor {
-	for _, d := range c.descs {
-		if d.uuid.Equal(u) {
-			panic("service already contains a characteristic with uuid " + u.String())
+	for _, d := range c.Descriptors {
+		if d.UUID.Equal(u) {
+			panic("service already contains a characteristic with UUID " + u.String())
 		}
 	}
-	d := &Descriptor{uuid: u, char: c}
-	c.descs = append(c.descs, d)
+	d := &Descriptor{UUID: u, char: c}
+	c.Descriptors = append(c.Descriptors, d)
 	return d
 }
 
@@ -182,7 +153,7 @@ func (c *Characteristic) AddDescriptor(u UUID) *Descriptor {
 // static value. SetValue must be called before the containing service is
 // added to a server.
 func (c *Characteristic) SetValue(b []byte) {
-	c.props |= CharRead
+	c.Property |= CharRead
 	c.value = make([]byte, len(b))
 	copy(c.value, b)
 }
@@ -191,7 +162,7 @@ func (c *Characteristic) SetValue(b []byte) {
 // requests to h. HandleRead must be called before the containing service is
 // added to a server.
 func (c *Characteristic) HandleRead(h ReadHandler) {
-	c.props |= CharRead
+	c.Property |= CharRead
 	c.rhandler = h
 }
 
@@ -201,7 +172,7 @@ func (c *Characteristic) HandleRead(h ReadHandler) {
 // requests; it is handled automatically.
 // HandleWrite must be called before the containing service is added to a server.
 func (c *Characteristic) HandleWrite(h WriteHandler) {
-	c.props |= CharWrite | CharWriteNR
+	c.Property |= CharWrite | CharWriteNR
 	c.whandler = h
 }
 
@@ -213,7 +184,7 @@ func (c *Characteristic) HandleNotify(h NotifyHandler) {
 		return
 	}
 	p := CharNotify | CharIndicate
-	c.props |= p
+	c.Property |= p
 	c.nhandler = h
 
 	// add ccc (client characteristic configuration) descriptor
@@ -224,27 +195,27 @@ func (c *Characteristic) HandleNotify(h NotifyHandler) {
 		secure = CharRead | CharWrite
 	}
 	cd := &Descriptor{
-		uuid:   attrClientCharacteristicConfigUUID,
-		props:  CharRead | CharWrite | CharWriteNR,
-		secure: secure,
+		UUID:     attrClientCharacteristicConfigUUID,
+		Property: CharRead | CharWrite | CharWriteNR,
+		secure:   secure,
 		// FIXME: currently, we always return 0, which is inaccurate.
 		// Each connection should have it's own copy of this value.
 		value: []byte{0x00, 0x00},
 		char:  c,
 	}
 	c.cccd = cd
-	c.descs = append(c.descs, cd)
+	c.Descriptors = append(c.Descriptors, cd)
 }
 
 // Descriptor is a BLE descriptor
 type Descriptor struct {
-	uuid   UUID
-	char   *Characteristic
-	props  Property // enabled properties
-	secure Property // security enabled properties
+	UUID     UUID
+	Property Property // enabled properties
 
-	h     uint16
-	value []byte
+	secure Property // security enabled properties
+	char   *Characteristic
+	h      uint16
+	value  []byte
 
 	rhandler ReadHandler
 	whandler WriteHandler
@@ -252,23 +223,17 @@ type Descriptor struct {
 
 // NewDescriptor creates and returns a Descriptor.
 func NewDescriptor(u UUID, h uint16, char *Characteristic) *Descriptor {
-	return &Descriptor{uuid: u, h: h, char: char}
+	return &Descriptor{UUID: u, h: h, char: char}
 }
-
-// UUID returns the UUID of the descriptor.
-func (d *Descriptor) UUID() UUID { return d.uuid }
 
 // Name returns the specificatin name of the descriptor.
 // If the UUID is not assigned, returns an empty string.
-func (d *Descriptor) Name() string { return knownDescriptors[d.uuid.String()].Name }
-
-// Characteristic returns the containing characteristic of the descriptor.
-func (d *Descriptor) Characteristic() *Characteristic { return d.char }
+func (d *Descriptor) Name() string { return knownDescriptors[d.UUID.String()].Name }
 
 // SetValue makes the descriptor support read requests, and returns a static value.
 // SetValue must be called before the containing service is added to a server.
 func (d *Descriptor) SetValue(b []byte) {
-	d.props |= CharRead
+	d.Property |= CharRead
 	d.value = make([]byte, len(b))
 	copy(d.value, b)
 }
@@ -276,7 +241,7 @@ func (d *Descriptor) SetValue(b []byte) {
 // HandleRead makes the descriptor support read requests, and routes read requests to h.
 // HandleRead must be called before the containing service is added to a server.
 func (d *Descriptor) HandleRead(h ReadHandler) {
-	d.props |= CharRead
+	d.Property |= CharRead
 	d.rhandler = h
 }
 
@@ -284,6 +249,6 @@ func (d *Descriptor) HandleRead(h ReadHandler) {
 // The WriteHandler does not differentiate between write and write-no-response requests; it is handled automatically.
 // HandleWrite must be called before the containing service is added to a server.
 func (d *Descriptor) HandleWrite(h WriteHandler) {
-	d.props |= CharWrite | CharWriteNR
+	d.Property |= CharWrite | CharWriteNR
 	d.whandler = h
 }
