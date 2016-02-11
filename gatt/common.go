@@ -242,7 +242,7 @@ func (c *Characteristic) HandleRead(h ReadHandler) {
 }
 
 // HandleReadFunc calls HandleRead(ReadHandlerFunc(f)).
-func (c *Characteristic) HandleReadFunc(f func(rsp ResponseWriter, req *Request)) {
+func (c *Characteristic) HandleReadFunc(f ReadHandlerFunc) {
 	c.HandleRead(ReadHandlerFunc(f))
 }
 
@@ -293,7 +293,7 @@ func (c *Characteristic) HandleNotify(h NotifyHandler) {
 }
 
 // HandleNotifyFunc calls HandleNotify(NotifyHandlerFunc(f)).
-func (c *Characteristic) HandleNotifyFunc(f func(r Request, n Notifier)) {
+func (c *Characteristic) HandleNotifyFunc(f NotifyHandlerFunc) {
 	c.HandleNotify(NotifyHandlerFunc(f))
 }
 
@@ -367,7 +367,7 @@ func (d *Descriptor) HandleRead(h ReadHandler) {
 }
 
 // HandleReadFunc calls HandleRead(ReadHandlerFunc(f)).
-func (d *Descriptor) HandleReadFunc(f func(rsp ResponseWriter, req *Request)) {
+func (d *Descriptor) HandleReadFunc(f ReadHandlerFunc) {
 	d.HandleRead(ReadHandlerFunc(f))
 }
 
@@ -380,6 +380,6 @@ func (d *Descriptor) HandleWrite(h WriteHandler) {
 }
 
 // HandleWriteFunc calls HandleWrite(WriteHandlerFunc(f)).
-func (d *Descriptor) HandleWriteFunc(f func(r Request, data []byte) (status byte)) {
+func (d *Descriptor) HandleWriteFunc(f WriteHandlerFunc) {
 	d.HandleWrite(WriteHandlerFunc(f))
 }
