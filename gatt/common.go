@@ -97,18 +97,6 @@ func (s *Service) Name() string {
 	return knownServices[s.uuid.String()].Name
 }
 
-// Handle returns the Handle of the service.
-func (s *Service) Handle() uint16 { return s.h }
-
-// EndHandle returns the End Handle of the service.
-func (s *Service) EndHandle() uint16 { return s.endh }
-
-// SetHandle sets the Handle of the service.
-func (s *Service) SetHandle(h uint16) { s.h = h }
-
-// SetEndHandle sets the End Handle of the service.
-func (s *Service) SetEndHandle(endh uint16) { s.endh = endh }
-
 // SetCharacteristics sets the Characteristics of the service.
 func (s *Service) SetCharacteristics(chars []*Characteristic) { s.chars = chars }
 
@@ -149,26 +137,8 @@ func NewCharacteristic(u UUID, s *Service, props Property, h uint16, vh uint16) 
 	return c
 }
 
-// Handle returns the Handle of the characteristic.
-func (c *Characteristic) Handle() uint16 { return c.h }
-
-// VHandle returns the Value Handle of the characteristic.
-func (c *Characteristic) VHandle() uint16 { return c.vh }
-
-// EndHandle returns the End Handle of the characteristic.
-func (c *Characteristic) EndHandle() uint16 { return c.endh }
-
 // Descriptor returns the Descriptor of the characteristic.
 func (c *Characteristic) Descriptor() *Descriptor { return c.cccd }
-
-// SetHandle sets the Handle of the characteristic.
-func (c *Characteristic) SetHandle(h uint16) { c.h = h }
-
-// SetVHandle sets the Value Handle of the characteristic.
-func (c *Characteristic) SetVHandle(vh uint16) { c.vh = vh }
-
-// SetEndHandle sets the End Handle of the characteristic.
-func (c *Characteristic) SetEndHandle(endh uint16) { c.endh = endh }
 
 // SetDescriptor sets the Descriptor of the characteristic.
 func (c *Characteristic) SetDescriptor(cccd *Descriptor) { c.cccd = cccd }
@@ -310,12 +280,6 @@ type Descriptor struct {
 	rhandler ReadHandler
 	whandler WriteHandler
 }
-
-// Handle returns the Handle of the descriptor.
-func (d *Descriptor) Handle() uint16 { return d.h }
-
-// SetHandle sets the Handle of the descriptor.
-func (d *Descriptor) SetHandle(h uint16) { d.h = h }
 
 // NewDescriptor creates and returns a Descriptor.
 func NewDescriptor(u UUID, h uint16, char *Characteristic) *Descriptor {
