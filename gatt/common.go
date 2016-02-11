@@ -211,11 +211,6 @@ func (c *Characteristic) HandleRead(h ReadHandler) {
 	c.rhandler = h
 }
 
-// HandleReadFunc calls HandleRead(ReadHandlerFunc(f)).
-func (c *Characteristic) HandleReadFunc(f ReadHandlerFunc) {
-	c.HandleRead(ReadHandlerFunc(f))
-}
-
 // HandleWrite makes the characteristic support write and write-no-response
 // requests, and routes write requests to h.
 // The WriteHandler does not differentiate between write and write-no-response
@@ -224,11 +219,6 @@ func (c *Characteristic) HandleReadFunc(f ReadHandlerFunc) {
 func (c *Characteristic) HandleWrite(h WriteHandler) {
 	c.props |= CharWrite | CharWriteNR
 	c.whandler = h
-}
-
-// HandleWriteFunc calls HandleWrite(WriteHandlerFunc(f)).
-func (c *Characteristic) HandleWriteFunc(f func(r Request, data []byte) (status byte)) {
-	c.HandleWrite(WriteHandlerFunc(f))
 }
 
 // HandleNotify makes the characteristic support notify requests, and routes
@@ -260,11 +250,6 @@ func (c *Characteristic) HandleNotify(h NotifyHandler) {
 	}
 	c.cccd = cd
 	c.descs = append(c.descs, cd)
-}
-
-// HandleNotifyFunc calls HandleNotify(NotifyHandlerFunc(f)).
-func (c *Characteristic) HandleNotifyFunc(f NotifyHandlerFunc) {
-	c.HandleNotify(NotifyHandlerFunc(f))
 }
 
 // Descriptor is a BLE descriptor
@@ -330,20 +315,10 @@ func (d *Descriptor) HandleRead(h ReadHandler) {
 	d.rhandler = h
 }
 
-// HandleReadFunc calls HandleRead(ReadHandlerFunc(f)).
-func (d *Descriptor) HandleReadFunc(f ReadHandlerFunc) {
-	d.HandleRead(ReadHandlerFunc(f))
-}
-
 // HandleWrite makes the descriptor support write and write-no-response requests, and routes write requests to h.
 // The WriteHandler does not differentiate between write and write-no-response requests; it is handled automatically.
 // HandleWrite must be called before the containing service is added to a server.
 func (d *Descriptor) HandleWrite(h WriteHandler) {
 	d.props |= CharWrite | CharWriteNR
 	d.whandler = h
-}
-
-// HandleWriteFunc calls HandleWrite(WriteHandlerFunc(f)).
-func (d *Descriptor) HandleWriteFunc(f WriteHandlerFunc) {
-	d.HandleWrite(WriteHandlerFunc(f))
 }
