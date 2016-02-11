@@ -189,11 +189,7 @@ func (c *Characteristic) AddDescriptor(u UUID) *Descriptor {
 // SetValue makes the characteristic support read requests, and returns a
 // static value. SetValue must be called before the containing service is
 // added to a server.
-// SetValue panics if the characteristic has been configured with a ReadHandler.
 func (c *Characteristic) SetValue(b []byte) {
-	if c.rhandler != nil {
-		panic("charactristic has been configured with a read handler")
-	}
 	c.props |= CharRead
 	c.value = make([]byte, len(b))
 	copy(c.value, b)
@@ -202,11 +198,7 @@ func (c *Characteristic) SetValue(b []byte) {
 // HandleRead makes the characteristic support read requests, and routes read
 // requests to h. HandleRead must be called before the containing service is
 // added to a server.
-// HandleRead panics if the characteristic has been configured with a static value.
 func (c *Characteristic) HandleRead(h ReadHandler) {
-	if c.value != nil {
-		panic("charactristic has been configured with a static value")
-	}
 	c.props |= CharRead
 	c.rhandler = h
 }
@@ -294,11 +286,7 @@ func (d *Descriptor) Characteristic() *Characteristic {
 
 // SetValue makes the descriptor support read requests, and returns a static value.
 // SetValue must be called before the containing service is added to a server.
-// SetValue panics if the descriptor has already configured with a ReadHandler.
 func (d *Descriptor) SetValue(b []byte) {
-	if d.rhandler != nil {
-		panic("descriptor has been configured with a read handler")
-	}
 	d.props |= CharRead
 	d.value = make([]byte, len(b))
 	copy(d.value, b)
@@ -306,11 +294,7 @@ func (d *Descriptor) SetValue(b []byte) {
 
 // HandleRead makes the descriptor support read requests, and routes read requests to h.
 // HandleRead must be called before the containing service is added to a server.
-// HandleRead panics if the descriptor has been configured with a static value.
 func (d *Descriptor) HandleRead(h ReadHandler) {
-	if d.value != nil {
-		panic("descriptor has been configured with a static value")
-	}
 	d.props |= CharRead
 	d.rhandler = h
 }
