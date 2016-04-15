@@ -18,6 +18,19 @@ type HCI interface {
 	Stop() error
 }
 
+// State ...
+type State string
+
+// State ...
+const (
+	StateUnknown      = "Unknown"
+	StateResetting    = "Resetting"
+	StateUnsupported  = "Unsupported"
+	StateUnauthorized = "Unauthorized"
+	StatePoweredOff   = "PoweredOff"
+	StatePoweredOn    = "PoweredOn"
+)
+
 // Command ...
 type Command interface {
 	OpCode() int

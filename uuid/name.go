@@ -1,7 +1,12 @@
-package gatt
+package uuid
+
+// Name ...
+func Name(u UUID) string {
+	return knownUUID[u.String()].Name
+}
 
 // A dictionary of known service names and type (keyed by service uuid)
-var knownServices = map[string]struct{ Name, Type string }{
+var knownUUID = map[string]struct{ Name, Type string }{
 	"1800": {Name: "Generic Access", Type: "org.bluetooth.service.generic_access"},
 	"1801": {Name: "Generic Attribute", Type: "org.bluetooth.service.generic_attribute"},
 	"1802": {Name: "Immediate Alert", Type: "org.bluetooth.service.immediate_alert"},
@@ -22,18 +27,14 @@ var knownServices = map[string]struct{ Name, Type string }{
 	"1813": {Name: "Scan Parameters", Type: "org.bluetooth.service.scan_parameters"},
 	"1814": {Name: "Running Speed and Cadence", Type: "org.bluetooth.service.running_speed_and_cadence"},
 	"1815": {Name: "Cycling Speed and Cadence", Type: "org.bluetooth.service.cycling_speed_and_cadence"},
-}
 
-// A dictionary of known descriptor names and type (keyed by attribute uuid)
-var knownAttributes = map[string]struct{ Name, Type string }{
+	// A dictionary of known descriptor names and type (keyed by attribute uuid)
 	"2800": {Name: "Primary Service", Type: "org.bluetooth.attribute.gatt.primary_service_declaration"},
 	"2801": {Name: "Secondary Service", Type: "org.bluetooth.attribute.gatt.secondary_service_declaration"},
 	"2802": {Name: "Include", Type: "org.bluetooth.attribute.gatt.include_declaration"},
 	"2803": {Name: "Characteristic", Type: "org.bluetooth.attribute.gatt.characteristic_declaration"},
-}
 
-// A dictionary of known descriptor names and type (keyed by descriptor uuid)
-var knownDescriptors = map[string]struct{ Name, Type string }{
+	// A dictionary of known descriptor names and type (keyed by descriptor uuid)
 	"2900": {Name: "Characteristic Extended Properties", Type: "org.bluetooth.descriptor.gatt.characteristic_extended_properties"},
 	"2901": {Name: "Characteristic User Description", Type: "org.bluetooth.descriptor.gatt.characteristic_user_description"},
 	"2902": {Name: "Client Characteristic Configuration", Type: "org.bluetooth.descriptor.gatt.client_characteristic_configuration"},
@@ -43,10 +44,8 @@ var knownDescriptors = map[string]struct{ Name, Type string }{
 	"2906": {Name: "Valid Range", Type: "org.bluetooth.descriptor.valid_range"},
 	"2907": {Name: "External Report Reference", Type: "org.bluetooth.descriptor.external_report_reference"},
 	"2908": {Name: "Report Reference", Type: "org.bluetooth.descriptor.report_reference"},
-}
 
-// A dictionary of known characteristic names and type (keyed by characteristic uuid)
-var knownCharacteristics = map[string]struct{ Name, Type string }{
+	// A dictionary of known characteristic names and type (keyed by characteristic uuid)
 	"2A00": {Name: "Device Name", Type: "org.bluetooth.characteristic.gap.device_name"},
 	"2A01": {Name: "Appearance", Type: "org.bluetooth.characteristic.gap.appearance"},
 	"2A02": {Name: "Peripheral Privacy Flag", Type: "org.bluetooth.characteristic.gap.peripheral_privacy_flag"},

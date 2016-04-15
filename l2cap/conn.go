@@ -8,6 +8,7 @@ import (
 	"log"
 	"net"
 
+	"github.com/currantlabs/bt/hci/cmd"
 	"github.com/currantlabs/bt/hci/evt"
 )
 
@@ -259,6 +260,10 @@ func (c *conn) recombine() error {
 
 // Close disconnects the connection by sending hci disconnect command to the device.
 func (c *conn) Close() error {
+	c.l.hci.Send(&cmd.Disconnect{
+		ConnectionHandle: c.param.ConnectionHandle(),
+		Reason:           0x13,
+	}, nil)
 	close(c.chDone)
 	return nil
 }

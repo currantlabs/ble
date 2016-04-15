@@ -1,3 +1,5 @@
 .*.swp
 .tags
 .tags1
+
+/examples/bin/*

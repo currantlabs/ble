@@ -12,7 +12,7 @@ import (
 const (
 	keyData = iota
 	keyOffset
-	keyCentral
+	keyServer
 	keyNotifier
 )
 
@@ -32,12 +32,12 @@ func WithOffset(ctx context.Context, o int) context.Context {
 	return context.WithValue(ctx, keyOffset, o)
 }
 
-// central ...
-func central(ctx context.Context) *Central { return ctx.Value(keyCentral).(*Central) }
+// server ...
+func server(ctx context.Context) *Server { return ctx.Value(keyServer).(*Server) }
 
-// withCentral ...
-func withCentral(ctx context.Context, c *Central) context.Context {
-	return context.WithValue(ctx, keyCentral, c)
+// withServer ...
+func withserver(ctx context.Context, s *Server) context.Context {
+	return context.WithValue(ctx, keyServer, s)
 }
 
 // Notifier ...
@@ -84,9 +84,6 @@ func (s *Service) AddCharacteristic(u uuid.UUID) *Characteristic {
 	return c
 }
 
-// Name returns the specificatin name of the service according to its UUID.
-func (s *Service) Name() string { return knownServices[s.UUID.String()].Name }
-
 // A Characteristic is a BLE characteristic.
 type Characteristic struct {
 	UUID        uuid.UUID
@@ -100,11 +97,6 @@ type Characteristic struct {
 	h    uint16
 	vh   uint16
 	endh uint16
-}
-
-// Name returns the specificatin name of the characteristic.
-func (c *Characteristic) Name() string {
-	return knownCharacteristics[c.UUID.String()].Name
 }
 
 func setupCCCD(c *Characteristic, h Handler) *Descriptor {
@@ -177,11 +169,6 @@ type Descriptor struct {
 	h uint16
 
 	value attValue
-}
-
-// Name returns the specificatin name of the descriptor.
-func (d *Descriptor) Name() string {
-	return knownDescriptors[d.UUID.String()].Name
 }
 
 // Handle ...
@@ -276,10 +263,10 @@ func (n *notifier) config(c *Characteristic, en bool, ctx context.Context, h Han
 		return
 	}
 	ctx, cancel := context.WithCancel(ctx)
-	central := central(ctx)
-	n.send = func(b []byte) (int, error) { return central.server.Notify(c.vh, b) }
+	s := server(ctx)
+	n.send = func(b []byte) (int, error) { return s.as.Notify(c.vh, b) }
 	if n.indicate {
-		n.send = func(b []byte) (int, error) { return central.server.Indicate(c.vh, b) }
+		n.send = func(b []byte) (int, error) { return s.as.Indicate(c.vh, b) }
 	}
 	n.cancel = cancel
 	go h.Serve(WithNotifier(ctx, n), resp)

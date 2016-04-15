@@ -57,7 +57,7 @@ type Conn interface {
 }
 
 // Dial ...
-func Dial(h hci.HCI) Dialer {
+func Dial(h hci.HCI) (Dialer, error) {
 	mu.Lock()
 	d, ok := l2devs[h]
 	if !ok {
@@ -65,11 +65,11 @@ func Dial(h hci.HCI) Dialer {
 		l2devs[h] = d
 	}
 	defer mu.Unlock()
-	return d
+	return d, nil
 }
 
 // Listen ...
-func Listen(h hci.HCI) Listener {
+func Listen(h hci.HCI) (Listener, error) {
 	mu.Lock()
 	d, ok := l2devs[h]
 	if !ok {
@@ -77,5 +77,5 @@ func Listen(h hci.HCI) Listener {
 		l2devs[h] = d
 	}
 	defer mu.Unlock()
-	return d
+	return d, nil
 }

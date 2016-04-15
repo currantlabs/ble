@@ -1,8 +1,8 @@
 package main
 
 import (
+	"fmt"
 	"log"
-	"time"
 
 	"github.com/currantlabs/bt/adv"
 	"github.com/currantlabs/bt/hci"
@@ -10,17 +10,23 @@ import (
 )
 
 func main() {
-	h, err := hci.NewHCI(-1)
+	h, err := hci.New(-1)
 	if err != nil {
 		log.Fatalf("failed to create HCI. %s", err)
 	}
 
-	a := adv.NewAdvPacket(nil)
-	a.AppendFlags(adv.FlagGeneralDiscoverable | adv.FlagLEOnly)
-	a.AppendName("Hello")
+	// Crafting a simple advertising data packet.
+	p := adv.Packet(nil)
+	p = p.AppendFlags(adv.FlagGeneralDiscoverable | adv.FlagLEOnly)
+	p = p.AppendCompleteName("Gopher")
 
-	h.Send(&cmd.LESetAdvertisingData{AdvertisingDataLength: uint8(a.Len()), AdvertisingData: a.Packet()}, nil)
+	// Set Advertising Data
+	h.Send(&cmd.LESetAdvertisingData{
+		AdvertisingDataLength: uint8(p.Len()),
+		AdvertisingData:       p.Data(),
+	}, nil)
 
+	// Set Advertising Parameter
 	h.Send(&cmd.LESetAdvertisingParameters{
 		AdvertisingIntervalMin:  0x010,     // [0x0800]: 0.625 ms * 0x0800 = 1280.0 ms
 		AdvertisingIntervalMax:  0x010,     // [0x0800]: 0.625 ms * 0x0800 = 1280.0 ms
@@ -32,8 +38,12 @@ func main() {
 		AdvertisingFilterPolicy: 0x00,
 	}, nil)
 
-	h.Send(&cmd.LESetAdvertiseEnable{AdvertisingEnable: 1}, nil)
+	// Set Enable Advertising
+	h.Send(&cmd.LESetAdvertiseEnable{
+		AdvertisingEnable: 1,
+	}, nil)
 
-	log.Printf("advertising")
-	time.Sleep(100 * time.Second)
+	fmt.Printf("Advertising...\n")
+
+	select {} // Prevent program from exiting
 }

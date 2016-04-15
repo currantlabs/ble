@@ -1,14 +1,8 @@
 package adv
 
-import "errors"
-
 // MaxEIRPacketLength is the maximum allowed AdvertisingPacket
 // and ScanResponsePacket length.
 const MaxEIRPacketLength = 31
-
-// ErrEIRPacketTooLong is the error returned when an AdvertisingPacket
-// or ScanResponsePacket is too long.
-var ErrEIRPacketTooLong = errors.New("max packet length is 31")
 
 // Advertising data field s
 const (

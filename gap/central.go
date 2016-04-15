@@ -13,12 +13,23 @@ type Central interface {
 }
 
 // NewCentral ...
-func NewCentral(h hci.HCI) Central {
-	c := &central{
-		Observer: NewObserver(h),
-		Dialer:   l2cap.Dial(h),
+func NewCentral(h hci.HCI) (Central, error) {
+	o, err := NewObserver(h)
+	if err != nil {
+		return nil, err
 	}
-	return c
+
+	d, err := l2cap.Dial(h)
+	if err != nil {
+		return nil, err
+	}
+
+	c := &central{
+		Observer: o,
+		Dialer:   d,
+	}
+
+	return c, nil
 }
 
 type central struct {

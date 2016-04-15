@@ -28,7 +28,7 @@ type NotificationHandler interface {
 
 // Client implementa an Attribute Protocol Client.
 type Client struct {
-	Conn l2cap.Conn
+	l2c  l2cap.Conn
 	rspc chan []byte
 
 	rxBuf   []byte
@@ -40,7 +40,7 @@ type Client struct {
 // NewClient returns an Attribute Protocol Client.
 func NewClient(l2c l2cap.Conn, h NotificationHandler) *Client {
 	c := &Client{
-		Conn:    l2c,
+		l2c:     l2c,
 		rspc:    make(chan []byte),
 		chTxBuf: make(chan []byte, 1),
 		rxBuf:   make([]byte, 65535),
@@ -74,7 +74,7 @@ func (c *Client) ExchangeMTU(clientRxMTU int) (serverRxMTU int, err error) {
 	}
 
 	// Let L2CAP know the MTU we can handle.
-	c.Conn.SetRxMTU(clientRxMTU)
+	c.l2c.SetRxMTU(clientRxMTU)
 
 	// Convert and validate the response.
 	rsp := ExchangeMTUResponse(b)
@@ -92,7 +92,7 @@ func (c *Client) ExchangeMTU(clientRxMTU int) (serverRxMTU int, err error) {
 	txMTU := int(rsp.ServerRxMTU())
 	if len(txBuf) != txMTU {
 		// Let L2CAP know the MTU that the remote device can handle.
-		c.Conn.SetTxMTU(txMTU)
+		c.l2c.SetTxMTU(txMTU)
 		// Put a re-allocated txBuf back to the channel.
 		// The txBuf has been captured in deferred function.
 		txBuf = make([]byte, txMTU, txMTU)
@@ -267,7 +267,7 @@ func (c *Client) ReadBlob(handle, offset uint16) ([]byte, error) {
 // [Vol 3, Part F, 3.4.4.7 & 3.4.4.8]
 func (c *Client) ReadMultiple(handles []uint16) ([]byte, error) {
 	// Should request to read two or more values.
-	if len(handles) < 2 || len(handles)*2 > c.Conn.TxMTU()-1 {
+	if len(handles) < 2 || len(handles)*2 > c.l2c.TxMTU()-1 {
 		return nil, ErrInvalidArgument
 	}
 
@@ -347,7 +347,7 @@ func (c *Client) ReadByGroupType(starth, endh uint16, uuid uuid.UUID) (int, []by
 // Write requests the server to write the value of an attribute and acknowledge that
 // this has been achieved in a Write Response. [Vol 3, Part F, 3.4.5.1 & 3.4.5.2]
 func (c *Client) Write(handle uint16, value []byte) error {
-	if len(value) > c.Conn.TxMTU()-3 {
+	if len(value) > c.l2c.TxMTU()-3 {
 		return ErrInvalidArgument
 	}
 
@@ -381,7 +381,7 @@ func (c *Client) Write(handle uint16, value []byte) error {
 // WriteCommand requests the server to write the value of an attribute, typically
 // into a control-point attribute. [Vol 3, Part F, 3.4.5.3]
 func (c *Client) WriteCommand(handle uint16, value []byte) error {
-	if len(value) > c.Conn.TxMTU()-3 {
+	if len(value) > c.l2c.TxMTU()-3 {
 		return ErrInvalidArgument
 	}
 
@@ -400,7 +400,7 @@ func (c *Client) WriteCommand(handle uint16, value []byte) error {
 // SignedWrite requests the server to write the value of an attribute with an authentication
 // signature, typically into a control-point attribute. [Vol 3, Part F, 3.4.5.4]
 func (c *Client) SignedWrite(handle uint16, value []byte, signature [12]byte) error {
-	if len(value) > c.Conn.TxMTU()-15 {
+	if len(value) > c.l2c.TxMTU()-15 {
 		return ErrInvalidArgument
 	}
 
@@ -422,7 +422,7 @@ func (c *Client) SignedWrite(handle uint16, value []byte, signature [12]byte) er
 // the Client can verify that the value was received correctly.
 // [Vol 3, Part F, 3.4.6.1 & 3.4.6.2]
 func (c *Client) PrepareWrite(handle uint16, offset uint16, value []byte) (uint16, uint16, []byte, error) {
-	if len(value) > c.Conn.TxMTU()-5 {
+	if len(value) > c.l2c.TxMTU()-5 {
 		return 0, 0, nil, ErrInvalidArgument
 	}
 
@@ -487,12 +487,12 @@ func (c *Client) ExecuteWrite(flags uint8) error {
 }
 
 func (c *Client) sendCmd(b []byte) error {
-	_, err := c.Conn.Write(b)
+	_, err := c.l2c.Write(b)
 	return err
 }
 
 func (c *Client) sendReq(b []byte) (rsp []byte, err error) {
-	if _, err := c.Conn.Write(b); err != nil {
+	if _, err := c.l2c.Write(b); err != nil {
 		return nil, err
 	}
 	select {
@@ -509,7 +509,7 @@ func (c *Client) sendReq(b []byte) (rsp []byte, err error) {
 func (c *Client) Loop() {
 	confirmation := []byte{HandleValueConfirmationCode}
 	for {
-		n, err := c.Conn.Read(c.rxBuf)
+		n, err := c.l2c.Read(c.rxBuf)
 		if err != nil {
 			// We don't expect any error from the bearer (L2CAP ACL-U)
 			// Pass it along to the pending request, if any, and escape.
@@ -530,7 +530,7 @@ func (c *Client) Loop() {
 
 		// Always write aknowledgement for an indication, even it was an invalid request.
 		if b[0] == HandleValueIndicationCode {
-			c.Conn.Write(confirmation)
+			c.l2c.Write(confirmation)
 		}
 	}
 }

@@ -25,7 +25,7 @@ func newLE(h hci.HCI) l2dev {
 
 		muConns:      &sync.Mutex{},
 		conns:        make(map[uint16]*conn),
-		chMasterConn: make(chan *conn),
+		chMasterConn: make(chan *conn), // Peripheral accepts master connection
 		chSlaveConn:  make(chan *conn),
 
 		// LECreateConnection implements LE Create Connection (0x08|0x000D) [Vol 2, Part E, 7.8.12]

@@ -31,8 +31,8 @@ type hci struct {
 	txPwrLv int
 }
 
-// NewHCI ...
-func NewHCI(id int) (HCI, error) {
+// New ...
+func New(id int) (HCI, error) {
 	skt, err := skt.NewSocket(id)
 	if err != nil {
 		return nil, err
@@ -88,7 +88,9 @@ func (h *hci) handlePkt(b []byte) error {
 	case pktTypeSCOData:
 		return fmt.Errorf("hci: unsupported sco packet: [ % X ]", b)
 	case pktTypeEvent:
-		return h.evt.handle(b)
+		// return h.evt.handle(b)
+		go h.evt.handle(b)
+		return nil
 	case pktTypeVendor:
 		return fmt.Errorf("hci: unsupported vendor packet: [ % X ]", b)
 	default:
