@@ -23,6 +23,7 @@ func (s sigCmd) id() uint8    { return s[1] }
 func (s sigCmd) len() int     { return int(binary.LittleEndian.Uint16(s[2:4])) }
 func (s sigCmd) data() []byte { return s[:4+s.len()] }
 
+// Signal ...
 func (c *conn) Signal(req Signal, rsp Signal) error {
 	data := req.Marshal()
 	buf := bytes.NewBuffer(make([]byte, 0))
@@ -202,10 +203,12 @@ func (c *conn) handleConnectionParameterUpdateRequest(s sigCmd) {
 		})
 }
 
+// LECreditBasedConnectionRequest ...
 func (c *conn) LECreditBasedConnectionRequest(s sigCmd) {
 	// TODO:
 }
 
+// LEFlowControlCredit ...
 func (c *conn) LEFlowControlCredit(s sigCmd) {
 	// TODO:
 }

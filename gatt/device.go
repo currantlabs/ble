@@ -52,7 +52,7 @@ type Device struct {
 	deviceHandler
 
 	hci hci.HCI
-	acl *l2cap.LE
+	acl l2cap.Listener
 
 	state State
 
@@ -116,7 +116,7 @@ func NewDevice(id int) (*Device, error) {
 	}
 
 	d.hci = h
-	d.acl = l2cap.NewL2CAP(h)
+	d.acl = l2cap.Listen(h)
 	return d, nil
 }
 

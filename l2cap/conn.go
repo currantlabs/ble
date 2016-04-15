@@ -11,34 +11,8 @@ import (
 	"github.com/currantlabs/bt/hci/evt"
 )
 
-// Conn implements a L2CAP connection.
-// Currently, it only supports LE-U logical transport, and not ACL-U.
-type Conn interface {
-	io.ReadWriteCloser
-
-	// LocalAddr returns local device's MAC address.
-	LocalAddr() net.HardwareAddr
-
-	// RemoteAddr returns remote device's MAC address.
-	RemoteAddr() net.HardwareAddr
-
-	// RxMTU returns the MTU which the upper layer is capable of accepting.
-	RxMTU() int
-
-	// SetRxMTU sets the MTU which the upper layer is capable of accepting.
-	SetRxMTU(mtu int)
-
-	// TxMTU returns the MTU which the upper layer of remote device is capable of accepting.
-	TxMTU() int
-
-	// SetRxMTU sets the MTU which the upper layer of remote device is capable of accepting.
-	SetTxMTU(mtu int)
-
-	Parameters() evt.LEConnectionComplete
-}
-
 type conn struct {
-	l *LE
+	l *le
 
 	param evt.LEConnectionComplete
 
@@ -76,7 +50,7 @@ type conn struct {
 
 	sigSent chan []byte
 
-	chInPkt chan pkt
+	chInPkt chan packet
 	chInPDU chan pdu
 
 	// leFrame is set to be true when the LE Credit based flow control is used.
@@ -89,7 +63,7 @@ type conn struct {
 	chDone chan bool
 }
 
-func newConn(l *LE, param evt.LEConnectionComplete) *conn {
+func newConn(l *le, param evt.LEConnectionComplete) *conn {
 	c := &conn{
 		l:     l,
 		param: param,
@@ -103,7 +77,7 @@ func newConn(l *LE, param evt.LEConnectionComplete) *conn {
 		sigRxMTU: 512,
 		sigTxMTU: 23,
 
-		chInPkt: make(chan pkt, 16),
+		chInPkt: make(chan packet, 16),
 		chInPDU: make(chan pdu, 16),
 
 		txBuffer: NewClient(l.pool),
@@ -300,21 +274,26 @@ func (c *conn) RemoteAddr() net.HardwareAddr {
 	return net.HardwareAddr([]byte{a[5], a[4], a[3], a[2], a[1], a[0]})
 }
 
+// RxMTU returns the MTU which the upper layer is capable of accepting.
 func (c *conn) RxMTU() int { return c.rxMTU }
 
+// SetRxMTU sets the MTU which the upper layer of remote device is capable of accepting.
 func (c *conn) SetRxMTU(mtu int) {
 	c.rxMTU = mtu
 	c.rxMPS = mtu
 }
 
+// TxMTU returns the MTU which the upper layer of remote device is capable of accepting.
 func (c *conn) TxMTU() int { return c.txMTU }
 
+// SetTxMTU sets the MTU which the upper layer is capable of accepting.
 func (c *conn) SetTxMTU(mtu int) {
 	log.Printf("Set MTU: %d", mtu)
 	c.txMTU = mtu
 	c.txMPS = mtu
 }
 
+// Parameters ...
 func (c *conn) Parameters() evt.LEConnectionComplete {
 	return c.param
 }
@@ -324,13 +303,13 @@ func (c *conn) Parameters() evt.LEConnectionComplete {
 // Broadcast flags. bit[7:8] of handle field's MSB
 // Not used in LE-U. Leave it as 0x00 (Point-to-Point).
 // Broadcasting in LE uses ADVB logical transport.
-type pkt []byte
+type packet []byte
 
-func (a pkt) handle() uint16 { return uint16(a[0]) | (uint16(a[1]&0x0f) << 8) }
-func (a pkt) pbf() int       { return (int(a[1]) >> 4) & 0x3 }
-func (a pkt) bcf() int       { return (int(a[1]) >> 6) & 0x3 }
-func (a pkt) dlen() int      { return int(a[2]) | (int(a[3]) << 8) }
-func (a pkt) data() []byte   { return a[4:] }
+func (a packet) handle() uint16 { return uint16(a[0]) | (uint16(a[1]&0x0f) << 8) }
+func (a packet) pbf() int       { return (int(a[1]) >> 4) & 0x3 }
+func (a packet) bcf() int       { return (int(a[1]) >> 6) & 0x3 }
+func (a packet) dlen() int      { return int(a[2]) | (int(a[3]) << 8) }
+func (a packet) data() []byte   { return a[4:] }
 
 type pdu []byte
 
