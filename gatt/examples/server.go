@@ -7,13 +7,12 @@ import (
 	"log"
 
 	"github.com/currantlabs/bt/gatt"
-	"github.com/currantlabs/bt/gatt/examples/option"
 	"github.com/currantlabs/bt/gatt/examples/service"
 	"github.com/currantlabs/bt/uuid"
 )
 
 func main() {
-	d, err := gatt.NewDevice(option.DefaultServerOptions...)
+	d, err := gatt.NewDevice(-1)
 	if err != nil {
 		log.Fatalf("Failed to open device, err: %s", err)
 	}

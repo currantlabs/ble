@@ -47,21 +47,6 @@ type deviceHandler struct {
 	PeripheralDisconnected func(p *Peripheral, err error)
 }
 
-// An Option is a self-referential function, which sets the option specified.
-// Most Options are platform-specific, which gives more fine-grained control over the Device at a cost of losing portibility.
-// See http://commandcenter.blogspot.com.au/2014/01/self-referential-functions-and-design.html for more discussion.
-type Option func(*Device) error
-
-// Option sets the options specified.
-// Some options can only be set before the Device is initialized; they are best used with NewDevice instead of Option.
-func (d *Device) Option(opts ...Option) error {
-	var err error
-	for _, opt := range opts {
-		err = opt(d)
-	}
-	return err
-}
-
 // Device ...
 type Device struct {
 	deviceHandler
@@ -86,11 +71,44 @@ type Device struct {
 }
 
 // NewDevice ...
-func NewDevice(opts ...Option) (*Device, error) {
+func NewDevice(id int) (*Device, error) {
 	d := &Device{
 		maxConn: 1,  // Support 1 connection at a time.
-		devID:   -1, // Find an available HCI Device.
+		devID:   id, // Find an available HCI Device.
 
+		advParam: &cmd.LESetAdvertisingParameters{
+			AdvertisingIntervalMin:  0x010,     // [0x0800]: 0.625 ms * 0x0800 = 1280.0 ms
+			AdvertisingIntervalMax:  0x010,     // [0x0800]: 0.625 ms * 0x0800 = 1280.0 ms
+			AdvertisingType:         0x00,      // [0x00]: ADV_IND, 0x01: DIRECT(HIGH), 0x02: SCAN, 0x03: NONCONN, 0x04: DIRECT(LOW)
+			OwnAddressType:          0x00,      // [0x00]: public, 0x01: random
+			DirectAddressType:       0x00,      // [0x00]: public, 0x01: random
+			DirectAddress:           [6]byte{}, // Public or Random Address of the Device to be connected
+			AdvertisingChannelMap:   0x7,       // [0x07] 0x01: ch37, 0x2: ch38, 0x4: ch39
+			AdvertisingFilterPolicy: 0x00,
+		},
+
+		scanParam: &cmd.LESetScanParameters{
+			LEScanType:           0x01,   // [0x00]: passive, 0x01: active
+			LEScanInterval:       0x0010, // [0x10]: 0.625ms * 16
+			LEScanWindow:         0x0010, // [0x10]: 0.625ms * 16
+			OwnAddressType:       0x00,   // [0x00]: public, 0x01: random
+			ScanningFilterPolicy: 0x00,   // [0x00]: accept all, 0x01: ignore non-white-listed.
+		},
+
+		connParam: &cmd.LECreateConnection{
+			LEScanInterval:        0x0010, // N x 0.625ms
+			LEScanWindow:          0x0010, // N x 0.625ms
+			InitiatorFilterPolicy: 0x00,   // white list not used
+			OwnAddressType:        0x00,   // public
+			ConnIntervalMin:       0x0006, // N x 0.125ms
+			ConnIntervalMax:       0x0006, // N x 0.125ms
+			ConnLatency:           0x0000, //
+			SupervisionTimeout:    0x0048, // N x 10ms
+			MinimumCELength:       0x0000, // N x 0.625ms
+			MaximumCELength:       0x0000, // N x 0.625ms
+			// PeerAddressType:       pd.AddressType, // public or random
+			// PeerAddress:           pd.Address,     //
+		},
 	}
 	h, err := hci.NewHCI(d.devID)
 	if err != nil {
@@ -99,7 +117,6 @@ func NewDevice(opts ...Option) (*Device, error) {
 
 	d.hci = h
 	d.acl = l2cap.NewL2CAP(h)
-	d.Option(opts...)
 	return d, nil
 }
 

@@ -12,7 +12,6 @@ import (
 
 	"github.com/currantlabs/bt/adv"
 	"github.com/currantlabs/bt/gatt"
-	"github.com/currantlabs/bt/gatt/examples/option"
 	"github.com/currantlabs/bt/uuid"
 )
 
@@ -149,7 +148,7 @@ func main() {
 		log.Fatalf("usage: %s [options] peripheral-id\n", os.Args[0])
 	}
 
-	d, err := gatt.NewDevice(option.DefaultClientOptions...)
+	d, err := gatt.NewDevice(-1)
 	if err != nil {
 		log.Fatalf("Failed to open device, err: %s\n", err)
 		return
@@ -164,31 +163,3 @@ func main() {
 	<-done
 	fmt.Println("Done")
 }
-
-// func (p Property) String() (result string) {
-// 	if (p & CharBroadcast) != 0 {
-// 		result += "broadcast "
-// 	}
-// 	if (p & CharRead) != 0 {
-// 		result += "read "
-// 	}
-// 	if (p & CharWriteNR) != 0 {
-// 		result += "writeWithoutResponse "
-// 	}
-// 	if (p & CharWrite) != 0 {
-// 		result += "write "
-// 	}
-// 	if (p & CharNotify) != 0 {
-// 		result += "notify "
-// 	}
-// 	if (p & CharIndicate) != 0 {
-// 		result += "indicate "
-// 	}
-// 	if (p & CharSignedWrite) != 0 {
-// 		result += "authenticateSignedWrites "
-// 	}
-// 	if (p & CharExtended) != 0 {
-// 		result += "extendedProperties "
-// 	}
-// 	return
-// }

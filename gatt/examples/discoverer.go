@@ -8,7 +8,6 @@ import (
 
 	"github.com/currantlabs/bt/adv"
 	"github.com/currantlabs/bt/gatt"
-	"github.com/currantlabs/bt/gatt/examples/option"
 	"github.com/currantlabs/bt/uuid"
 )
 
@@ -30,7 +29,7 @@ func onPeriphDiscovered(p *gatt.Peripheral, a *adv.Packet, rssi int) {
 }
 
 func main() {
-	d, err := gatt.NewDevice(option.DefaultClientOptions...)
+	d, err := gatt.NewDevice(-1)
 	if err != nil {
 		log.Fatalf("Failed to open device, err: %s\n", err)
 		return
