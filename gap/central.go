@@ -1,7 +1,7 @@
 package gap
 
 import (
-	"github.com/currantlabs/bt/hci"
+	"github.com/currantlabs/bt/dev"
 	"github.com/currantlabs/bt/hci/cmd"
 	"github.com/currantlabs/bt/l2cap"
 )
@@ -13,20 +13,20 @@ type Central interface {
 }
 
 // NewCentral ...
-func NewCentral(h hci.HCI) (Central, error) {
-	o, err := NewObserver(h)
+func NewCentral(d dev.Device) (Central, error) {
+	o, err := NewObserver(d)
 	if err != nil {
 		return nil, err
 	}
 
-	d, err := l2cap.Dial(h)
+	dl, err := l2cap.Dial(d)
 	if err != nil {
 		return nil, err
 	}
 
 	c := &central{
 		Observer: o,
-		Dialer:   d,
+		Dialer:   dl,
 	}
 
 	return c, nil

@@ -5,8 +5,8 @@ import (
 	"log"
 
 	"github.com/currantlabs/bt/adv"
+	"github.com/currantlabs/bt/dev"
 	"github.com/currantlabs/bt/gap"
-	"github.com/currantlabs/bt/hci"
 )
 
 func filter(a gap.Advertisement) bool {
@@ -29,12 +29,12 @@ func discovered(a gap.Advertisement) {
 
 func main() {
 	// Find an available HCI device
-	h, err := hci.New(-1)
+	d, err := dev.New(-1)
 	if err != nil {
 		log.Fatalf("Failed to open HCI device, err: %s\n", err)
 	}
 
-	o, err := gap.NewObserver(h)
+	o, err := gap.NewObserver(d)
 	if err != nil {
 		log.Fatalf("Failed to create an observer, err: %s\n", err)
 	}

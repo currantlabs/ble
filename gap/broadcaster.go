@@ -4,7 +4,7 @@ import (
 	"sync"
 
 	"github.com/currantlabs/bt/adv"
-	"github.com/currantlabs/bt/hci"
+	"github.com/currantlabs/bt/dev"
 	"github.com/currantlabs/bt/hci/cmd"
 )
 
@@ -16,9 +16,9 @@ type Broadcaster interface {
 }
 
 // NewBroadcaster ...
-func NewBroadcaster(h hci.HCI) (Broadcaster, error) {
+func NewBroadcaster(d dev.Device) (Broadcaster, error) {
 	b := &bcast{
-		hci: h,
+		dev: d,
 
 		advOn:  cmd.LESetAdvertiseEnable{AdvertisingEnable: 1},
 		advOff: cmd.LESetAdvertiseEnable{AdvertisingEnable: 0},
@@ -39,7 +39,7 @@ func NewBroadcaster(h hci.HCI) (Broadcaster, error) {
 type bcast struct {
 	sync.RWMutex
 
-	hci hci.HCI
+	dev dev.Device
 
 	advOn    cmd.LESetAdvertiseEnable
 	advOff   cmd.LESetAdvertiseEnable
@@ -64,19 +64,19 @@ func (b *bcast) Advertise(ad []byte, sr []byte) error {
 
 	// TODO: set advParam event type accordingly.
 
-	b.hci.Send(&b.advOff, nil)
-	b.hci.Send(&b.advParam, nil)
-	b.hci.Send(&b.advData, nil)
-	b.hci.Send(&b.scanResp, nil)
-	b.hci.Send(&b.advOn, nil)
+	b.dev.Send(&b.advOff, nil)
+	b.dev.Send(&b.advParam, nil)
+	b.dev.Send(&b.advData, nil)
+	b.dev.Send(&b.scanResp, nil)
+	b.dev.Send(&b.advOn, nil)
 
 	return nil
 }
 
 func (b *bcast) StartAdvertising() error {
-	return b.hci.Send(&b.advOn, nil)
+	return b.dev.Send(&b.advOn, nil)
 }
 
 func (b *bcast) StopAdvertising() error {
-	return b.hci.Send(&b.advOff, nil)
+	return b.dev.Send(&b.advOff, nil)
 }

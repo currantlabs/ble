@@ -5,17 +5,17 @@ import (
 	"log"
 
 	"github.com/currantlabs/bt/adv"
+	"github.com/currantlabs/bt/dev"
 	"github.com/currantlabs/bt/examples/service"
 	"github.com/currantlabs/bt/gap"
 	"github.com/currantlabs/bt/gatt"
-	"github.com/currantlabs/bt/hci"
 )
 
 // A mandatory handler for monitoring device state.
-func onStateChanged(h hci.HCI, s hci.State) {
+func onStateChanged(d dev.Device, s dev.State) {
 	fmt.Printf("State: %s\n", s)
 	switch s {
-	case hci.StatePoweredOn:
+	case dev.StatePoweredOn:
 
 	default:
 	}
@@ -38,12 +38,12 @@ func main() {
 
 	sr := adv.Packet(nil).AppendCompleteName("Gopher")
 
-	h, err := hci.New(-1)
+	d, err := dev.New(-1)
 	if err != nil {
 		log.Fatalf("Failed to open device, err: %s", err)
 	}
 
-	p, err := gap.NewPeripheral(h, s)
+	p, err := gap.NewPeripheral(d, s)
 	if err != nil {
 		log.Fatalf("Failed to open device, err: %s", err)
 	}

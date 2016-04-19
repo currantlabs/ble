@@ -5,33 +5,34 @@ import (
 	"log"
 	"time"
 
+	"github.com/currantlabs/bt/dev"
 	"github.com/currantlabs/bt/hci"
 	"github.com/currantlabs/bt/hci/cmd"
 	"github.com/currantlabs/bt/hci/evt"
 )
 
 func main() {
-	h, err := hci.New(-1)
+	d, err := dev.New(-1)
 	if err != nil {
 		log.Fatalf("Filed to open HCI device: %s", err)
 	}
 
 	du := time.Duration(3 * time.Second)
 
-	h.Send(&cmd.LESetScanEnable{LEScanEnable: 1}, nil)
+	d.Send(&cmd.LESetScanEnable{LEScanEnable: 1}, nil)
 	fmt.Printf("Start scanning for %s ...\n", du)
 	time.Sleep(du)
-	h.Send(&cmd.LESetScanEnable{LEScanEnable: 0}, nil)
+	d.Send(&cmd.LESetScanEnable{LEScanEnable: 0}, nil)
 
 	fmt.Printf("\nRegister our customized advertising report handler ...\n")
-	h.SetSubeventHandler(
+	d.SetSubeventHandler(
 		evt.LEAdvertisingReportSubCode,
 		hci.HandlerFunc(handleLEAdvertisingReport))
 
 	fmt.Printf("Start scanning for %s ...\n", du)
-	h.Send(&cmd.LESetScanEnable{LEScanEnable: 1}, nil)
+	d.Send(&cmd.LESetScanEnable{LEScanEnable: 1}, nil)
 	time.Sleep(du)
-	h.Send(&cmd.LESetScanEnable{LEScanEnable: 0}, nil)
+	d.Send(&cmd.LESetScanEnable{LEScanEnable: 0}, nil)
 
 	fmt.Printf("Stopped.\n")
 }

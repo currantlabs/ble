@@ -1,8 +1,8 @@
 package gap
 
 import (
+	"github.com/currantlabs/bt/dev"
 	"github.com/currantlabs/bt/gatt"
-	"github.com/currantlabs/bt/hci"
 	"github.com/currantlabs/bt/l2cap"
 )
 
@@ -23,12 +23,12 @@ type Peripheral interface {
 }
 
 // NewPeripheral ...
-func NewPeripheral(h hci.HCI, s *gatt.Server) (Peripheral, error) {
-	b, err := NewBroadcaster(h)
+func NewPeripheral(d dev.Device, s *gatt.Server) (Peripheral, error) {
+	b, err := NewBroadcaster(d)
 	if err != nil {
 		return nil, err
 	}
-	l, err := l2cap.Listen(h)
+	l, err := l2cap.Listen(d)
 	if err != nil {
 		return nil, err
 	}

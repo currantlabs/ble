@@ -5,12 +5,12 @@ import (
 	"log"
 
 	"github.com/currantlabs/bt/adv"
-	"github.com/currantlabs/bt/hci"
+	"github.com/currantlabs/bt/dev"
 	"github.com/currantlabs/bt/hci/cmd"
 )
 
 func main() {
-	h, err := hci.New(-1)
+	d, err := dev.New(-1)
 	if err != nil {
 		log.Fatalf("failed to create HCI. %s", err)
 	}
@@ -21,13 +21,13 @@ func main() {
 	p = p.AppendCompleteName("Gopher")
 
 	// Set Advertising Data
-	h.Send(&cmd.LESetAdvertisingData{
+	d.Send(&cmd.LESetAdvertisingData{
 		AdvertisingDataLength: uint8(p.Len()),
 		AdvertisingData:       p.Data(),
 	}, nil)
 
 	// Set Advertising Parameter
-	h.Send(&cmd.LESetAdvertisingParameters{
+	d.Send(&cmd.LESetAdvertisingParameters{
 		AdvertisingIntervalMin:  0x010,     // [0x0800]: 0.625 ms * 0x0800 = 1280.0 ms
 		AdvertisingIntervalMax:  0x010,     // [0x0800]: 0.625 ms * 0x0800 = 1280.0 ms
 		AdvertisingType:         0x03,      // [0x00]: ADV_IND, 0x01: DIRECT(HIGH), 0x02: SCAN, 0x03: NONCONN, 0x04: DIRECT(LOW)
@@ -39,7 +39,7 @@ func main() {
 	}, nil)
 
 	// Set Enable Advertising
-	h.Send(&cmd.LESetAdvertiseEnable{
+	d.Send(&cmd.LESetAdvertiseEnable{
 		AdvertisingEnable: 1,
 	}, nil)
 

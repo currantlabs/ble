@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/currantlabs/bt/adv"
+	"github.com/currantlabs/bt/dev"
 	"github.com/currantlabs/bt/gap"
 	"github.com/currantlabs/bt/gatt"
-	"github.com/currantlabs/bt/hci"
 	"github.com/currantlabs/bt/uuid"
 )
 
@@ -139,12 +139,12 @@ func main() {
 		flt = func(a gap.Advertisement) bool { return strings.EqualFold(a.Address().String(), flag.Args()[0]) }
 	}
 
-	h, err := hci.New(-1)
+	d, err := dev.New(-1)
 	if err != nil {
 		log.Fatalf("Failed to open HCI device, err: %s\n", err)
 	}
 
-	c, err := gap.NewCentral(h)
+	c, err := gap.NewCentral(d)
 	if err != nil {
 		log.Fatalf("Failed to create a central, err: %s\n", err)
 	}
@@ -152,5 +152,4 @@ func main() {
 	e := newExplorer(c)
 	e.Scan(gap.FilterFunc(flt), e)
 	e.Wait()
-	log.Printf("EXIT")
 }

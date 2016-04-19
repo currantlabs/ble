@@ -1,10 +1,11 @@
-package hci
+package dev
 
 import (
 	"fmt"
 	"io"
 	"log"
 
+	"github.com/currantlabs/bt/hci"
 	"github.com/currantlabs/bt/hci/evt"
 )
 
@@ -29,11 +30,11 @@ func newCmdSender(skt io.Writer) *cmdSender {
 }
 
 type pkt struct {
-	cmd  Command
+	cmd  hci.Command
 	done chan []byte
 }
 
-func (s *cmdSender) send(c Command, r CommandRP) error {
+func (s *cmdSender) send(c hci.Command, r hci.CommandRP) error {
 	p := &pkt{c, make(chan []byte)}
 	s.chPkt <- p
 	b := <-p.done

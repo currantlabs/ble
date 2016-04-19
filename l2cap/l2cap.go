@@ -6,6 +6,7 @@ import (
 	"net"
 	"sync"
 
+	"github.com/currantlabs/bt/dev"
 	"github.com/currantlabs/bt/hci"
 	"github.com/currantlabs/bt/hci/cmd"
 	"github.com/currantlabs/bt/hci/evt"
@@ -16,12 +17,12 @@ type l2dev interface {
 	Dialer
 }
 
-var l2devs = map[hci.HCI]l2dev{}
+var l2devs = map[dev.Device]l2dev{}
 var mu = sync.Mutex{}
 
-func newLE(h hci.HCI) l2dev {
+func newLE(d dev.Device) l2dev {
 	l := &le{
-		hci: h,
+		dev: d,
 
 		muConns:      &sync.Mutex{},
 		conns:        make(map[uint16]*conn),
@@ -48,23 +49,23 @@ func newLE(h hci.HCI) l2dev {
 
 	// Pre-allocate buffers with additional head room for lower layer headers.
 	// HCI header (1 Byte) + ACL Data Header (4 bytes) + L2CAP PDU (or fragment)
-	w, size, cnt := h.SetACLHandler(hci.HandlerFunc(l.handlePacket))
+	w, size, cnt := d.SetACLHandler(hci.HandlerFunc(l.handlePacket))
 	l.pktWriter = w
 	l.pool = NewPool(1+4+size, cnt)
 
-	h.SetEventHandler(evt.DisconnectionCompleteCode, hci.HandlerFunc(l.handleDisconnectionComplete))
-	h.SetEventHandler(evt.NumberOfCompletedPacketsCode, hci.HandlerFunc(l.handleNumberOfCompletedPackets))
+	d.SetEventHandler(evt.DisconnectionCompleteCode, hci.HandlerFunc(l.handleDisconnectionComplete))
+	d.SetEventHandler(evt.NumberOfCompletedPacketsCode, hci.HandlerFunc(l.handleNumberOfCompletedPackets))
 
-	h.SetSubeventHandler(evt.LEConnectionCompleteSubCode, hci.HandlerFunc(l.handleLEConnectionComplete))
-	h.SetSubeventHandler(evt.LEConnectionUpdateCompleteSubCode, hci.HandlerFunc(l.handleLEConnectionUpdateComplete))
-	h.SetSubeventHandler(evt.LELongTermKeyRequestSubCode, hci.HandlerFunc(l.handleLELongTermKeyRequest))
+	d.SetSubeventHandler(evt.LEConnectionCompleteSubCode, hci.HandlerFunc(l.handleLEConnectionComplete))
+	d.SetSubeventHandler(evt.LEConnectionUpdateCompleteSubCode, hci.HandlerFunc(l.handleLEConnectionUpdateComplete))
+	d.SetSubeventHandler(evt.LELongTermKeyRequestSubCode, hci.HandlerFunc(l.handleLELongTermKeyRequest))
 
 	return l
 }
 
 // le implements L2CAP (le-U logical link) handling
 type le struct {
-	hci       hci.HCI
+	dev       dev.Device
 	pktWriter io.Writer
 
 	// Host to Controller Data Flow Control Packet-based Data flow control for le-U [Vol 2, Part E, 4.1.1]
@@ -91,13 +92,13 @@ func (l *le) Close() error {
 }
 
 func (l *le) Addr() net.HardwareAddr {
-	return l.hci.LocalAddr()
+	return l.dev.LocalAddr()
 }
 
 func (l *le) Dial(a net.HardwareAddr) (Conn, error) {
 	cmd := *l.connParam
 	cmd.PeerAddress = [6]byte{a[5], a[4], a[3], a[2], a[1], a[0]}
-	l.hci.Send(&cmd, nil)
+	l.dev.Send(&cmd, nil)
 	c := <-l.chMasterConn
 	return c, nil
 }
@@ -169,7 +170,7 @@ func (l *le) handleNumberOfCompletedPackets(b []byte) error {
 
 func (l *le) handleLELongTermKeyRequest(b []byte) error {
 	e := evt.LELongTermKeyRequest(b)
-	return l.hci.Send(&cmd.LELongTermKeyRequestNegativeReply{
+	return l.dev.Send(&cmd.LELongTermKeyRequestNegativeReply{
 		ConnectionHandle: e.ConnectionHandle(),
 	}, nil)
 }

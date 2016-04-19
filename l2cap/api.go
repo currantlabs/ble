@@ -4,7 +4,7 @@ import (
 	"io"
 	"net"
 
-	"github.com/currantlabs/bt/hci"
+	"github.com/currantlabs/bt/dev"
 	"github.com/currantlabs/bt/hci/evt"
 )
 
@@ -57,25 +57,25 @@ type Conn interface {
 }
 
 // Dial ...
-func Dial(h hci.HCI) (Dialer, error) {
+func Dial(d dev.Device) (Dialer, error) {
 	mu.Lock()
-	d, ok := l2devs[h]
+	dl, ok := l2devs[d]
 	if !ok {
-		d = newLE(h)
-		l2devs[h] = d
+		dl = newLE(d)
+		l2devs[d] = dl
 	}
 	defer mu.Unlock()
-	return d, nil
+	return dl, nil
 }
 
 // Listen ...
-func Listen(h hci.HCI) (Listener, error) {
+func Listen(d dev.Device) (Listener, error) {
 	mu.Lock()
-	d, ok := l2devs[h]
+	dl, ok := l2devs[d]
 	if !ok {
-		d = newLE(h)
-		l2devs[h] = d
+		dl = newLE(d)
+		l2devs[d] = dl
 	}
 	defer mu.Unlock()
-	return d, nil
+	return dl, nil
 }

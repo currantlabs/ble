@@ -1,10 +1,11 @@
-package hci
+package dev
 
 import (
 	"fmt"
 	"log"
 	"sync"
 
+	"github.com/currantlabs/bt/hci"
 	"github.com/currantlabs/bt/hci/evt"
 )
 
@@ -12,37 +13,37 @@ func newEvtHub() *evtHub {
 	todo := func(b []byte) error { return fmt.Errorf("hci: unhandled (TODO) event packet: [ % X ]", b) }
 
 	h := &evtHub{
-		evth: map[int]Handler{
-			evt.EncryptionChangeCode:                     HandlerFunc(todo),
-			evt.ReadRemoteVersionInformationCompleteCode: HandlerFunc(todo),
-			evt.HardwareErrorCode:                        HandlerFunc(todo),
-			evt.DataBufferOverflowCode:                   HandlerFunc(todo),
-			evt.EncryptionKeyRefreshCompleteCode:         HandlerFunc(todo),
-			evt.AuthenticatedPayloadTimeoutExpiredCode:   HandlerFunc(todo),
+		evth: map[int]hci.Handler{
+			evt.EncryptionChangeCode:                     hci.HandlerFunc(todo),
+			evt.ReadRemoteVersionInformationCompleteCode: hci.HandlerFunc(todo),
+			evt.HardwareErrorCode:                        hci.HandlerFunc(todo),
+			evt.DataBufferOverflowCode:                   hci.HandlerFunc(todo),
+			evt.EncryptionKeyRefreshCompleteCode:         hci.HandlerFunc(todo),
+			evt.AuthenticatedPayloadTimeoutExpiredCode:   hci.HandlerFunc(todo),
 		},
-		subh: map[int]Handler{
-			evt.LEReadRemoteUsedFeaturesCompleteSubCode:   HandlerFunc(todo),
-			evt.LERemoteConnectionParameterRequestSubCode: HandlerFunc(todo),
+		subh: map[int]hci.Handler{
+			evt.LEReadRemoteUsedFeaturesCompleteSubCode:   hci.HandlerFunc(todo),
+			evt.LERemoteConnectionParameterRequestSubCode: hci.HandlerFunc(todo),
 		},
 	}
-	h.SetEventHandler(0x3E, HandlerFunc(h.handleLEMeta))
-	h.SetSubeventHandler(evt.LEAdvertisingReportSubCode, HandlerFunc(h.handleLEAdvertisingReport))
+	h.SetEventHandler(0x3E, hci.HandlerFunc(h.handleLEMeta))
+	h.SetSubeventHandler(evt.LEAdvertisingReportSubCode, hci.HandlerFunc(h.handleLEAdvertisingReport))
 	return h
 }
 
 type evtHub struct {
 	sync.Mutex
-	evth map[int]Handler
-	subh map[int]Handler
+	evth map[int]hci.Handler
+	subh map[int]hci.Handler
 }
 
-func (h *evtHub) EventHandler(c int) Handler {
+func (h *evtHub) EventHandler(c int) hci.Handler {
 	h.Lock()
 	defer h.Unlock()
 	return h.evth[c]
 }
 
-func (h *evtHub) SetEventHandler(c int, f Handler) Handler {
+func (h *evtHub) SetEventHandler(c int, f hci.Handler) hci.Handler {
 	h.Lock()
 	defer h.Unlock()
 	old := h.evth[c]
@@ -50,13 +51,13 @@ func (h *evtHub) SetEventHandler(c int, f Handler) Handler {
 	return old
 }
 
-func (h *evtHub) SubeventHandler(c int) Handler {
+func (h *evtHub) SubeventHandler(c int) hci.Handler {
 	h.Lock()
 	defer h.Unlock()
 	return h.subh[c]
 }
 
-func (h *evtHub) SetSubeventHandler(c int, f Handler) Handler {
+func (h *evtHub) SetSubeventHandler(c int, f hci.Handler) hci.Handler {
 	h.Lock()
 	defer h.Unlock()
 	old := h.subh[c]

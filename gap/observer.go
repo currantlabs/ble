@@ -3,6 +3,7 @@ package gap
 import (
 	"net"
 
+	"github.com/currantlabs/bt/dev"
 	"github.com/currantlabs/bt/hci"
 	"github.com/currantlabs/bt/hci/cmd"
 	"github.com/currantlabs/bt/hci/evt"
@@ -66,9 +67,9 @@ func (a Advertisement) Address() net.HardwareAddr {
 func (a Advertisement) Data() []byte { return a.e.Data(a.i) }
 
 // NewObserver ...
-func NewObserver(h hci.HCI) (Observer, error) {
+func NewObserver(d dev.Device) (Observer, error) {
 	o := &observer{
-		hci: h,
+		dev: d,
 
 		scanOn:  cmd.LESetScanEnable{LEScanEnable: 1},
 		scanOff: cmd.LESetScanEnable{LEScanEnable: 0},
@@ -82,13 +83,13 @@ func NewObserver(h hci.HCI) (Observer, error) {
 	}
 
 	// Register our own advertising report handler.
-	o.hci.SetSubeventHandler(evt.LEAdvertisingReportSubCode, hci.HandlerFunc(o.advHandler))
+	o.dev.SetSubeventHandler(evt.LEAdvertisingReportSubCode, hci.HandlerFunc(o.advHandler))
 
 	return o, nil
 }
 
 type observer struct {
-	hci     hci.HCI
+	dev     dev.Device
 	filter  Filter
 	handler Handler
 
@@ -100,15 +101,15 @@ type observer struct {
 // Scan ...
 func (o *observer) Scan(f Filter, h Handler) error {
 	o.filter, o.handler = f, h
-	o.hci.Send(&o.scanOff, nil)
-	o.hci.Send(&o.scanParam, nil)
-	o.hci.Send(&o.scanOn, nil)
+	o.dev.Send(&o.scanOff, nil)
+	o.dev.Send(&o.scanParam, nil)
+	o.dev.Send(&o.scanOn, nil)
 	return nil
 }
 
 // StopScanning stops scanning.
 func (o *observer) StopScanning() error {
-	o.hci.Send(&o.scanOff, nil)
+	o.dev.Send(&o.scanOff, nil)
 	return nil
 }
 
