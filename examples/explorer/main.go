@@ -62,7 +62,7 @@ func (e *explorer) explore(a net.HardwareAddr) {
 	}
 
 	for _, s := range ss {
-		fmt.Printf("Service: %s %s\n", s.UUID, uuid.Name(s.UUID))
+		fmt.Printf("Service: %s %s\n", s.UUID(), uuid.Name(s.UUID()))
 
 		// Discovery characteristics
 		cs, err := p.DiscoverCharacteristics(nil, s)
@@ -72,10 +72,10 @@ func (e *explorer) explore(a net.HardwareAddr) {
 		}
 
 		for _, c := range cs {
-			fmt.Printf("  Characteristic: %s, Property: 0x%02X, %s\n", c.UUID, c.Property, uuid.Name(c.UUID))
+			fmt.Printf("  Characteristic: %s, Properties: 0x%02X, %s\n", c.UUID(), c.Properties(), uuid.Name(c.UUID()))
 
 			// Read the characteristic, if possible.
-			if (c.Property & gatt.CharRead) != 0 {
+			if (c.Properties() & gatt.CharRead) != 0 {
 				b, err := p.ReadCharacteristic(c)
 				if err != nil {
 					fmt.Printf("Failed to read characteristic, err: %s\n", err)
@@ -92,7 +92,7 @@ func (e *explorer) explore(a net.HardwareAddr) {
 			}
 
 			for _, d := range ds {
-				fmt.Printf("    Descriptor: %s, %s\n", d.UUID, uuid.Name(d.UUID))
+				fmt.Printf("    Descriptor: %s, %s\n", d.UUID(), uuid.Name(d.UUID()))
 				// Read descriptor (could fail, if it's not readable)
 				b, err := p.ReadDescriptor(d)
 				if err != nil {
@@ -104,14 +104,14 @@ func (e *explorer) explore(a net.HardwareAddr) {
 
 			// Subscribe the characteristic, if possible.
 			// Note: This can only be done after the descriptors (CCCD) are discovered.
-			if (c.Property & gatt.CharNotify) != 0 {
+			if (c.Properties() & gatt.CharNotify) != 0 {
 				f := func(b []byte) { fmt.Printf("Notified: % X | %q\n", b, b) }
 				if err := p.SetNotificationHandler(c, f); err != nil {
 					fmt.Printf("Failed to subscribe characteristic, err: %s\n", err)
 					continue
 				}
 			}
-			if (c.Property & gatt.CharIndicate) != 0 {
+			if (c.Properties() & gatt.CharIndicate) != 0 {
 				f := func(b []byte) { fmt.Printf("Indicated: % X | %q\n", b, b) }
 				if err := p.SetIndicationHandler(c, f); err != nil {
 					fmt.Printf("Failed to subscribe characteristic, err: %s\n", err)

@@ -23,7 +23,7 @@ type Peripheral interface {
 }
 
 // NewPeripheral ...
-func NewPeripheral(d dev.Device, s *gatt.Server) (Peripheral, error) {
+func NewPeripheral(d dev.Device, s gatt.Server) (Peripheral, error) {
 	b, err := NewBroadcaster(d)
 	if err != nil {
 		return nil, err
@@ -44,7 +44,7 @@ func NewPeripheral(d dev.Device, s *gatt.Server) (Peripheral, error) {
 type peripheral struct {
 	Broadcaster
 	l2cap.Listener
-	s *gatt.Server
+	s gatt.Server
 }
 
 func (p *peripheral) loop() {

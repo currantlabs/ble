@@ -34,7 +34,7 @@ func main() {
 
 	// Crafting the advertising data packet
 	ad := adv.Packet(nil).AppendFlags(adv.FlagGeneralDiscoverable | adv.FlagLEOnly)
-	ad = ad.AppendAllUUID(s1.UUID).AppendAllUUID(s2.UUID)
+	ad = ad.AppendAllUUID(s1.UUID()).AppendAllUUID(s2.UUID())
 
 	sr := adv.Packet(nil).AppendCompleteName("Gopher")
 

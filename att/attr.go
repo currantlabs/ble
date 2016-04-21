@@ -6,8 +6,6 @@ import (
 	"log"
 
 	"github.com/currantlabs/bt/uuid"
-
-	"golang.org/x/net/context"
 )
 
 // Attribute is a BLE attribute.
@@ -22,7 +20,8 @@ type Attribute struct {
 
 // Value ...
 type Value interface {
-	Handle(ctx context.Context, req []byte, resp *ResponseWriter) Error
+	HandleATT(req []byte, resp *ResponseWriter) Error
+	Value() []byte
 }
 
 // A Range is a contiguous range of attributes.
@@ -94,23 +93,25 @@ func DumpAttributes(Attributes []Attribute) {
 
 // ResponseWriter ...
 type ResponseWriter struct {
-	buf *bytes.Buffer
+	svr    *Server
+	buf    *bytes.Buffer
+	status Error
 }
 
-// Reset ...
-func (r *ResponseWriter) Reset() {
-	r.buf.Reset()
-}
+// Status reports the result of the request.
+func (r *ResponseWriter) Status() Error { return r.status }
+
+// SetStatus reports the result of the request.
+func (r *ResponseWriter) SetStatus(status Error) { r.status = status }
+
+// Server ...
+func (r *ResponseWriter) Server() *Server { return r.svr }
 
 // Len ...
-func (r *ResponseWriter) Len() int {
-	return r.buf.Len()
-}
+func (r *ResponseWriter) Len() int { return r.buf.Len() }
 
 // Cap ...
-func (r *ResponseWriter) Cap() int {
-	return r.buf.Cap()
-}
+func (r *ResponseWriter) Cap() int { return r.buf.Cap() }
 
 // Write writes data to return as the characteristic value.
 func (r *ResponseWriter) Write(b []byte) (int, error) {

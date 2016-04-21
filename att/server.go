@@ -7,8 +7,6 @@ import (
 	"log"
 	"time"
 
-	"golang.org/x/net/context"
-
 	"github.com/currantlabs/bt/l2cap"
 	"github.com/currantlabs/bt/uuid"
 )
@@ -16,7 +14,6 @@ import (
 // Server implementas an ATT (Attribute Protocol) server.
 type Server struct {
 	l2c   l2cap.Conn
-	ctx   context.Context
 	attrs *Range
 
 	// Refer to [Vol 3, Part F, 3.3.2 & 3.3.3] for the requirement of
@@ -29,13 +26,12 @@ type Server struct {
 }
 
 // NewServer returns an ATT (Attribute Protocol) server.
-func NewServer(ctx context.Context, a *Range, l2c l2cap.Conn, rxMTU int) *Server {
+func NewServer(a *Range, l2c l2cap.Conn, rxMTU int) *Server {
 	// Although the rxBuf is initialized with the capacity of rxMTU, it is
 	// not discovered, and only the default ATT_MTU (23 bytes) of it shall
 	// be used until remote central request ExchangeMTU.
 	s := &Server{
 		l2c:   l2c,
-		ctx:   ctx,
 		attrs: a,
 
 		txBuf:     make([]byte, 23, 23),
@@ -260,7 +256,7 @@ func (s *Server) handleFindByTypeValueRequest(r FindByTypeValueRequest) []byte {
 			// Since ResponseWriter caps the value at the capacity,
 			// we allocate one extra byte, and the written length.
 			buf2 := bytes.NewBuffer(make([]byte, 0, len(s.txBuf)-7+1))
-			e := a.Pvt.Handle(s.ctx, r, &ResponseWriter{buf: buf2})
+			e := a.Pvt.HandleATT(r, &ResponseWriter{svr: s, buf: buf2})
 			if e != ErrSuccess || buf2.Len() > len(s.txBuf)-7 {
 				return NewErrorResponse(r.AttributeOpcode(), r.StartingHandle(), ErrInvalidHandle)
 			}
@@ -307,7 +303,7 @@ func (s *Server) handleReadByTypeRequest(r ReadByTypeRequest) []byte {
 		v := a.Value
 		if v == nil {
 			buf2 := bytes.NewBuffer(make([]byte, 0, len(s.txBuf)-2))
-			if e := a.Pvt.Handle(s.ctx, r, &ResponseWriter{buf: buf2}); e != ErrSuccess {
+			if e := a.Pvt.HandleATT(r, &ResponseWriter{svr: s, buf: buf2}); e != ErrSuccess {
 				// Return if the first value read cause an error.
 				if dlen == 0 {
 					return NewErrorResponse(r.AttributeOpcode(), r.StartingHandle(), e)
@@ -365,7 +361,7 @@ func (s *Server) handleReadRequest(r ReadRequest) []byte {
 
 	// Pass the request to upper layer with the ResponseWriter, which caps
 	// the buffer to a valid length of payload.
-	if e := a.Pvt.Handle(s.ctx, r, &ResponseWriter{buf: buf}); e != ErrSuccess {
+	if e := a.Pvt.HandleATT(r, &ResponseWriter{svr: s, buf: buf}); e != ErrSuccess {
 		return NewErrorResponse(r.AttributeOpcode(), r.AttributeHandle(), e)
 	}
 	return rsp[:1+buf.Len()]
@@ -397,7 +393,7 @@ func (s *Server) handleReadBlobRequest(r ReadBlobRequest) []byte {
 
 	// Pass the request to upper layer with the ResponseWriter, which caps
 	// the buffer to a valid length of payload.
-	if e := a.Pvt.Handle(s.ctx, r, &ResponseWriter{buf: buf}); e != ErrSuccess {
+	if e := a.Pvt.HandleATT(r, &ResponseWriter{svr: s, buf: buf}); e != ErrSuccess {
 		return NewErrorResponse(r.AttributeOpcode(), r.AttributeHandle(), e)
 	}
 	return rsp[:1+buf.Len()]
@@ -423,7 +419,7 @@ func (s *Server) handleReadByGroupRequest(r ReadByGroupTypeRequest) []byte {
 		v := a.Value
 		if v == nil {
 			buf2 := bytes.NewBuffer(make([]byte, buf.Cap()-buf.Len()-4))
-			if e := a.Pvt.Handle(s.ctx, r, &ResponseWriter{buf: buf2}); e != ErrSuccess {
+			if e := a.Pvt.HandleATT(r, &ResponseWriter{svr: s, buf: buf2}); e != ErrSuccess {
 				return NewErrorResponse(r.AttributeOpcode(), r.StartingHandle(), e)
 			}
 			v = buf2.Bytes()
@@ -467,7 +463,7 @@ func (s *Server) handleWriteRequest(r WriteRequest) []byte {
 	if a.Pvt == nil {
 		return NewErrorResponse(r.AttributeOpcode(), r.AttributeHandle(), ErrWriteNotPerm)
 	}
-	if e := a.Pvt.Handle(s.ctx, r, nil); e != ErrSuccess {
+	if e := a.Pvt.HandleATT(r, &ResponseWriter{svr: s}); e != ErrSuccess {
 		return NewErrorResponse(r.AttributeOpcode(), r.AttributeHandle(), e)
 	}
 	return []byte{WriteResponseCode}
@@ -490,7 +486,7 @@ func (s *Server) handleWriteCommand(r WriteCommand) []byte {
 	if a.Pvt == nil {
 		return nil
 	}
-	if e := a.Pvt.Handle(s.ctx, r, nil); e != ErrSuccess {
+	if e := a.Pvt.HandleATT(r, nil); e != ErrSuccess {
 		return nil
 	}
 	return nil
