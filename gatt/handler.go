@@ -131,7 +131,7 @@ func config(c *Characteristic, p Property, nh NotifyHandler, ih IndicateHandler)
 			if value&flagCCCNotify != 0 && c.nn == nil {
 				n := &notifier{}
 				n.ctx, n.cancel = context.WithCancel(context.Background())
-				n.send = func(b []byte) (int, error) { return rsp.Server().Notify(c.vh, b) }
+				n.send = func(b []byte) (int, error) { return rsp.Server().Notify(c.attr.vh, b) }
 				c.nn = n
 				go c.nh.ServeNotify(req, n)
 			}
@@ -142,7 +142,7 @@ func config(c *Characteristic, p Property, nh NotifyHandler, ih IndicateHandler)
 			if value&flagCCCIndicate != 0 && c.in == nil {
 				n := &notifier{}
 				n.ctx, n.cancel = context.WithCancel(context.Background())
-				n.send = func(b []byte) (int, error) { return rsp.Server().Indicate(c.vh, b) }
+				n.send = func(b []byte) (int, error) { return rsp.Server().Indicate(c.attr.vh, b) }
 				c.in = n
 				go c.ih.ServeIndicate(req, n)
 			}

@@ -57,7 +57,10 @@ func (p *client) DiscoverServices(filter []uuid.UUID) ([]*Service, error) {
 			endh := binary.LittleEndian.Uint16(b[2:4])
 			u := uuid.UUID(b[4:length])
 			if filter == nil || uuid.Contains(filter, u) {
-				p.svcs = append(p.svcs, &Service{uuid: u, h: h, endh: endh})
+				p.svcs = append(p.svcs, &Service{
+					uuid: u,
+					attr: attr{h: h, endh: endh},
+				})
 			}
 			if endh == 0xFFFF {
 				return p.svcs, nil
@@ -73,10 +76,10 @@ func (p *client) DiscoverIncludedServices(ss []uuid.UUID, s *Service) ([]*Servic
 }
 
 func (p *client) DiscoverCharacteristics(filter []uuid.UUID, s *Service) ([]*Characteristic, error) {
-	start := s.h
+	start := s.attr.h
 	var lastChar *Characteristic
-	for start <= s.endh {
-		length, b, err := p.c.ReadByType(start, s.endh, attrCharacteristicUUID)
+	for start <= s.attr.endh {
+		length, b, err := p.c.ReadByType(start, s.attr.endh, attrCharacteristicUUID)
 		if err == att.ErrAttrNotFound {
 			break
 		} else if err != nil {
@@ -90,16 +93,17 @@ func (p *client) DiscoverCharacteristics(filter []uuid.UUID, s *Service) ([]*Cha
 			c := &Characteristic{
 				uuid:  u,
 				props: props,
-				value: attValue{},
-				h:     h,
-				vh:    vh,
-				endh:  s.endh,
+				attr: attr{
+					h:    h,
+					vh:   vh,
+					endh: s.attr.endh,
+				},
 			}
 			if filter == nil || uuid.Contains(filter, u) {
 				s.chars = append(s.chars, c)
 			}
 			if lastChar != nil {
-				lastChar.endh = c.h - 1
+				lastChar.attr.endh = c.attr.h - 1
 			}
 			lastChar = c
 			start = vh + 1
@@ -110,9 +114,9 @@ func (p *client) DiscoverCharacteristics(filter []uuid.UUID, s *Service) ([]*Cha
 }
 
 func (p *client) DiscoverDescriptors(filter []uuid.UUID, c *Characteristic) ([]*Descriptor, error) {
-	start := c.vh + 1
-	for start <= c.endh {
-		fmt, b, err := p.c.FindInformation(start, c.endh)
+	start := c.attr.vh + 1
+	for start <= c.attr.endh {
+		fmt, b, err := p.c.FindInformation(start, c.attr.endh)
 		if err == att.ErrAttrNotFound {
 			break
 		} else if err != nil {
@@ -125,7 +129,10 @@ func (p *client) DiscoverDescriptors(filter []uuid.UUID, c *Characteristic) ([]*
 		for len(b) != 0 {
 			h := binary.LittleEndian.Uint16(b[:2])
 			u := uuid.UUID(b[2:length])
-			d := &Descriptor{uuid: u, h: h}
+			d := &Descriptor{
+				uuid: u,
+				attr: attr{h: h},
+			}
 			if filter == nil || uuid.Contains(filter, u) {
 				c.descs = append(c.descs, d)
 			}
@@ -139,21 +146,21 @@ func (p *client) DiscoverDescriptors(filter []uuid.UUID, c *Characteristic) ([]*
 	return c.descs, nil
 }
 
-func (p *client) ReadCharacteristic(c *Characteristic) ([]byte, error) { return p.c.Read(c.vh) }
+func (p *client) ReadCharacteristic(c *Characteristic) ([]byte, error) { return p.c.Read(c.attr.vh) }
 
 func (p *client) ReadLongCharacteristic(c *Characteristic) ([]byte, error) { return nil, nil }
 
 func (p *client) WriteCharacteristic(c *Characteristic, value []byte, noRsp bool) error {
 	if noRsp {
-		p.c.WriteCommand(c.vh, value)
+		p.c.WriteCommand(c.attr.vh, value)
 		return nil
 	}
-	return p.c.Write(c.vh, value)
+	return p.c.Write(c.attr.vh, value)
 }
 
-func (p *client) ReadDescriptor(d *Descriptor) ([]byte, error) { return p.c.Read(d.h) }
+func (p *client) ReadDescriptor(d *Descriptor) ([]byte, error) { return p.c.Read(d.attr.h) }
 
-func (p *client) WriteDescriptor(d *Descriptor, v []byte) error { return p.c.Write(d.h, v) }
+func (p *client) WriteDescriptor(d *Descriptor, v []byte) error { return p.c.Write(d.attr.h, v) }
 
 func (p *client) ReadRSSI() int { return -1 }
 
@@ -163,11 +170,11 @@ func (p *client) SetMTU(mtu int) error {
 }
 
 func (p *client) SetNotificationHandler(c *Characteristic, h NotificationHandler) error {
-	return p.setHandlers(c.cccd.h, c.vh, flagCCCNotify, h)
+	return p.setHandlers(c.cccd.attr.h, c.attr.vh, flagCCCNotify, h)
 }
 
 func (p *client) SetIndicationHandler(c *Characteristic, h NotificationHandler) error {
-	return p.setHandlers(c.cccd.h, c.vh, flagCCCIndicate, h)
+	return p.setHandlers(c.cccd.attr.h, c.attr.vh, flagCCCIndicate, h)
 }
 
 func (p *client) setHandlers(cccdh, vh, flag uint16, h NotificationHandler) error {

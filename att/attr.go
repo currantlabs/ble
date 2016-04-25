@@ -9,17 +9,11 @@ import (
 )
 
 // Attribute is a BLE attribute.
-type Attribute struct {
-	Handle       uint16    // Handle
-	EndingHandle uint16    // Group EndingHandle
-	Type         uuid.UUID // Type (in UUID)
+type Attribute interface {
+	Handle() uint16
+	EndingHandle() uint16
+	Type() uuid.UUID
 
-	Value []byte // Staic and read-only Value
-	Pvt   Value  // Handler from upper layer, such as GATT.
-}
-
-// Value ...
-type Value interface {
 	HandleATT(req []byte, resp *ResponseWriter) Error
 	Value() []byte
 }
@@ -52,7 +46,7 @@ func (r *Range) idx(h int) int {
 func (r *Range) at(h uint16) (a Attribute, ok bool) {
 	i := r.idx(int(h))
 	if i < 0 {
-		return Attribute{}, false
+		return nil, false
 	}
 	return r.Attributes[i], true
 }
@@ -83,11 +77,11 @@ func DumpAttributes(Attributes []Attribute) {
 	log.Printf("Generating attribute table:")
 	log.Printf("handle\tend\ttype\tvalue")
 	for _, a := range Attributes {
-		if a.Value != nil {
-			log.Printf("0x%04X\t0x%04X\t0x%s\t[ % X ]", a.Handle, a.EndingHandle, a.Type, a.Value)
+		if a.Value() != nil {
+			log.Printf("0x%04X\t0x%04X\t0x%s\t[ % X ]", a.Handle(), a.EndingHandle(), a.Type(), a.Value())
 			continue
 		}
-		log.Printf("0x%04X\t0x%04X\t0x%s\t%T", a.Handle, a.EndingHandle, a.Type, a.Pvt)
+		log.Printf("0x%04X\t0x%04X\t0x%s", a.Handle(), a.EndingHandle(), a.Type())
 	}
 }
 

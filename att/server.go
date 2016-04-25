@@ -210,21 +210,21 @@ func (s *Server) handleFindInformationRequest(r FindInformationRequest) []byte {
 	for _, a := range s.attrs.subrange(r.StartingHandle(), r.EndingHandle()) {
 		if rsp.Format() == 0 {
 			rsp.SetFormat(0x01)
-			if a.Type.Len() == 16 {
+			if a.Type().Len() == 16 {
 				rsp.SetFormat(0x02)
 			}
 		}
-		if rsp.Format() == 0x01 && a.Type.Len() != 2 {
+		if rsp.Format() == 0x01 && a.Type().Len() != 2 {
 			break
 		}
-		if rsp.Format() == 0x02 && a.Type.Len() != 16 {
+		if rsp.Format() == 0x02 && a.Type().Len() != 16 {
 			break
 		}
-		if buf.Len()+2+a.Type.Len() > buf.Cap() {
+		if buf.Len()+2+a.Type().Len() > buf.Cap() {
 			break
 		}
-		binary.Write(buf, binary.LittleEndian, a.Handle)
-		binary.Write(buf, binary.LittleEndian, a.Type)
+		binary.Write(buf, binary.LittleEndian, a.Handle())
+		binary.Write(buf, binary.LittleEndian, a.Type())
 	}
 
 	// Nothing has been found.
@@ -250,17 +250,17 @@ func (s *Server) handleFindByTypeValueRequest(r FindByTypeValueRequest) []byte {
 	buf.Reset()
 
 	for _, a := range s.attrs.subrange(r.StartingHandle(), r.EndingHandle()) {
-		v, starth, endh := a.Value, a.Handle, a.EndingHandle
+		v, starth, endh := a.Value(), a.Handle(), a.EndingHandle()
 		if v == nil {
 			// The value shall not exceed ATT_MTU - 7 bytes.
 			// Since ResponseWriter caps the value at the capacity,
 			// we allocate one extra byte, and the written length.
 			buf2 := bytes.NewBuffer(make([]byte, 0, len(s.txBuf)-7+1))
-			e := a.Pvt.HandleATT(r, &ResponseWriter{svr: s, buf: buf2})
+			e := a.HandleATT(r, &ResponseWriter{svr: s, buf: buf2})
 			if e != ErrSuccess || buf2.Len() > len(s.txBuf)-7 {
 				return NewErrorResponse(r.AttributeOpcode(), r.StartingHandle(), ErrInvalidHandle)
 			}
-			endh = a.Handle
+			endh = a.Handle()
 		}
 		if !(uuid.UUID(v).Equal(uuid.UUID(r.AttributeValue()))) {
 			continue
@@ -297,13 +297,13 @@ func (s *Server) handleReadByTypeRequest(r ReadByTypeRequest) []byte {
 	// Each response shall only contains values with the same size.
 	dlen := 0
 	for _, a := range s.attrs.subrange(r.StartingHandle(), r.EndingHandle()) {
-		if !a.Type.Equal(uuid.UUID(r.AttributeType())) {
+		if !a.Type().Equal(uuid.UUID(r.AttributeType())) {
 			continue
 		}
-		v := a.Value
+		v := a.Value()
 		if v == nil {
 			buf2 := bytes.NewBuffer(make([]byte, 0, len(s.txBuf)-2))
-			if e := a.Pvt.HandleATT(r, &ResponseWriter{svr: s, buf: buf2}); e != ErrSuccess {
+			if e := a.HandleATT(r, &ResponseWriter{svr: s, buf: buf2}); e != ErrSuccess {
 				// Return if the first value read cause an error.
 				if dlen == 0 {
 					return NewErrorResponse(r.AttributeOpcode(), r.StartingHandle(), e)
@@ -326,7 +326,7 @@ func (s *Server) handleReadByTypeRequest(r ReadByTypeRequest) []byte {
 		} else if 2+len(v) != dlen {
 			break
 		}
-		binary.Write(buf, binary.LittleEndian, a.Handle)
+		binary.Write(buf, binary.LittleEndian, a.Handle())
 		binary.Write(buf, binary.LittleEndian, v[:dlen-2])
 	}
 	if dlen == 0 {
@@ -354,14 +354,14 @@ func (s *Server) handleReadRequest(r ReadRequest) []byte {
 	}
 
 	// Simple case. Read-only, no-authorization, no-authentication.
-	if a.Value != nil {
-		binary.Write(buf, binary.LittleEndian, a.Value)
+	if a.Value() != nil {
+		binary.Write(buf, binary.LittleEndian, a.Value())
 		return rsp[:1+buf.Len()]
 	}
 
 	// Pass the request to upper layer with the ResponseWriter, which caps
 	// the buffer to a valid length of payload.
-	if e := a.Pvt.HandleATT(r, &ResponseWriter{svr: s, buf: buf}); e != ErrSuccess {
+	if e := a.HandleATT(r, &ResponseWriter{svr: s, buf: buf}); e != ErrSuccess {
 		return NewErrorResponse(r.AttributeOpcode(), r.AttributeHandle(), e)
 	}
 	return rsp[:1+buf.Len()]
@@ -386,14 +386,14 @@ func (s *Server) handleReadBlobRequest(r ReadBlobRequest) []byte {
 	buf.Reset()
 
 	// Simple case. Read-only, no-authorization, no-authentication.
-	if a.Value != nil {
-		binary.Write(buf, binary.LittleEndian, a.Value)
+	if a.Value() != nil {
+		binary.Write(buf, binary.LittleEndian, a.Value())
 		return rsp[:1+buf.Len()]
 	}
 
 	// Pass the request to upper layer with the ResponseWriter, which caps
 	// the buffer to a valid length of payload.
-	if e := a.Pvt.HandleATT(r, &ResponseWriter{svr: s, buf: buf}); e != ErrSuccess {
+	if e := a.HandleATT(r, &ResponseWriter{svr: s, buf: buf}); e != ErrSuccess {
 		return NewErrorResponse(r.AttributeOpcode(), r.AttributeHandle(), e)
 	}
 	return rsp[:1+buf.Len()]
@@ -416,10 +416,10 @@ func (s *Server) handleReadByGroupRequest(r ReadByGroupTypeRequest) []byte {
 
 	dlen := 0
 	for _, a := range s.attrs.subrange(r.StartingHandle(), r.EndingHandle()) {
-		v := a.Value
+		v := a.Value()
 		if v == nil {
 			buf2 := bytes.NewBuffer(make([]byte, buf.Cap()-buf.Len()-4))
-			if e := a.Pvt.HandleATT(r, &ResponseWriter{svr: s, buf: buf2}); e != ErrSuccess {
+			if e := a.HandleATT(r, &ResponseWriter{svr: s, buf: buf2}); e != ErrSuccess {
 				return NewErrorResponse(r.AttributeOpcode(), r.StartingHandle(), e)
 			}
 			v = buf2.Bytes()
@@ -436,8 +436,8 @@ func (s *Server) handleReadByGroupRequest(r ReadByGroupTypeRequest) []byte {
 		} else if 4+len(v) != dlen {
 			break
 		}
-		binary.Write(buf, binary.LittleEndian, a.Handle)
-		binary.Write(buf, binary.LittleEndian, a.EndingHandle)
+		binary.Write(buf, binary.LittleEndian, a.Handle())
+		binary.Write(buf, binary.LittleEndian, a.EndingHandle())
 		binary.Write(buf, binary.LittleEndian, v[:dlen-4])
 	}
 	if dlen == 0 {
@@ -460,10 +460,10 @@ func (s *Server) handleWriteRequest(r WriteRequest) []byte {
 	}
 
 	// We don't support write to static value. Pass the request to upper layer.
-	if a.Pvt == nil {
+	if a == nil {
 		return NewErrorResponse(r.AttributeOpcode(), r.AttributeHandle(), ErrWriteNotPerm)
 	}
-	if e := a.Pvt.HandleATT(r, &ResponseWriter{svr: s}); e != ErrSuccess {
+	if e := a.HandleATT(r, &ResponseWriter{svr: s}); e != ErrSuccess {
 		return NewErrorResponse(r.AttributeOpcode(), r.AttributeHandle(), e)
 	}
 	return []byte{WriteResponseCode}
@@ -483,10 +483,10 @@ func (s *Server) handleWriteCommand(r WriteCommand) []byte {
 	}
 
 	// We don't support write to static value. Pass the request to upper layer.
-	if a.Pvt == nil {
+	if a == nil {
 		return nil
 	}
-	if e := a.Pvt.HandleATT(r, nil); e != ErrSuccess {
+	if e := a.HandleATT(r, nil); e != ErrSuccess {
 		return nil
 	}
 	return nil
