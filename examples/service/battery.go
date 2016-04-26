@@ -1,17 +1,18 @@
 package service
 
 import (
+	"github.com/currantlabs/bt"
 	"github.com/currantlabs/bt/gatt"
 	"github.com/currantlabs/bt/uuid"
 )
 
 // NewBatteryService ...
-func NewBatteryService() *gatt.Service {
+func NewBatteryService() bt.Service {
 	lv := byte(100)
 	s := gatt.NewService(uuid.UUID16(0x180F))
 	c := s.AddCharacteristic(uuid.UUID16(0x2A19))
 	c.HandleRead(
-		gatt.ReadHandlerFunc(func(req gatt.Request, rsp gatt.ResponseWriter) {
+		bt.ReadHandlerFunc(func(req bt.Request, rsp bt.ResponseWriter) {
 			rsp.Write([]byte{lv})
 			lv--
 		}))

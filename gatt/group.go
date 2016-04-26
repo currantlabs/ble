@@ -1,153 +1,115 @@
 package gatt
 
-import "github.com/currantlabs/bt/uuid"
+import (
+	"github.com/currantlabs/bt"
+	"github.com/currantlabs/bt/uuid"
+)
 
 // NewService returns a GATT service.
-func NewService(u uuid.UUID) *Service {
-	return &Service{uuid: u}
-}
+func NewService(u uuid.UUID) bt.Service { return &svc{uuid: u} }
 
-// A Service is a GATT service.
-type Service struct {
+type svc struct {
 	uuid  uuid.UUID
-	chars []*Characteristic
+	chars []bt.Characteristic
 
 	attr attr
 }
 
-// UUID returns the UUID of the service.
-func (s *Service) UUID() uuid.UUID { return s.uuid }
+func (s *svc) UUID() uuid.UUID                      { return s.uuid }
+func (s *svc) Characteristics() []bt.Characteristic { return s.chars }
 
-// Characteristics returns the contained characteristic of this service.
-func (s *Service) Characteristics() []*Characteristic { return s.chars }
-
-// AddCharacteristic adds a characteristic to a service.
-// AddCharacteristic panics if the service already contains another
-// characteristic with the same UUID.
-func (s *Service) AddCharacteristic(u uuid.UUID) *Characteristic {
+func (s *svc) AddCharacteristic(u uuid.UUID) bt.Characteristic {
 	for _, c := range s.chars {
 		if c.UUID().Equal(u) {
 			panic("Service already contains a characteristic with uuid " + u.String())
 		}
 	}
-	c := &Characteristic{uuid: u}
+	c := &char{uuid: u}
 	s.chars = append(s.chars, c)
 	return c
 }
 
-// A Characteristic is a GATT characteristic.
-type Characteristic struct {
+type char struct {
 	uuid  uuid.UUID
-	props Property
-	descs []*Descriptor
-	cccd  *Descriptor
+	props bt.Property
+	descs []bt.Descriptor
+	cccd  *desc
 
 	attr  attr
 	vattr attr
 
-	nh NotifyHandler
-	ih IndicateHandler
+	nh bt.NotifyHandler
+	ih bt.IndicateHandler
 	nn *notifier
 	in *notifier
 }
 
-// UUID returns the UUID of the characteristic.
-func (c *Characteristic) UUID() uuid.UUID { return c.uuid }
+func (c *char) UUID() uuid.UUID              { return c.uuid }
+func (c *char) Properties() bt.Property      { return c.props }
+func (c *char) Descriptors() []bt.Descriptor { return c.descs }
 
-// Properties returns the properties of this characteristic.
-func (c *Characteristic) Properties() Property { return c.props }
-
-// Descriptors returns the contained descriptors of this characteristic.
-func (c *Characteristic) Descriptors() []*Descriptor { return c.descs }
-
-// SetValue panics if the characteristic has been configured with a ReadHandler.
-// SetValue makes the characteristic support the requests, and returns a static attr.
-// SetValue must be called before the containing service is added to a server.
-func (c *Characteristic) SetValue(b []byte) *Characteristic {
-	c.props |= CharRead
-	c.vattr.setValue(b)
+func (c *char) SetValue(b []byte) bt.Characteristic {
+	c.props |= bt.CharRead
+	c.vattr.SetValue(b)
 	return c
 }
 
-// HandleRead makes the characteristic support the requests, and routes the requests to h.
-// HandleRead must be called before the containing service is added to a server.
-// HandleRead panics if the characteristic has been configured with a static attr.
-func (c *Characteristic) HandleRead(h ReadHandler) *Characteristic {
-	c.props |= CharRead
-	c.vattr.handleRead(h)
+func (c *char) HandleRead(h bt.ReadHandler) bt.Characteristic {
+	c.props |= bt.CharRead
+	c.vattr.HandleRead(h)
 	return c
 }
 
-// HandleWrite makes the characteristic support write and write-no-response requests, and routes the requests to h.
-// The WriteHandler does not differentiate between write and write-no-response requests; it is handled automatically.
-// HandleWrite must be called before the containing service is added to a server.
-func (c *Characteristic) HandleWrite(h WriteHandler) *Characteristic {
-	c.props |= CharWrite | CharWriteNR
-	c.vattr.handleWrite(h)
+func (c *char) HandleWrite(h bt.WriteHandler) bt.Characteristic {
+	c.props |= bt.CharWrite | bt.CharWriteNR
+	c.vattr.HandleWrite(h)
 	return c
 }
 
-// HandleNotify makes the characteristic support notify requests, and routes the requests to h.
-// HandleNotify must be called before the containing service is added to a server.
-func (c *Characteristic) HandleNotify(h NotifyHandler) *Characteristic {
-	config(c, CharNotify, h, nil)
+func (c *char) HandleNotify(h bt.NotifyHandler) bt.Characteristic {
+	config(c, bt.CharNotify, h, nil)
 	return c
 }
 
-// HandleIndicate makes the characteristic support notify requests, and routes the requests to h.
-// HandleIndicate must be called before the containing service is added to a server.
-func (c *Characteristic) HandleIndicate(h IndicateHandler) *Characteristic {
-	config(c, CharIndicate, nil, h)
+func (c *char) HandleIndicate(h bt.IndicateHandler) bt.Characteristic {
+	config(c, bt.CharIndicate, nil, h)
 	return c
 }
 
-// AddDescriptor adds a descriptor to a characteristic.
-// AddDescriptor panics if the characteristic already contains another descriptor with the same UUID.
-func (c *Characteristic) AddDescriptor(u uuid.UUID) *Descriptor {
+func (c *char) AddDescriptor(u uuid.UUID) bt.Descriptor {
 	for _, d := range c.descs {
 		if d.UUID().Equal(u) {
 			panic("Service already contains a characteristic with uuid " + u.String())
 		}
 	}
-	d := &Descriptor{uuid: u}
+	d := &desc{uuid: u}
 	c.descs = append(c.descs, d)
 	return d
 }
 
-// Descriptor is a GATT descriptor
-type Descriptor struct {
+type desc struct {
 	uuid  uuid.UUID
-	props Property
+	props bt.Property
 
 	attr attr
 }
 
-// UUID returns the UUID of the descriptor.
-func (d *Descriptor) UUID() uuid.UUID { return d.uuid }
+func (d *desc) UUID() uuid.UUID { return d.uuid }
 
-// SetValue makes the descriptor support the requests, and returns a static attr.
-// SetValue must be called before the containing service is added to a server.
-// SetValue panics if the descriptor has already configured with a ReadHandler.
-func (d *Descriptor) SetValue(b []byte) *Descriptor {
-	d.props |= CharRead
-	d.attr.setValue(b)
+func (d *desc) SetValue(b []byte) bt.Descriptor {
+	d.props |= bt.CharRead
+	d.attr.SetValue(b)
 	return d
 }
 
-// HandleRead makes the descriptor support the requests, and routes the requests to h.
-// HandleRead must be called before the containing service is added to a server.
-// HandleRead panics if the descriptor has been configured with a static attr.
-func (d *Descriptor) HandleRead(h ReadHandler) *Descriptor {
-	d.props |= CharRead
-	d.attr.handleRead(h)
+func (d *desc) HandleRead(h bt.ReadHandler) bt.Descriptor {
+	d.props |= bt.CharRead
+	d.attr.HandleRead(h)
 	return d
 }
 
-// HandleWrite makes the descriptor support write and write-no-response requests, and routes the requests to h.
-// The WriteHandler does not differentiate between write and write-no-response requests; it is handled automatically.
-// HandleWrite must be called before the containing service is added to a server.
-func (d *Descriptor) HandleWrite(h WriteHandler) *Descriptor {
-	d.props |= CharWrite | CharWriteNR
-	d.attr.handleWrite(h)
+func (d *desc) HandleWrite(h bt.WriteHandler) bt.Descriptor {
+	d.props |= bt.CharWrite | bt.CharWriteNR
+	d.attr.HandleWrite(h)
 	return d
 }

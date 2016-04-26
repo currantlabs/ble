@@ -1,6 +1,7 @@
 package service
 
 import (
+	"github.com/currantlabs/bt"
 	"github.com/currantlabs/bt/gatt"
 	"github.com/currantlabs/bt/uuid"
 )
@@ -11,7 +12,7 @@ var (
 )
 
 // NewGattService ...
-func NewGattService() *gatt.Service {
+func NewGattService() bt.Service {
 	s := gatt.NewService(attrGATTUUID)
 	// s.AddCharacteristic(attrServiceChangedUUID).HandleNotify(
 	// 	gatt.NotifyHandlerFunc(func(r gatt.Request, n *gatt.Notifier) {

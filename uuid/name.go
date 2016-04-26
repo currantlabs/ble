@@ -46,11 +46,11 @@ var knownUUID = map[string]struct{ Name, Type string }{
 	"2908": {Name: "Report Reference", Type: "org.bluetooth.descriptor.report_reference"},
 
 	// A dictionary of known characteristic names and type (keyed by characteristic uuid)
-	"2A00": {Name: "Device Name", Type: "org.bluetooth.characteristic.gap.device_name"},
-	"2A01": {Name: "Appearance", Type: "org.bluetooth.characteristic.gap.appearance"},
-	"2A02": {Name: "Peripheral Privacy Flag", Type: "org.bluetooth.characteristic.gap.peripheral_privacy_flag"},
-	"2A03": {Name: "Reconnection Address", Type: "org.bluetooth.characteristic.gap.reconnection_address"},
-	"2A04": {Name: "Peripheral Preferred Connection Parameters", Type: "org.bluetooth.characteristic.gap.peripheral_preferred_connection_parameters"},
+	"2A00": {Name: "Device Name", Type: "org.bluetooth.characteristic.bt.device_name"},
+	"2A01": {Name: "Appearance", Type: "org.bluetooth.characteristic.bt.appearance"},
+	"2A02": {Name: "Peripheral Privacy Flag", Type: "org.bluetooth.characteristic.bt.peripheral_privacy_flag"},
+	"2A03": {Name: "Reconnection Address", Type: "org.bluetooth.characteristic.bt.reconnection_address"},
+	"2A04": {Name: "Peripheral Preferred Connection Parameters", Type: "org.bluetooth.characteristic.bt.peripheral_preferred_connection_parameters"},
 	"2A05": {Name: "Service Changed", Type: "org.bluetooth.characteristic.gatt.service_changed"},
 	"2A06": {Name: "Alert Level", Type: "org.bluetooth.characteristic.alert_level"},
 	"2A07": {Name: "Tx Power Level", Type: "org.bluetooth.characteristic.tx_power_level"},

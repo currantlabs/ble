@@ -1,41 +1,45 @@
 package gatt
 
 import (
+	"github.com/currantlabs/bt"
 	"github.com/currantlabs/bt/att"
-	"github.com/currantlabs/bt/gap"
 )
+
+// NewServer ...
+func NewServer() *Server {
+	return &Server{}
+}
 
 // Server ...
 type Server struct {
-	svcs  []*Service
+	svcs  []bt.Service
 	attrs *att.Range
 }
 
-// AddService add a service to database.
-func (s *Server) AddService(svc *Service) *Service {
+// AddService ...
+func (s *Server) AddService(svc bt.Service) bt.Service {
 	s.svcs = append(s.svcs, svc)
 	s.attrs = genAttr(s.svcs, uint16(1)) // ble attrs start at 1
 	return svc
 }
 
-// RemoveAllServices removes all services that are currently in the database.
+// RemoveAllServices ...
 func (s *Server) RemoveAllServices() error {
 	s.svcs = nil
 	s.attrs = nil
 	return nil
 }
 
-// SetServices set the specified service to the database.
-// It removes all currently added services, if any.
-func (s *Server) SetServices(svcs []*Service) error {
+// SetServices ...
+func (s *Server) SetServices(svcs []bt.Service) error {
 	s.RemoveAllServices()
 	s.svcs = append(s.svcs, svcs...)
 	s.attrs = genAttr(s.svcs, uint16(1)) // ble attrs start at 1
 	return nil
 }
 
-// Init ...
-func (s *Server) Init(p *gap.Peripheral) {
+// Start ...
+func (s *Server) Start(p bt.Peripheral) error {
 	go func() {
 		for {
 			l2c, err := p.Accept()
@@ -43,7 +47,13 @@ func (s *Server) Init(p *gap.Peripheral) {
 				break
 			}
 			att.NewServer(s.attrs, l2c, 1024).Loop()
-			p.StartAdvertising()
+			p.Advertise()
 		}
 	}()
+	return nil
+}
+
+// Stop ...
+func (s *Server) Stop() error {
+	return nil
 }

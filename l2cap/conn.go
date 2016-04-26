@@ -12,8 +12,7 @@ import (
 	"github.com/currantlabs/bt/hci/evt"
 )
 
-// Conn implements a L2CAP connection.
-// Currently, it only supports LE-U logical transport, and not ACL-U.
+// Conn ...
 type Conn struct {
 	l *LE
 
@@ -262,7 +261,7 @@ func (c *Conn) recombine() error {
 
 // Close disconnects the connection by sending hci disconnect command to the device.
 func (c *Conn) Close() error {
-	c.l.dev.Send(&cmd.Disconnect{
+	c.l.hci.Send(&cmd.Disconnect{
 		ConnectionHandle: c.param.ConnectionHandle(),
 		Reason:           0x13,
 	}, nil)
@@ -272,7 +271,7 @@ func (c *Conn) Close() error {
 
 // LocalAddr returns local device's MAC address.
 func (c *Conn) LocalAddr() net.HardwareAddr {
-	return c.l.dev.LocalAddr()
+	return c.l.hci.LocalAddr()
 }
 
 // RemoteAddr returns remote device's MAC address.

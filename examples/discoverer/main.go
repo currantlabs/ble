@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/currantlabs/bt"
 	"github.com/currantlabs/bt/adv"
-	"github.com/currantlabs/bt/dev"
-	"github.com/currantlabs/bt/gap"
+	"github.com/currantlabs/bt/hci"
 )
 
-func filter(a gap.Advertisement) bool {
+func filter(a bt.Advertisement) bool {
 	p := adv.Packet(a.Data())
 	if p.LocalName() == "Gopher" {
 		return true
@@ -18,26 +18,24 @@ func filter(a gap.Advertisement) bool {
 	return false
 }
 
-func discovered(a gap.Advertisement) {
+func discovered(a bt.Advertisement) {
+	// Show event level info, and raw data.
+	fmt.Printf("%s: EvtType %d, AddrType %d, RSSI %d, Data [%X]\n",
+		a.Address(), a.EventType(), a.AddressType(), a.RSSI(), a.Data())
+
+	// Decode the raw data
 	p := adv.Packet(a.Data())
-	t := "AD" // Advertising Data
-	if a.EventType()&0x02 == 0x02 {
-		t = "SR" // Scan Response
-	}
-	fmt.Printf("%s (%s): RSSI: %3d, Name: %s, UUIDs: %v\n", a.Address(), t, a.RSSI(), p.LocalName(), p.UUIDs())
+	fmt.Printf("Name: %s, UUIDs: %v\n\n", p.LocalName(), p.UUIDs())
 }
 
 func main() {
-	d, err := dev.New(-1)
-	if err != nil {
+	h := &hci.HCI{}
+	if err := h.Init(-1); err != nil {
 		log.Fatalf("Failed to open HCI device, err: %s\n", err)
 	}
 
-	o := &gap.Observer{}
-	if o.Init(d); err != nil {
-		log.Fatalf("Failed to create an observer, err: %s\n", err)
-	}
-	o.Scan(gap.AdvFilterFunc(filter), gap.AdvHandlerFunc(discovered))
+	h.SetAdvHandler(bt.AdvFilterFunc(filter), bt.AdvHandlerFunc(discovered))
+	h.Scan()
 
 	select {}
 }

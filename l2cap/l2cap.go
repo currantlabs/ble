@@ -6,15 +6,14 @@ import (
 	"net"
 	"sync"
 
-	"github.com/currantlabs/bt/dev"
-	"github.com/currantlabs/bt/hci"
+	"github.com/currantlabs/bt"
 	"github.com/currantlabs/bt/hci/cmd"
 	"github.com/currantlabs/bt/hci/evt"
 )
 
 // LE implements L2CAP (LE-U logical link) handling
 type LE struct {
-	dev       dev.Device
+	hci       bt.HCI
 	pktWriter io.Writer
 
 	// Host to Controller Data Flow Control Packet-based Data flow control for LE-U [Vol 2, Part E, 4.1.1]
@@ -31,12 +30,12 @@ type LE struct {
 }
 
 // Init ...
-func (l *LE) Init(d dev.Device) error {
-	l.dev = d
+func (l *LE) Init(h bt.HCI) error {
+	l.hci = h
 
 	l.muConns = &sync.Mutex{}
 	l.conns = make(map[uint16]*Conn)
-	l.chMasterConn = make(chan *Conn)
+	l.chMasterConn = make(chan *Conn) // Peripheral accepts master connection
 	l.chSlaveConn = make(chan *Conn)
 
 	// LECreateConnection implements LE Create Connection (0x08|0x000D) [Vol 2, Part E, 7.8.12]
@@ -58,40 +57,41 @@ func (l *LE) Init(d dev.Device) error {
 
 	// Pre-allocate buffers with additional head room for lower layer headers.
 	// HCI header (1 Byte) + ACL Data Header (4 bytes) + L2CAP PDU (or fragment)
-	w, size, cnt := d.SetACLHandler(hci.HandlerFunc(l.handlePacket))
+	w, size, cnt := h.SetACLHandler(bt.HandlerFunc(l.handlePacket))
 	l.pktWriter = w
 	l.pool = NewPool(1+4+size, cnt)
 
-	d.SetEventHandler(evt.DisconnectionCompleteCode, hci.HandlerFunc(l.handleDisconnectionComplete))
-	d.SetEventHandler(evt.NumberOfCompletedPacketsCode, hci.HandlerFunc(l.handleNumberOfCompletedPackets))
+	h.SetEventHandler(evt.DisconnectionCompleteCode, bt.HandlerFunc(l.handleDisconnectionComplete))
+	h.SetEventHandler(evt.NumberOfCompletedPacketsCode, bt.HandlerFunc(l.handleNumberOfCompletedPackets))
 
-	d.SetSubeventHandler(evt.LEConnectionCompleteSubCode, hci.HandlerFunc(l.handleLEConnectionComplete))
-	d.SetSubeventHandler(evt.LEConnectionUpdateCompleteSubCode, hci.HandlerFunc(l.handleLEConnectionUpdateComplete))
-	d.SetSubeventHandler(evt.LELongTermKeyRequestSubCode, hci.HandlerFunc(l.handleLELongTermKeyRequest))
+	h.SetSubeventHandler(evt.LEConnectionCompleteSubCode, bt.HandlerFunc(l.handleLEConnectionComplete))
+	h.SetSubeventHandler(evt.LEConnectionUpdateCompleteSubCode, bt.HandlerFunc(l.handleLEConnectionUpdateComplete))
+	h.SetSubeventHandler(evt.LELongTermKeyRequestSubCode, bt.HandlerFunc(l.handleLELongTermKeyRequest))
 
 	return nil
 }
 
 // Accept returns a L2CAP master connection.
-func (l *LE) Accept() (*Conn, error) {
+func (l *LE) Accept() (bt.Conn, error) {
 	return <-l.chSlaveConn, nil
 }
 
 // Close ...
 func (l *LE) Close() error {
+	// TODO: implement HCI reference counting.
 	return nil
 }
 
 // Addr ...
 func (l *LE) Addr() net.HardwareAddr {
-	return l.dev.LocalAddr()
+	return l.hci.LocalAddr()
 }
 
 // Dial ...
-func (l *LE) Dial(a net.HardwareAddr) (*Conn, error) {
+func (l *LE) Dial(a net.HardwareAddr) (bt.Conn, error) {
 	cmd := *l.connParam
 	cmd.PeerAddress = [6]byte{a[5], a[4], a[3], a[2], a[1], a[0]}
-	l.dev.Send(&cmd, nil)
+	l.hci.Send(&cmd, nil)
 	c := <-l.chMasterConn
 	return c, nil
 }
@@ -163,7 +163,7 @@ func (l *LE) handleNumberOfCompletedPackets(b []byte) error {
 
 func (l *LE) handleLELongTermKeyRequest(b []byte) error {
 	e := evt.LELongTermKeyRequest(b)
-	return l.dev.Send(&cmd.LELongTermKeyRequestNegativeReply{
+	return l.hci.Send(&cmd.LELongTermKeyRequestNegativeReply{
 		ConnectionHandle: e.ConnectionHandle(),
 	}, nil)
 }

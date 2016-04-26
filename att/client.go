@@ -5,7 +5,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/currantlabs/bt/l2cap"
+	"github.com/currantlabs/bt"
 	"github.com/currantlabs/bt/uuid"
 )
 
@@ -28,7 +28,7 @@ type NotificationHandler interface {
 
 // Client implementa an Attribute Protocol Client.
 type Client struct {
-	l2c  *l2cap.Conn
+	l2c  bt.Conn
 	rspc chan []byte
 
 	rxBuf   []byte
@@ -38,7 +38,7 @@ type Client struct {
 }
 
 // NewClient returns an Attribute Protocol Client.
-func NewClient(l2c *l2cap.Conn, h NotificationHandler) *Client {
+func NewClient(l2c bt.Conn, h NotificationHandler) *Client {
 	c := &Client{
 		l2c:     l2c,
 		rspc:    make(chan []byte),
@@ -80,7 +80,7 @@ func (c *Client) ExchangeMTU(clientRxMTU int) (serverRxMTU int, err error) {
 	rsp := ExchangeMTUResponse(b)
 	switch {
 	case rsp[0] == ErrorResponseCode && len(rsp) == 5:
-		return 0, Error(rsp[4])
+		return 0, bt.AttError(rsp[4])
 	case rsp[0] == ErrorResponseCode && len(rsp) != 5:
 		fallthrough
 	case rsp[0] != rsp.AttributeOpcode():
@@ -127,7 +127,7 @@ func (c *Client) FindInformation(starth, endh uint16) (fmt int, data []byte, err
 	rsp := FindInformationResponse(b)
 	switch {
 	case rsp[0] == ErrorResponseCode && len(rsp) == 5:
-		return 0x00, nil, Error(rsp[4])
+		return 0x00, nil, bt.AttError(rsp[4])
 	case rsp[0] == ErrorResponseCode && len(rsp) != 5:
 		fallthrough
 	case rsp[0] != rsp.AttributeOpcode():
@@ -182,7 +182,7 @@ func (c *Client) ReadByType(starth, endh uint16, uuid uuid.UUID) (int, []byte, e
 	rsp := ReadByTypeResponse(b)
 	switch {
 	case rsp[0] == ErrorResponseCode && len(rsp) == 5:
-		return 0, nil, Error(rsp[4])
+		return 0, nil, bt.AttError(rsp[4])
 	case rsp[0] == ErrorResponseCode && len(rsp) != 5:
 		fallthrough
 	case rsp[0] != rsp.AttributeOpcode():
@@ -214,7 +214,7 @@ func (c *Client) Read(handle uint16) ([]byte, error) {
 	rsp := ReadResponse(b)
 	switch {
 	case rsp[0] == ErrorResponseCode && len(rsp) == 5:
-		return nil, Error(rsp[4])
+		return nil, bt.AttError(rsp[4])
 	case rsp[0] == ErrorResponseCode && len(rsp) != 5:
 		fallthrough
 	case rsp[0] != rsp.AttributeOpcode():
@@ -248,7 +248,7 @@ func (c *Client) ReadBlob(handle, offset uint16) ([]byte, error) {
 	rsp := ReadBlobResponse(b)
 	switch {
 	case rsp[0] == ErrorResponseCode && len(rsp) == 5:
-		return nil, Error(rsp[4])
+		return nil, bt.AttError(rsp[4])
 	case rsp[0] == ErrorResponseCode && len(rsp) != 5:
 		fallthrough
 	case rsp[0] != rsp.AttributeOpcode():
@@ -292,7 +292,7 @@ func (c *Client) ReadMultiple(handles []uint16) ([]byte, error) {
 	rsp := ReadMultipleResponse(b)
 	switch {
 	case rsp[0] == ErrorResponseCode && len(rsp) == 5:
-		return nil, Error(rsp[4])
+		return nil, bt.AttError(rsp[4])
 	case rsp[0] == ErrorResponseCode && len(rsp) != 5:
 		fallthrough
 	case rsp[0] != rsp.AttributeOpcode():
@@ -330,7 +330,7 @@ func (c *Client) ReadByGroupType(starth, endh uint16, uuid uuid.UUID) (int, []by
 	rsp := ReadByGroupTypeResponse(b)
 	switch {
 	case rsp[0] == ErrorResponseCode && len(rsp) == 5:
-		return 0, nil, Error(rsp[4])
+		return 0, nil, bt.AttError(rsp[4])
 	case rsp[0] == ErrorResponseCode && len(rsp) != 5:
 		fallthrough
 	case rsp[0] != rsp.AttributeOpcode():
@@ -369,7 +369,7 @@ func (c *Client) Write(handle uint16, value []byte) error {
 	rsp := WriteResponse(b)
 	switch {
 	case rsp[0] == ErrorResponseCode && len(rsp) == 5:
-		return Error(rsp[4])
+		return bt.AttError(rsp[4])
 	case rsp[0] == ErrorResponseCode && len(rsp) != 5:
 		fallthrough
 	case rsp[0] != rsp.AttributeOpcode():
@@ -444,7 +444,7 @@ func (c *Client) PrepareWrite(handle uint16, offset uint16, value []byte) (uint1
 	rsp := PrepareWriteResponse(b)
 	switch {
 	case rsp[0] == ErrorResponseCode && len(rsp) == 5:
-		return 0, 0, nil, Error(rsp[4])
+		return 0, 0, nil, bt.AttError(rsp[4])
 	case rsp[0] == ErrorResponseCode && len(rsp) != 5:
 		fallthrough
 	case rsp[0] != rsp.AttributeOpcode():
@@ -477,7 +477,7 @@ func (c *Client) ExecuteWrite(flags uint8) error {
 	rsp := ExecuteWriteResponse(b)
 	switch {
 	case rsp[0] == ErrorResponseCode && len(rsp) == 5:
-		return Error(rsp[4])
+		return bt.AttError(rsp[4])
 	case rsp[0] == ErrorResponseCode && len(rsp) == 5:
 		fallthrough
 	case rsp[0] != rsp.AttributeOpcode():

@@ -1,6 +1,7 @@
 package service
 
 import (
+	"github.com/currantlabs/bt"
 	"github.com/currantlabs/bt/gatt"
 	"github.com/currantlabs/bt/uuid"
 )
@@ -15,11 +16,11 @@ var (
 	attrPeferredParamsUUID    = uuid.UUID16(0x2A04)
 )
 
-// https://developer.bluetooth.org/gatt/characteristics/Pages/CharacteristicViewer.aspx?u=org.bluetooth.characteristic.gap.appearance.xml
+// https://developer.bluetooth.org/gatt/characteristics/Pages/CharacteristicViewer.aspx?u=org.bluetooth.characteristic.bt.appearance.xml
 var gapCharAppearanceGenericComputer = []byte{0x00, 0x80}
 
 // NewGapService ...
-func NewGapService(name string) *gatt.Service {
+func NewGapService(name string) bt.Service {
 	s := gatt.NewService(attrGAPUUID)
 	s.AddCharacteristic(attrDeviceNameUUID).SetValue([]byte(name))
 	s.AddCharacteristic(attrAppearanceUUID).SetValue(gapCharAppearanceGenericComputer)

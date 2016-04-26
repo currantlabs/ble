@@ -5,6 +5,7 @@ import (
 	"io"
 	"log"
 
+	"github.com/currantlabs/bt"
 	"github.com/currantlabs/bt/uuid"
 )
 
@@ -14,7 +15,7 @@ type Attribute interface {
 	EndingHandle() uint16
 	Type() uuid.UUID
 
-	HandleATT(req []byte, resp *ResponseWriter) Error
+	HandleATT(req []byte, resp *ResponseWriter) bt.AttError
 	Value() []byte
 }
 
@@ -89,17 +90,17 @@ func DumpAttributes(Attributes []Attribute) {
 type ResponseWriter struct {
 	svr    *Server
 	buf    *bytes.Buffer
-	status Error
+	status bt.AttError
 }
 
 // Status reports the result of the request.
-func (r *ResponseWriter) Status() Error { return r.status }
+func (r *ResponseWriter) Status() bt.AttError { return r.status }
 
 // SetStatus reports the result of the request.
-func (r *ResponseWriter) SetStatus(status Error) { r.status = status }
+func (r *ResponseWriter) SetStatus(status bt.AttError) { r.status = status }
 
 // Server ...
-func (r *ResponseWriter) Server() *Server { return r.svr }
+func (r *ResponseWriter) Server() bt.AttServer { return r.svr }
 
 // Len ...
 func (r *ResponseWriter) Len() int { return r.buf.Len() }

@@ -180,7 +180,7 @@ func (c *Conn) handleConnectionParameterUpdateRequest(s sigCmd) {
 	}
 
 	// LE Connection Update (0x08|0x0013) [Vol 2, Part E, 7.8.18]
-	c.l.dev.Send(&cmd.LEConnectionUpdate{
+	c.l.hci.Send(&cmd.LEConnectionUpdate{
 		ConnectionHandle:   c.param.ConnectionHandle(),
 		ConnIntervalMin:    req.IntervalMin,
 		ConnIntervalMax:    req.IntervalMax,

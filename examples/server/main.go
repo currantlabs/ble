@@ -4,14 +4,13 @@ import (
 	"log"
 
 	"github.com/currantlabs/bt/adv"
-	"github.com/currantlabs/bt/dev"
 	"github.com/currantlabs/bt/examples/service"
-	"github.com/currantlabs/bt/gap"
 	"github.com/currantlabs/bt/gatt"
+	"github.com/currantlabs/bt/hci"
 )
 
 func main() {
-	s := &gatt.Server{}
+	s := gatt.NewServer()
 	s.AddService(service.NewGapService("Gopher"))
 	s.AddService(service.NewGattService())
 
@@ -27,17 +26,14 @@ func main() {
 
 	sr := adv.Packet(nil).AppendCompleteName("Gopher")
 
-	d, err := dev.New(-1)
-	if err != nil {
+	h := &hci.HCI{}
+	if err := h.Init(-1); err != nil {
 		log.Fatalf("Failed to open device, err: %s", err)
 	}
 
-	p := &gap.Peripheral{}
-	if err := p.Init(d); err != nil {
-		log.Fatalf("Failed to open device, err: %s", err)
-	}
-	s.Init(p)
-	p.Advertise(ad, sr)
+	h.SetAdvertisement(ad, sr)
+	h.Advertise()
+	s.Start(h)
 
 	select {}
 }
