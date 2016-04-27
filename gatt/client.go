@@ -10,24 +10,17 @@ import (
 	"github.com/currantlabs/bt/uuid"
 )
 
-// NewClient ...
-func NewClient(l2c l2cap.Conn) Client {
-	h := newNHandler()
-	p := &client{
-		c:       att.NewClient(l2c, h),
-		handler: h,
-	}
-	go p.c.Loop()
-	return p
-}
+// NotificationHandler ...
+type NotificationHandler func(req []byte)
 
-type client struct {
-	// NameChanged is called whenever the client GAP device name has changed.
-	NameChanged func(*client)
+// Client ...
+type Client struct {
+	// NameChanged is called whenever the Client GAP device name has changed.
+	// NameChanged func(*Client)
 
-	// ServicedModified is called when one or more service of a client have changed.
+	// ServicedModified is called when one or more service of a Client have changed.
 	// A list of invalid service is provided in the parameter.
-	ServicesModified func(*client, []Service)
+	// ServicesModified func(*Client, []Service)
 
 	svcs []*Service
 
@@ -38,16 +31,34 @@ type client struct {
 	c       *att.Client
 }
 
-func (p *client) Address() net.HardwareAddr { return p.addr }
-func (p *client) Name() string              { return p.name }
-func (p *client) Services() []*Service      { return p.svcs }
+// Init ...
+func (gc *Client) Init(l2c l2cap.Conn) error {
+	h := newNHandler()
+	gc.c = att.NewClient(l2c, h)
+	gc.handler = h
+	go gc.c.Loop()
+	return nil
+}
 
-func (p *client) DiscoverServices(filter []uuid.UUID) ([]*Service, error) {
+// Address is the platform specific unique ID of the remote peripheral, e.g. MAC for Linux, Client UUID for MacOS.
+func (gc *Client) Address() net.HardwareAddr { return gc.addr }
+
+// Name returns the name of the remote peripheral.
+// This can be the advertised name, if exists, or the GAP device name, which takes priority.
+func (gc *Client) Name() string { return gc.name }
+
+// Services returnns the services of the remote peripheral which has been discovered.
+func (gc *Client) Services() []*Service { return gc.svcs }
+
+// DiscoverServices discovers all the primary service on a server. [Vol 3, Parg G, 4.4.1]
+// DiscoverServices discover the specified services of the remote peripheral.
+// If the specified services is set to nil, all the available services of the remote peripheral are returned.
+func (gc *Client) DiscoverServices(filter []uuid.UUID) ([]*Service, error) {
 	start := uint16(0x0001)
 	for {
-		length, b, err := p.c.ReadByGroupType(start, 0xFFFF, uuid.UUID(attrPrimaryServiceUUID))
+		length, b, err := gc.c.ReadByGroupType(start, 0xFFFF, uuid.UUID(attrPrimaryServiceUUID))
 		if err == att.ErrAttrNotFound {
-			return p.svcs, nil
+			return gc.svcs, nil
 		}
 		if err != nil {
 			return nil, err
@@ -57,13 +68,13 @@ func (p *client) DiscoverServices(filter []uuid.UUID) ([]*Service, error) {
 			endh := binary.LittleEndian.Uint16(b[2:4])
 			u := uuid.UUID(b[4:length])
 			if filter == nil || uuid.Contains(filter, u) {
-				p.svcs = append(p.svcs, &Service{
+				gc.svcs = append(gc.svcs, &Service{
 					uuid: u,
 					attr: attr{h: h, endh: endh},
 				})
 			}
 			if endh == 0xFFFF {
-				return p.svcs, nil
+				return gc.svcs, nil
 			}
 			start = endh + 1
 			b = b[length:]
@@ -71,15 +82,19 @@ func (p *client) DiscoverServices(filter []uuid.UUID) ([]*Service, error) {
 	}
 }
 
-func (p *client) DiscoverIncludedServices(ss []uuid.UUID, s *Service) ([]*Service, error) {
+// DiscoverIncludedServices discovers the specified included services of a service.
+// If the specified services is set to nil, all the included services of the service are returned.
+func (gc *Client) DiscoverIncludedServices(ss []uuid.UUID, s *Service) ([]*Service, error) {
 	return nil, nil
 }
 
-func (p *client) DiscoverCharacteristics(filter []uuid.UUID, s *Service) ([]*Characteristic, error) {
+// DiscoverCharacteristics discovers the specified characteristics of a service.
+// If the specified characterstics is set to nil, all the characteristic of the service are returned.
+func (gc *Client) DiscoverCharacteristics(filter []uuid.UUID, s *Service) ([]*Characteristic, error) {
 	start := s.attr.h
 	var lastChar *Characteristic
 	for start <= s.attr.endh {
-		length, b, err := p.c.ReadByType(start, s.attr.endh, attrCharacteristicUUID)
+		length, b, err := gc.c.ReadByType(start, s.attr.endh, attrCharacteristicUUID)
 		if err == att.ErrAttrNotFound {
 			break
 		} else if err != nil {
@@ -113,10 +128,12 @@ func (p *client) DiscoverCharacteristics(filter []uuid.UUID, s *Service) ([]*Cha
 	return s.chars, nil
 }
 
-func (p *client) DiscoverDescriptors(filter []uuid.UUID, c *Characteristic) ([]*Descriptor, error) {
+// DiscoverDescriptors discovers the descriptors of a characteristic.
+// If the specified descriptors is set to nil, all the descriptors of the characteristic are returned.
+func (gc *Client) DiscoverDescriptors(filter []uuid.UUID, c *Characteristic) ([]*Descriptor, error) {
 	start := c.attr.vh + 1
 	for start <= c.attr.endh {
-		fmt, b, err := p.c.FindInformation(start, c.attr.endh)
+		fmt, b, err := gc.c.FindInformation(start, c.attr.endh)
 		if err == att.ErrAttrNotFound {
 			break
 		} else if err != nil {
@@ -146,42 +163,61 @@ func (p *client) DiscoverDescriptors(filter []uuid.UUID, c *Characteristic) ([]*
 	return c.descs, nil
 }
 
-func (p *client) ReadCharacteristic(c *Characteristic) ([]byte, error) { return p.c.Read(c.attr.vh) }
+// ReadCharacteristic retrieves the value of a specified characteristic.
+func (gc *Client) ReadCharacteristic(c *Characteristic) ([]byte, error) { return gc.c.Read(c.attr.vh) }
 
-func (p *client) ReadLongCharacteristic(c *Characteristic) ([]byte, error) { return nil, nil }
+// ReadLongCharacteristic retrieves the value of a specified characteristic that is longer than the MTU.
+func (gc *Client) ReadLongCharacteristic(c *Characteristic) ([]byte, error) { return nil, nil }
 
-func (p *client) WriteCharacteristic(c *Characteristic, value []byte, noRsp bool) error {
+// WriteCharacteristic writes the value of a characteristic.
+func (gc *Client) WriteCharacteristic(c *Characteristic, value []byte, noRsp bool) error {
 	if noRsp {
-		p.c.WriteCommand(c.attr.vh, value)
+		gc.c.WriteCommand(c.attr.vh, value)
 		return nil
 	}
-	return p.c.Write(c.attr.vh, value)
+	return gc.c.Write(c.attr.vh, value)
 }
 
-func (p *client) ReadDescriptor(d *Descriptor) ([]byte, error) { return p.c.Read(d.attr.h) }
+// ReadDescriptor retrieves the value of a specified characteristic descriptor.
+func (gc *Client) ReadDescriptor(d *Descriptor) ([]byte, error) { return gc.c.Read(d.attr.h) }
 
-func (p *client) WriteDescriptor(d *Descriptor, v []byte) error { return p.c.Write(d.attr.h, v) }
+// WriteDescriptor writes the value of a characteristic descriptor.
+func (gc *Client) WriteDescriptor(d *Descriptor, v []byte) error { return gc.c.Write(d.attr.h, v) }
 
-func (p *client) ReadRSSI() int { return -1 }
+// ReadRSSI retrieves the current RSSI value for the remote peripheral.
+func (gc *Client) ReadRSSI() int { return -1 }
 
-func (p *client) SetMTU(mtu int) error {
-	_, err := p.c.ExchangeMTU(mtu)
+// SetMTU sets the mtu for the remote peripheral.
+func (gc *Client) SetMTU(mtu int) error {
+	_, err := gc.c.ExchangeMTU(mtu)
 	return err
 }
 
-func (p *client) SetNotificationHandler(c *Characteristic, h NotificationHandler) error {
-	return p.setHandlers(c.cccd.attr.h, c.attr.vh, flagCCCNotify, h)
+// SetNotificationHandler sets notifications for the value of a specified characteristic.
+func (gc *Client) SetNotificationHandler(c *Characteristic, h NotificationHandler) error {
+	return gc.setHandlers(c.cccd.attr.h, c.attr.vh, flagCCCNotify, h)
 }
 
-func (p *client) SetIndicationHandler(c *Characteristic, h NotificationHandler) error {
-	return p.setHandlers(c.cccd.attr.h, c.attr.vh, flagCCCIndicate, h)
+// SetIndicationHandler sets indications for the value of a specified characteristic.
+func (gc *Client) SetIndicationHandler(c *Characteristic, h NotificationHandler) error {
+	return gc.setHandlers(c.cccd.attr.h, c.attr.vh, flagCCCIndicate, h)
 }
 
-func (p *client) setHandlers(cccdh, vh, flag uint16, h NotificationHandler) error {
-	s, ok := p.handler.stubs[vh]
+// ClearHandlers ...
+func (gc *Client) ClearHandlers() error {
+	for _, s := range gc.handler.stubs {
+		if err := gc.c.Write(s.cccdh, make([]byte, 2)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (gc *Client) setHandlers(cccdh, vh, flag uint16, h NotificationHandler) error {
+	s, ok := gc.handler.stubs[vh]
 	if !ok {
 		s = &stub{cccdh, 0x0000, nil, nil}
-		p.handler.stubs[vh] = s
+		gc.handler.stubs[vh] = s
 	}
 	switch {
 	case h == nil && (s.ccc&flag) == 0:
@@ -201,16 +237,7 @@ func (p *client) setHandlers(cccdh, vh, flag uint16, h NotificationHandler) erro
 	} else {
 		s.iHandler = h
 	}
-	return p.c.Write(s.cccdh, v)
-}
-
-func (p *client) ClearHandlers() error {
-	for _, s := range p.handler.stubs {
-		if err := p.c.Write(s.cccdh, make([]byte, 2)); err != nil {
-			return err
-		}
-	}
-	return nil
+	return gc.c.Write(s.cccdh, v)
 }
 
 type nHandlers struct {

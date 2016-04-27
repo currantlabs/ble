@@ -5,36 +5,37 @@ import (
 	"github.com/currantlabs/bt/gap"
 )
 
-// NewServer ...
-func NewServer() Server {
-	return &server{}
-}
-
-type server struct {
+// Server ...
+type Server struct {
 	svcs  []*Service
 	attrs *att.Range
 }
 
-func (s *server) AddService(svc *Service) *Service {
+// AddService add a service to database.
+func (s *Server) AddService(svc *Service) *Service {
 	s.svcs = append(s.svcs, svc)
 	s.attrs = genAttr(s.svcs, uint16(1)) // ble attrs start at 1
 	return svc
 }
 
-func (s *server) RemoveAllServices() error {
+// RemoveAllServices removes all services that are currently in the database.
+func (s *Server) RemoveAllServices() error {
 	s.svcs = nil
 	s.attrs = nil
 	return nil
 }
 
-func (s *server) SetServices(svcs []*Service) error {
+// SetServices set the specified service to the database.
+// It removes all currently added services, if any.
+func (s *Server) SetServices(svcs []*Service) error {
 	s.RemoveAllServices()
 	s.svcs = append(s.svcs, svcs...)
 	s.attrs = genAttr(s.svcs, uint16(1)) // ble attrs start at 1
 	return nil
 }
 
-func (s *server) Start(p *gap.Peripheral) {
+// Init ...
+func (s *Server) Init(p *gap.Peripheral) {
 	go func() {
 		for {
 			l2c, err := p.Accept()

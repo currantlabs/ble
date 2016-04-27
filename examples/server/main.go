@@ -11,7 +11,7 @@ import (
 )
 
 func main() {
-	s := gatt.NewServer()
+	s := &gatt.Server{}
 	s.AddService(service.NewGapService("Gopher"))
 	s.AddService(service.NewGattService())
 
@@ -36,7 +36,7 @@ func main() {
 	if err := p.Init(d); err != nil {
 		log.Fatalf("Failed to open device, err: %s", err)
 	}
-	s.Start(p)
+	s.Init(p)
 	p.Advertise(ad, sr)
 
 	select {}
