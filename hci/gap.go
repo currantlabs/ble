@@ -15,6 +15,18 @@ type ScanParams struct {
 	ScanningFilterPolicy uint8
 }
 
+// AdvParams implements LE Set Advertising Parameters (0x08|0x0006) [Vol 2, Part E, 7.8.5]
+type AdvParams struct {
+	AdvertisingIntervalMin  uint16
+	AdvertisingIntervalMax  uint16
+	AdvertisingType         uint8
+	OwnAddressType          uint8
+	DirectAddressType       uint8
+	DirectAddress           [6]byte
+	AdvertisingChannelMap   uint8
+	AdvertisingFilterPolicy uint8
+}
+
 // SetAdvHandler ...
 func (h *HCI) SetAdvHandler(af bt.AdvFilter, ah bt.AdvHandler) error {
 	h.advFilter, h.advHandler = af, ah
@@ -36,18 +48,6 @@ func (h *HCI) Scan() error {
 // StopScanning stops scanning.
 func (h *HCI) StopScanning() error {
 	return h.Send(&cmd.LESetScanEnable{LEScanEnable: 0}, nil)
-}
-
-// AdvParams implements LE Set Advertising Parameters (0x08|0x0006) [Vol 2, Part E, 7.8.5]
-type AdvParams struct {
-	AdvertisingIntervalMin  uint16
-	AdvertisingIntervalMax  uint16
-	AdvertisingType         uint8
-	OwnAddressType          uint8
-	DirectAddressType       uint8
-	DirectAddress           [6]byte
-	AdvertisingChannelMap   uint8
-	AdvertisingFilterPolicy uint8
 }
 
 // SetAdvertisement ...

@@ -1,4 +1,4 @@
-package l2cap
+package hci
 
 // HCI Packet types
 const (

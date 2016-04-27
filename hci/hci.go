@@ -11,20 +11,30 @@ import (
 	"github.com/currantlabs/bt/hci/cmd"
 	"github.com/currantlabs/bt/hci/evt"
 	"github.com/currantlabs/bt/hci/skt"
-	"github.com/currantlabs/bt/l2cap"
 )
 
-// HCI Packet types
-const (
-	pktTypeCommand uint8 = 0x01
-	pktTypeACLData uint8 = 0x02
-	pktTypeSCOData uint8 = 0x03
-	pktTypeEvent   uint8 = 0x04
-	pktTypeVendor  uint8 = 0xFF
-)
+// Command ...
+type Command interface {
+	OpCode() int
+	Len() int
+	Marshal([]byte) error
+}
+
+// CommandRP ...
+type CommandRP interface {
+	Unmarshal(b []byte) error
+}
+
+// CommandSender ...
+type CommandSender interface {
+	// Send sends a HCI Command and returns unserialized return parameter.
+	Send(Command, CommandRP) error
+}
+
+type handlerFn func(b []byte) error
 
 type pkt struct {
-	cmd  bt.Command
+	cmd  Command
 	done chan []byte
 }
 
@@ -41,31 +51,35 @@ type HCI struct {
 	chBufs chan []byte
 
 	// evtHub
-	evth map[int]bt.Handler
-	subh map[int]bt.Handler
+	evth map[int]handlerFn
+	subh map[int]handlerFn
 
 	// aclHandler
-	bufSize    int
-	bufCnt     int
-	aclHandler bt.Handler
+	bufSize int
+	bufCnt  int
 
 	// Device information or status.
 	addr    net.HardwareAddr
 	txPwrLv int
 
-	// broadcaster
-	advParams cmd.LESetAdvertisingParameters
-	advData   cmd.LESetAdvertisingData
-	scanResp  cmd.LESetScanResponseData
-
-	// observer
+	advParams  cmd.LESetAdvertisingParameters
+	advData    cmd.LESetAdvertisingData
+	scanResp   cmd.LESetScanResponseData
 	scanParams cmd.LESetScanParameters
+	connParams cmd.LECreateConnection
 
 	advFilter  bt.AdvFilter
 	advHandler bt.AdvHandler
 
-	// peripheral & central
-	l2cap.LE
+	// Host to Controller Data Flow Control Packet-based Data flow control for LE-U [Vol 2, Part E, 4.1.1]
+	// Minimum 27 bytes. 4 bytes of L2CAP Header, and 23 bytes Payload from upper layer (ATT)
+	pool *Pool
+
+	// L2CAP connections
+	muConns      *sync.Mutex
+	conns        map[uint16]*Conn
+	chMasterConn chan *Conn
+	chSlaveConn  chan *Conn
 }
 
 // Init ...
@@ -80,8 +94,8 @@ func (h *HCI) Init(id int) error {
 	h.chBufs = make(chan []byte, 8)
 	h.sent = make(map[int]*pkt)
 
-	h.evth = map[int]bt.Handler{}
-	h.subh = map[int]bt.Handler{}
+	h.evth = map[int]handlerFn{}
+	h.subh = map[int]handlerFn{}
 
 	h.scanParams = cmd.LESetScanParameters{
 		LEScanType:           0x01,   // [0x00]: passive, 0x01: active
@@ -102,37 +116,83 @@ func (h *HCI) Init(id int) error {
 		AdvertisingFilterPolicy: 0x00,
 	}
 
+	h.connParams = cmd.LECreateConnection{
+		LEScanInterval:        0x0004,    // N * 0.625 msec
+		LEScanWindow:          0x0004,    // N * 0.625 msec
+		InitiatorFilterPolicy: 0x00,      // White list is not used
+		PeerAddressType:       0x00,      // Public Device Address
+		PeerAddress:           [6]byte{}, //
+		OwnAddressType:        0x00,      // Public Device Address
+		ConnIntervalMin:       0x0006,    // N * 1.25 msec
+		ConnIntervalMax:       0x0006,    // N * 1.25 msec
+		ConnLatency:           0x0000,    // N * 1.25 msec
+		SupervisionTimeout:    0x0048,    // N * 10 msec
+		MinimumCELength:       0x0000,    // N * 0.625 msec
+		MaximumCELength:       0x0000,    // N * 0.625 msec
+	}
+
 	// Register our own advertising report advHandler.
-	h.SetEventHandler(0x3E, bt.HandlerFunc(h.handleLEMeta))
-	h.SetSubeventHandler(evt.LEAdvertisingReportSubCode, bt.HandlerFunc(h.handleLEAdvertisingReport))
-	h.SetEventHandler(evt.CommandCompleteCode, bt.HandlerFunc(h.handleCommandComplete))
-	h.SetEventHandler(evt.CommandStatusCode, bt.HandlerFunc(h.handleCommandStatus))
-	// evt.EncryptionChangeCode:                     bt.HandlerFunc(todo),
-	// evt.ReadRemoteVersionInformationCompleteCode: bt.HandlerFunc(todo),
-	// evt.HardwareErrorCode:                        bt.HandlerFunc(todo),
-	// evt.DataBufferOverflowCode:                   bt.HandlerFunc(todo),
-	// evt.EncryptionKeyRefreshCompleteCode:         bt.HandlerFunc(todo),
-	// evt.AuthenticatedPayloadTimeoutExpiredCode:   bt.HandlerFunc(todo),
-	// evt.LEReadRemoteUsedFeaturesCompleteSubCode:   bt.HandlerFunc(todo),
-	// evt.LERemoteConnectionParameterRequestSubCode: bt.HandlerFunc(todo),
+	h.evth[0x3E] = h.handleLEMeta
+	h.evth[evt.CommandCompleteCode] = h.handleCommandComplete
+	h.evth[evt.CommandStatusCode] = h.handleCommandStatus
+	h.evth[evt.DisconnectionCompleteCode] = h.handleDisconnectionComplete
+	h.evth[evt.NumberOfCompletedPacketsCode] = h.handleNumberOfCompletedPackets
+
+	h.subh[evt.LEAdvertisingReportSubCode] = h.handleLEAdvertisingReport
+	h.subh[evt.LEConnectionCompleteSubCode] = h.handleLEConnectionComplete
+	h.subh[evt.LEConnectionUpdateCompleteSubCode] = h.handleLEConnectionUpdateComplete
+	h.subh[evt.LELongTermKeyRequestSubCode] = h.handleLELongTermKeyRequest
+	// evt.EncryptionChangeCode:                     bt.todo),
+	// evt.ReadRemoteVersionInformationCompleteCode: bt.todo),
+	// evt.HardwareErrorCode:                        bt.todo),
+	// evt.DataBufferOverflowCode:                   bt.todo),
+	// evt.EncryptionKeyRefreshCompleteCode:         bt.todo),
+	// evt.AuthenticatedPayloadTimeoutExpiredCode:   bt.todo),
+	// evt.LEReadRemoteUsedFeaturesCompleteSubCode:   bt.todo),
+	// evt.LERemoteConnectionParameterRequestSubCode: bt.todo),
 	go h.cmdLoop()
 	go h.mainLoop()
 	h.init()
-	h.LE.Init(h)
+
+	h.muConns = &sync.Mutex{}
+	h.conns = make(map[uint16]*Conn)
+	h.chMasterConn = make(chan *Conn) // Peripheral accepts master connection
+	h.chSlaveConn = make(chan *Conn)
+
+	// Pre-allocate buffers with additional head room for lower layer headers.
+	// HCI header (1 Byte) + ACL Data Header (4 bytes) + L2CAP PDU (or fragment)
+	h.pool = NewPool(1+4+h.bufSize, h.bufCnt)
+
 	return nil
 }
 
-// SetACLHandler ...
-func (h *HCI) SetACLHandler(f bt.Handler) (w io.Writer, size int, cnt int) {
-	h.aclHandler = f
-	return h.skt, h.bufSize, h.bufCnt
-}
-
-// LocalAddr ...
-func (h *HCI) LocalAddr() bt.Addr { return h.addr }
-
 // Stop ...
 func (h *HCI) Stop() error { return h.skt.Close() }
+
+// Accept returns a L2CAP master connection.
+func (h *HCI) Accept() (bt.Conn, error) {
+	return <-h.chSlaveConn, nil
+}
+
+// Close ...
+func (h *HCI) Close() error {
+	return nil
+}
+
+// Addr ...
+func (h *HCI) Addr() bt.Addr { return h.addr }
+
+// Dial ...
+func (h *HCI) Dial(a bt.Addr) (bt.Conn, error) {
+	b, ok := a.(net.HardwareAddr)
+	if !ok {
+		return nil, fmt.Errorf("invalid addr")
+	}
+	h.connParams.PeerAddress = [6]byte{b[5], b[4], b[3], b[2], b[1], b[0]}
+	h.Send(&h.connParams, nil)
+	c := <-h.chMasterConn
+	return c, nil
+}
 
 func (h *HCI) init() error {
 	ResetRP := cmd.ResetRP{}
@@ -221,40 +281,8 @@ func (h *HCI) init() error {
 	return nil
 }
 
-// EventHandler ...
-func (h *HCI) EventHandler(c int) bt.Handler {
-	h.Lock()
-	defer h.Unlock()
-	return h.evth[c]
-}
-
-// SetEventHandler ...
-func (h *HCI) SetEventHandler(c int, f bt.Handler) bt.Handler {
-	h.Lock()
-	defer h.Unlock()
-	old := h.evth[c]
-	h.evth[c] = f
-	return old
-}
-
-// SubeventHandler ...
-func (h *HCI) SubeventHandler(c int) bt.Handler {
-	h.Lock()
-	defer h.Unlock()
-	return h.subh[c]
-}
-
-// SetSubeventHandler ...
-func (h *HCI) SetSubeventHandler(c int, f bt.Handler) bt.Handler {
-	h.Lock()
-	defer h.Unlock()
-	old := h.subh[c]
-	h.subh[c] = f
-	return old
-}
-
 // Send ...
-func (h *HCI) Send(c bt.Command, r bt.CommandRP) error {
+func (h *HCI) Send(c Command, r CommandRP) error {
 	p := &pkt{c, make(chan []byte)}
 	h.chPkt <- p
 	b := <-p.done
@@ -328,10 +356,14 @@ func (h *HCI) handlePkt(b []byte) error {
 }
 
 func (h *HCI) handleACL(b []byte) error {
-	if h.aclHandler == nil {
-		return fmt.Errorf("hci: unhandled ACL packet: % X", b)
+	h.muConns.Lock()
+	c, ok := h.conns[packet(b).handle()]
+	h.muConns.Unlock()
+	if !ok {
+		return fmt.Errorf("l2cap: incoming packet for non-existing connection")
 	}
-	return h.aclHandler.Handle(b)
+	c.chInPkt <- b
+	return nil
 }
 
 func (h *HCI) handleEvt(b []byte) error {
@@ -339,16 +371,16 @@ func (h *HCI) handleEvt(b []byte) error {
 	if plen != len(b[2:]) {
 		return fmt.Errorf("hci: corrupt event packet: [ % X ]", b)
 	}
-	if f := h.EventHandler(code); f != nil {
-		return f.Handle(b[2:])
+	if f := h.evth[code]; f != nil {
+		return f(b[2:])
 	}
 	return fmt.Errorf("hci: unsupported event packet: [ % X ]", b)
 }
 
 func (h *HCI) handleLEMeta(b []byte) error {
 	subcode := int(b[0])
-	if f := h.SubeventHandler(subcode); f != nil {
-		return f.Handle(b)
+	if f := h.subh[subcode]; f != nil {
+		return f(b)
 	}
 	return fmt.Errorf("hci: unsupported LE event: [ % X ]", b)
 }
@@ -369,7 +401,6 @@ func (h *HCI) handleLEAdvertisingReport(b []byte) error {
 
 func (h *HCI) handleCommandComplete(b []byte) error {
 	e := evt.CommandComplete(b)
-
 	for i := 0; i < int(e.NumHCICommandPackets()); i++ {
 		h.chBufs <- make([]byte, 64)
 	}
@@ -388,7 +419,6 @@ func (h *HCI) handleCommandComplete(b []byte) error {
 
 func (h *HCI) handleCommandStatus(b []byte) error {
 	e := evt.CommandStatus(b)
-
 	for i := 0; i < int(e.NumHCICommandPackets()); i++ {
 		h.chBufs <- make([]byte, 64)
 	}
@@ -399,4 +429,64 @@ func (h *HCI) handleCommandStatus(b []byte) error {
 	}
 	close(p.done)
 	return nil
+}
+
+func (h *HCI) handleLEConnectionComplete(b []byte) error {
+	e := evt.LEConnectionComplete(b)
+	c := newConn(h, e)
+	h.muConns.Lock()
+	h.conns[e.ConnectionHandle()] = c
+	h.muConns.Unlock()
+	if e.Role() == roleMaster {
+		h.chMasterConn <- c
+		return nil
+	}
+	h.chSlaveConn <- c
+	return nil
+}
+
+func (h *HCI) handleLEConnectionUpdateComplete(b []byte) error {
+	return nil
+}
+
+func (h *HCI) handleDisconnectionComplete(b []byte) error {
+	e := evt.DisconnectionComplete(b)
+	h.muConns.Lock()
+	c, found := h.conns[e.ConnectionHandle()]
+	delete(h.conns, e.ConnectionHandle())
+	h.muConns.Unlock()
+	if !found {
+		return fmt.Errorf("l2cap: disconnecting an invalid handle %04X", e.ConnectionHandle())
+	}
+	close(c.chInPkt)
+
+	// When a connection disconnects, all the sent packets and weren't acked yet
+	// will be recylecd. [Vol2, Part E 4.1.1]
+	c.txBuffer.PutAll()
+	return nil
+}
+
+func (h *HCI) handleNumberOfCompletedPackets(b []byte) error {
+	e := evt.NumberOfCompletedPackets(b)
+	h.muConns.Lock()
+	defer h.muConns.Unlock()
+	for i := 0; i < int(e.NumberOfHandles()); i++ {
+		c, found := h.conns[e.ConnectionHandle(i)]
+		if !found {
+			continue
+		}
+
+		// Put the delivered buffers back to the pool.
+		for j := 0; j < int(e.HCNumOfCompletedPackets(i)); j++ {
+			c.txBuffer.Put()
+		}
+	}
+	return nil
+}
+
+func (h *HCI) handleLELongTermKeyRequest(b []byte) error {
+	e := evt.LELongTermKeyRequest(b)
+	return h.Send(&cmd.LELongTermKeyRequestNegativeReply{
+		ConnectionHandle: e.ConnectionHandle(),
+	}, nil)
 }

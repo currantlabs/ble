@@ -1,4 +1,4 @@
-package l2cap
+package hci
 
 import (
 	"bytes"
@@ -15,7 +15,7 @@ import (
 
 // Conn ...
 type Conn struct {
-	l *LE
+	hci *HCI
 
 	param evt.LEConnectionComplete
 
@@ -66,9 +66,9 @@ type Conn struct {
 	chDone chan bool
 }
 
-func newConn(l *LE, param evt.LEConnectionComplete) *Conn {
+func newConn(h *HCI, param evt.LEConnectionComplete) *Conn {
 	c := &Conn{
-		l:     l,
+		hci:   h,
 		param: param,
 
 		rxMTU: 23,
@@ -83,7 +83,7 @@ func newConn(l *LE, param evt.LEConnectionComplete) *Conn {
 		chInPkt: make(chan packet, 16),
 		chInPDU: make(chan pdu, 16),
 
-		txBuffer: NewClient(l.pool),
+		txBuffer: NewClient(h.pool),
 
 		chDone: make(chan bool),
 	}
@@ -206,7 +206,7 @@ func (c *Conn) writePDU(cid uint16, pdu []byte) (int, error) {
 		default:
 		}
 
-		if _, err := c.l.pktWriter.Write(pkt.Bytes()); err != nil {
+		if _, err := c.hci.skt.Write(pkt.Bytes()); err != nil {
 			return sent, err
 		}
 		sent += flen
@@ -262,7 +262,7 @@ func (c *Conn) recombine() error {
 
 // Close disconnects the connection by sending hci disconnect command to the device.
 func (c *Conn) Close() error {
-	c.l.hci.Send(&cmd.Disconnect{
+	c.hci.Send(&cmd.Disconnect{
 		ConnectionHandle: c.param.ConnectionHandle(),
 		Reason:           0x13,
 	}, nil)
@@ -272,7 +272,7 @@ func (c *Conn) Close() error {
 
 // LocalAddr returns local device's MAC address.
 func (c *Conn) LocalAddr() bt.Addr {
-	return c.l.hci.LocalAddr()
+	return c.hci.Addr()
 }
 
 // RemoteAddr returns remote device's MAC address.
