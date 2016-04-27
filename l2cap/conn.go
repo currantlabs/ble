@@ -12,8 +12,10 @@ import (
 	"github.com/currantlabs/bt/hci/evt"
 )
 
-type conn struct {
-	l *le
+// Conn implements a L2CAP connection.
+// Currently, it only supports LE-U logical transport, and not ACL-U.
+type Conn struct {
+	l *LE
 
 	param evt.LEConnectionComplete
 
@@ -64,8 +66,8 @@ type conn struct {
 	chDone chan bool
 }
 
-func newConn(l *le, param evt.LEConnectionComplete) *conn {
-	c := &conn{
+func newConn(l *LE, param evt.LEConnectionComplete) *Conn {
+	c := &Conn{
 		l:     l,
 		param: param,
 
@@ -101,7 +103,7 @@ func newConn(l *le, param evt.LEConnectionComplete) *conn {
 }
 
 // Read copies re-assembled L2CAP PDUs into sdu.
-func (c *conn) Read(sdu []byte) (int, error) {
+func (c *Conn) Read(sdu []byte) (int, error) {
 	p, ok := <-c.chInPDU
 	if !ok || len(p) == 0 {
 		return 0, io.ErrUnexpectedEOF
@@ -130,7 +132,7 @@ func (c *conn) Read(sdu []byte) (int, error) {
 }
 
 // Write breaks down a L2CAP SDU into segmants [Vol 3, Part A, 7.3.1]
-func (c *conn) Write(sdu []byte) (int, error) {
+func (c *Conn) Write(sdu []byte) (int, error) {
 	if len(sdu) > c.txMTU {
 		return 0, io.ErrShortWrite
 	}
@@ -173,7 +175,7 @@ func (c *conn) Write(sdu []byte) (int, error) {
 }
 
 // writePDU breaks down a L2CAP PDU into fragments if it's larger than the HCI buffer size. [Vol 3, Part A, 7.2.1]
-func (c *conn) writePDU(cid uint16, pdu []byte) (int, error) {
+func (c *Conn) writePDU(cid uint16, pdu []byte) (int, error) {
 	sent := 0
 	flags := uint16(pbfHostToControllerStart << 4) // ACL boundary flags
 
@@ -216,7 +218,7 @@ func (c *conn) writePDU(cid uint16, pdu []byte) (int, error) {
 }
 
 // Recombines fragments into a L2CAP PDU. [Vol 3, Part A, 7.2.2]
-func (c *conn) recombine() error {
+func (c *Conn) recombine() error {
 	pkt, ok := <-c.chInPkt
 	if !ok {
 		return io.EOF
@@ -259,7 +261,7 @@ func (c *conn) recombine() error {
 }
 
 // Close disconnects the connection by sending hci disconnect command to the device.
-func (c *conn) Close() error {
+func (c *Conn) Close() error {
 	c.l.dev.Send(&cmd.Disconnect{
 		ConnectionHandle: c.param.ConnectionHandle(),
 		Reason:           0x13,
@@ -269,37 +271,37 @@ func (c *conn) Close() error {
 }
 
 // LocalAddr returns local device's MAC address.
-func (c *conn) LocalAddr() net.HardwareAddr {
+func (c *Conn) LocalAddr() net.HardwareAddr {
 	return c.l.dev.LocalAddr()
 }
 
 // RemoteAddr returns remote device's MAC address.
-func (c *conn) RemoteAddr() net.HardwareAddr {
+func (c *Conn) RemoteAddr() net.HardwareAddr {
 	a := c.param.PeerAddress()
 	return net.HardwareAddr([]byte{a[5], a[4], a[3], a[2], a[1], a[0]})
 }
 
 // RxMTU returns the MTU which the upper layer is capable of accepting.
-func (c *conn) RxMTU() int { return c.rxMTU }
+func (c *Conn) RxMTU() int { return c.rxMTU }
 
 // SetRxMTU sets the MTU which the upper layer of remote device is capable of accepting.
-func (c *conn) SetRxMTU(mtu int) {
+func (c *Conn) SetRxMTU(mtu int) {
 	c.rxMTU = mtu
 	c.rxMPS = mtu
 }
 
 // TxMTU returns the MTU which the upper layer of remote device is capable of accepting.
-func (c *conn) TxMTU() int { return c.txMTU }
+func (c *Conn) TxMTU() int { return c.txMTU }
 
 // SetTxMTU sets the MTU which the upper layer is capable of accepting.
-func (c *conn) SetTxMTU(mtu int) {
+func (c *Conn) SetTxMTU(mtu int) {
 	log.Printf("Set MTU: %d", mtu)
 	c.txMTU = mtu
 	c.txMPS = mtu
 }
 
 // Parameters ...
-func (c *conn) Parameters() evt.LEConnectionComplete {
+func (c *Conn) Parameters() evt.LEConnectionComplete {
 	return c.param
 }
 

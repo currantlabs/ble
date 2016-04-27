@@ -8,7 +8,7 @@ import (
 // Central ...
 type Central struct {
 	Observer
-	l2cap.Dialer
+	l2cap.LE
 }
 
 // Init ...
@@ -17,11 +17,9 @@ func (c *Central) Init(d dev.Device) error {
 		return err
 	}
 
-	l, err := l2cap.Dial(d)
-	if err != nil {
+	if err := c.LE.Init(d); err != nil {
 		return err
 	}
-	c.Dialer = l
 
 	return nil
 }

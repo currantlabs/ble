@@ -8,7 +8,7 @@ import (
 // Peripheral ...
 type Peripheral struct {
 	Broadcaster
-	l2cap.Listener
+	l2cap.LE
 }
 
 // Init ...
@@ -17,12 +17,9 @@ func (p *Peripheral) Init(d dev.Device) error {
 		return err
 	}
 
-	l, err := l2cap.Listen(d)
-	if err != nil {
+	if err := p.LE.Init(d); err != nil {
 		return err
 	}
-
-	p.Listener = l
 
 	return nil
 }

@@ -24,7 +24,7 @@ func (s sigCmd) len() int     { return int(binary.LittleEndian.Uint16(s[2:4])) }
 func (s sigCmd) data() []byte { return s[:4+s.len()] }
 
 // Signal ...
-func (c *conn) Signal(req Signal, rsp Signal) error {
+func (c *Conn) Signal(req Signal, rsp Signal) error {
 	data := req.Marshal()
 	buf := bytes.NewBuffer(make([]byte, 0))
 	binary.Write(buf, binary.LittleEndian, uint8(req.Code()))
@@ -58,7 +58,7 @@ func (c *conn) Signal(req Signal, rsp Signal) error {
 	return rsp.Unmarshal(s.data())
 }
 
-func (c *conn) sendResponse(code uint8, id uint8, r Signal) (int, error) {
+func (c *Conn) sendResponse(code uint8, id uint8, r Signal) (int, error) {
 	data := r.Marshal()
 	buf := bytes.NewBuffer(make([]byte, 0))
 	binary.Write(buf, binary.LittleEndian, uint8(code))
@@ -70,7 +70,7 @@ func (c *conn) sendResponse(code uint8, id uint8, r Signal) (int, error) {
 	return c.writePDU(cidLESignal, buf.Bytes())
 }
 
-func (c *conn) handleSignal(p pdu) error {
+func (c *Conn) handleSignal(p pdu) error {
 	// When multiple commands are included in an L2CAP packet and the packet
 	// exceeds the signaling MTU (MTUsig) of the receiver, a single Command Reject
 	// packet shall be sent in response. The identifier shall match the first Request
@@ -120,7 +120,7 @@ func (c *conn) handleSignal(p pdu) error {
 }
 
 // DisconnectRequest implements Disconnect Request (0x06) [Vol 3, Part A, 4.6].
-func (c *conn) handleDisconnectRequest(s sigCmd) {
+func (c *Conn) handleDisconnectRequest(s sigCmd) {
 	var req DisconnectRequest
 	if err := req.Unmarshal(s.data()); err != nil {
 		return
@@ -156,7 +156,7 @@ func (c *conn) handleDisconnectRequest(s sigCmd) {
 }
 
 // ConnectionParameterUpdateRequest implements Connection Parameter Update Request (0x12) [Vol 3, Part A, 4.20].
-func (c *conn) handleConnectionParameterUpdateRequest(s sigCmd) {
+func (c *Conn) handleConnectionParameterUpdateRequest(s sigCmd) {
 	// This command shall only be sent from the LE slave device to the LE master
 	// device and only if one or more of the LE slave Controller, the LE master
 	// Controller, the LE slave Host and the LE master Host do not support the
@@ -204,11 +204,11 @@ func (c *conn) handleConnectionParameterUpdateRequest(s sigCmd) {
 }
 
 // LECreditBasedConnectionRequest ...
-func (c *conn) LECreditBasedConnectionRequest(s sigCmd) {
+func (c *Conn) LECreditBasedConnectionRequest(s sigCmd) {
 	// TODO:
 }
 
 // LEFlowControlCredit ...
-func (c *conn) LEFlowControlCredit(s sigCmd) {
+func (c *Conn) LEFlowControlCredit(s sigCmd) {
 	// TODO:
 }

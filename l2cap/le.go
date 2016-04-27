@@ -12,39 +12,48 @@ import (
 	"github.com/currantlabs/bt/hci/evt"
 )
 
-type l2dev interface {
-	Listener
-	Dialer
+// LE implements L2CAP (LE-U logical link) handling
+type LE struct {
+	dev       dev.Device
+	pktWriter io.Writer
+
+	// Host to Controller Data Flow Control Packet-based Data flow control for LE-U [Vol 2, Part E, 4.1.1]
+	// Minimum 27 bytes. 4 bytes of L2CAP Header, and 23 bytes Payload from upper layer (ATT)
+	pool *Pool
+
+	// L2CAP connections
+	muConns      *sync.Mutex
+	conns        map[uint16]*Conn
+	chMasterConn chan *Conn
+	chSlaveConn  chan *Conn
+
+	connParam *cmd.LECreateConnection
 }
 
-var l2devs = map[dev.Device]l2dev{}
-var mu = sync.Mutex{}
+// Init ...
+func (l *LE) Init(d dev.Device) error {
+	l.dev = d
 
-func newLE(d dev.Device) l2dev {
-	l := &le{
-		dev: d,
+	l.muConns = &sync.Mutex{}
+	l.conns = make(map[uint16]*Conn)
+	l.chMasterConn = make(chan *Conn)
+	l.chSlaveConn = make(chan *Conn)
 
-		muConns:      &sync.Mutex{},
-		conns:        make(map[uint16]*conn),
-		chMasterConn: make(chan *conn), // Peripheral accepts master connection
-		chSlaveConn:  make(chan *conn),
-
-		// LECreateConnection implements LE Create Connection (0x08|0x000D) [Vol 2, Part E, 7.8.12]
-		// TODO: allow users to overrite the default values
-		connParam: &cmd.LECreateConnection{
-			LEScanInterval:        0x0004,    // N * 0.625 msec
-			LEScanWindow:          0x0004,    // N * 0.625 msec
-			InitiatorFilterPolicy: 0x00,      // White list is not used
-			PeerAddressType:       0x00,      // Public Device Address
-			PeerAddress:           [6]byte{}, //
-			OwnAddressType:        0x00,      // Public Device Address
-			ConnIntervalMin:       0x0006,    // N * 1.25 msec
-			ConnIntervalMax:       0x0006,    // N * 1.25 msec
-			ConnLatency:           0x0000,    // N * 1.25 msec
-			SupervisionTimeout:    0x0048,    // N * 10 msec
-			MinimumCELength:       0x0000,    // N * 0.625 msec
-			MaximumCELength:       0x0000,    // N * 0.625 msec
-		},
+	// LECreateConnection implements LE Create Connection (0x08|0x000D) [Vol 2, Part E, 7.8.12]
+	// TODO: allow users to overrite the default values
+	l.connParam = &cmd.LECreateConnection{
+		LEScanInterval:        0x0004,    // N * 0.625 msec
+		LEScanWindow:          0x0004,    // N * 0.625 msec
+		InitiatorFilterPolicy: 0x00,      // White list is not used
+		PeerAddressType:       0x00,      // Public Device Address
+		PeerAddress:           [6]byte{}, //
+		OwnAddressType:        0x00,      // Public Device Address
+		ConnIntervalMin:       0x0006,    // N * 1.25 msec
+		ConnIntervalMax:       0x0006,    // N * 1.25 msec
+		ConnLatency:           0x0000,    // N * 1.25 msec
+		SupervisionTimeout:    0x0048,    // N * 10 msec
+		MinimumCELength:       0x0000,    // N * 0.625 msec
+		MaximumCELength:       0x0000,    // N * 0.625 msec
 	}
 
 	// Pre-allocate buffers with additional head room for lower layer headers.
@@ -60,42 +69,26 @@ func newLE(d dev.Device) l2dev {
 	d.SetSubeventHandler(evt.LEConnectionUpdateCompleteSubCode, hci.HandlerFunc(l.handleLEConnectionUpdateComplete))
 	d.SetSubeventHandler(evt.LELongTermKeyRequestSubCode, hci.HandlerFunc(l.handleLELongTermKeyRequest))
 
-	return l
-}
-
-// le implements L2CAP (le-U logical link) handling
-type le struct {
-	dev       dev.Device
-	pktWriter io.Writer
-
-	// Host to Controller Data Flow Control Packet-based Data flow control for le-U [Vol 2, Part E, 4.1.1]
-	// Minimum 27 bytes. 4 bytes of L2CAP Header, and 23 bytes Payload from upper layer (ATT)
-	pool *Pool
-
-	// L2CAP connections
-	muConns      *sync.Mutex
-	conns        map[uint16]*conn
-	chMasterConn chan *conn
-	chSlaveConn  chan *conn
-
-	connParam *cmd.LECreateConnection
-}
-
-// Accept returns a L2CAP master connection.
-func (l *le) Accept() (Conn, error) {
-	return <-l.chSlaveConn, nil
-}
-
-func (l *le) Close() error {
-	// TODO: implement HCI reference counting.
 	return nil
 }
 
-func (l *le) Addr() net.HardwareAddr {
+// Accept returns a L2CAP master connection.
+func (l *LE) Accept() (*Conn, error) {
+	return <-l.chSlaveConn, nil
+}
+
+// Close ...
+func (l *LE) Close() error {
+	return nil
+}
+
+// Addr ...
+func (l *LE) Addr() net.HardwareAddr {
 	return l.dev.LocalAddr()
 }
 
-func (l *le) Dial(a net.HardwareAddr) (Conn, error) {
+// Dial ...
+func (l *LE) Dial(a net.HardwareAddr) (*Conn, error) {
 	cmd := *l.connParam
 	cmd.PeerAddress = [6]byte{a[5], a[4], a[3], a[2], a[1], a[0]}
 	l.dev.Send(&cmd, nil)
@@ -103,7 +96,7 @@ func (l *le) Dial(a net.HardwareAddr) (Conn, error) {
 	return c, nil
 }
 
-func (l *le) handlePacket(b []byte) error {
+func (l *LE) handlePacket(b []byte) error {
 	l.muConns.Lock()
 	c, ok := l.conns[packet(b).handle()]
 	l.muConns.Unlock()
@@ -114,7 +107,7 @@ func (l *le) handlePacket(b []byte) error {
 	return nil
 }
 
-func (l *le) handleLEConnectionComplete(b []byte) error {
+func (l *LE) handleLEConnectionComplete(b []byte) error {
 	e := evt.LEConnectionComplete(b)
 	c := newConn(l, e)
 	l.muConns.Lock()
@@ -128,12 +121,12 @@ func (l *le) handleLEConnectionComplete(b []byte) error {
 	return nil
 }
 
-func (l *le) handleLEConnectionUpdateComplete(b []byte) error {
+func (l *LE) handleLEConnectionUpdateComplete(b []byte) error {
 	// TODO: anything todo?
 	return nil
 }
 
-func (l *le) handleDisconnectionComplete(b []byte) error {
+func (l *LE) handleDisconnectionComplete(b []byte) error {
 	e := evt.DisconnectionComplete(b)
 	l.muConns.Lock()
 	c, found := l.conns[e.ConnectionHandle()]
@@ -150,7 +143,7 @@ func (l *le) handleDisconnectionComplete(b []byte) error {
 	return nil
 }
 
-func (l *le) handleNumberOfCompletedPackets(b []byte) error {
+func (l *LE) handleNumberOfCompletedPackets(b []byte) error {
 	e := evt.NumberOfCompletedPackets(b)
 	l.muConns.Lock()
 	defer l.muConns.Unlock()
@@ -168,7 +161,7 @@ func (l *le) handleNumberOfCompletedPackets(b []byte) error {
 	return nil
 }
 
-func (l *le) handleLELongTermKeyRequest(b []byte) error {
+func (l *LE) handleLELongTermKeyRequest(b []byte) error {
 	e := evt.LELongTermKeyRequest(b)
 	return l.dev.Send(&cmd.LELongTermKeyRequestNegativeReply{
 		ConnectionHandle: e.ConnectionHandle(),
