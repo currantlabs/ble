@@ -1,9 +1,6 @@
 package bt
 
-import (
-	"io"
-	"net"
-)
+import "io"
 
 // HCI ...
 type HCI interface {
@@ -12,7 +9,7 @@ type HCI interface {
 	ACLHandler
 
 	// LocalAddr returns the MAC address of local skt.
-	LocalAddr() net.HardwareAddr
+	LocalAddr() Addr
 
 	// Stop closes the HCI socket.
 	Stop() error

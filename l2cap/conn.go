@@ -8,6 +8,7 @@ import (
 	"log"
 	"net"
 
+	"github.com/currantlabs/bt"
 	"github.com/currantlabs/bt/hci/cmd"
 	"github.com/currantlabs/bt/hci/evt"
 )
@@ -270,12 +271,12 @@ func (c *Conn) Close() error {
 }
 
 // LocalAddr returns local device's MAC address.
-func (c *Conn) LocalAddr() net.HardwareAddr {
+func (c *Conn) LocalAddr() bt.Addr {
 	return c.l.hci.LocalAddr()
 }
 
 // RemoteAddr returns remote device's MAC address.
-func (c *Conn) RemoteAddr() net.HardwareAddr {
+func (c *Conn) RemoteAddr() bt.Addr {
 	a := c.param.PeerAddress()
 	return net.HardwareAddr([]byte{a[5], a[4], a[3], a[2], a[1], a[0]})
 }

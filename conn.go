@@ -1,9 +1,11 @@
 package bt
 
-import (
-	"io"
-	"net"
-)
+import "io"
+
+// Addr represents a network end point address.
+type Addr interface {
+	String() string
+}
 
 // A Listener is a le for L2CAP protocol.
 type Listener interface {
@@ -15,12 +17,12 @@ type Listener interface {
 	Close() error
 
 	// Addr returns the le's network address.
-	Addr() net.HardwareAddr
+	Addr() Addr
 }
 
 // Dialer ...
 type Dialer interface {
-	Dial(net.HardwareAddr) (Conn, error)
+	Dial(Addr) (Conn, error)
 }
 
 // Conn implements a L2CAP connection.
@@ -29,10 +31,10 @@ type Conn interface {
 	io.ReadWriteCloser
 
 	// LocalAddr returns local device's MAC address.
-	LocalAddr() net.HardwareAddr
+	LocalAddr() Addr
 
 	// RemoteAddr returns remote device's MAC address.
-	RemoteAddr() net.HardwareAddr
+	RemoteAddr() Addr
 
 	// RxMTU returns the MTU which the upper layer is capable of accepting.
 	RxMTU() int

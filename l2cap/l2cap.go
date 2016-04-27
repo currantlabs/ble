@@ -83,14 +83,18 @@ func (l *LE) Close() error {
 }
 
 // Addr ...
-func (l *LE) Addr() net.HardwareAddr {
+func (l *LE) Addr() bt.Addr {
 	return l.hci.LocalAddr()
 }
 
 // Dial ...
-func (l *LE) Dial(a net.HardwareAddr) (bt.Conn, error) {
+func (l *LE) Dial(a bt.Addr) (bt.Conn, error) {
 	cmd := *l.connParam
-	cmd.PeerAddress = [6]byte{a[5], a[4], a[3], a[2], a[1], a[0]}
+	b, ok := a.(net.HardwareAddr)
+	if !ok {
+		return nil, fmt.Errorf("invalid addr")
+	}
+	cmd.PeerAddress = [6]byte{b[5], b[4], b[3], b[2], b[1], b[0]}
 	l.hci.Send(&cmd, nil)
 	c := <-l.chMasterConn
 	return c, nil

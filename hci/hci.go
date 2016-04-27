@@ -129,7 +129,7 @@ func (h *HCI) SetACLHandler(f bt.Handler) (w io.Writer, size int, cnt int) {
 }
 
 // LocalAddr ...
-func (h *HCI) LocalAddr() net.HardwareAddr { return h.addr }
+func (h *HCI) LocalAddr() bt.Addr { return h.addr }
 
 // Stop ...
 func (h *HCI) Stop() error { return h.skt.Close() }
