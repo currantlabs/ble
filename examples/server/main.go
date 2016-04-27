@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 
 	"github.com/currantlabs/bt/adv"
@@ -10,16 +9,6 @@ import (
 	"github.com/currantlabs/bt/gap"
 	"github.com/currantlabs/bt/gatt"
 )
-
-// A mandatory handler for monitoring device state.
-func onStateChanged(d dev.Device, s dev.State) {
-	fmt.Printf("State: %s\n", s)
-	switch s {
-	case dev.StatePoweredOn:
-
-	default:
-	}
-}
 
 func main() {
 	s := gatt.NewServer()
@@ -43,14 +32,12 @@ func main() {
 		log.Fatalf("Failed to open device, err: %s", err)
 	}
 
-	p, err := gap.NewPeripheral(d, s)
-	if err != nil {
+	p := &gap.Peripheral{}
+	if err := p.Init(d); err != nil {
 		log.Fatalf("Failed to open device, err: %s", err)
 	}
-
+	s.Start(p)
 	p.Advertise(ad, sr)
-
-	// d.Init(onStateChanged)
 
 	select {}
 }

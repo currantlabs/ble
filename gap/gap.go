@@ -10,15 +10,12 @@ package gap
 // Version Exchange procedure
 // Termination procedure
 
-// State ...
-type State string
+// Mode ...
+type Mode int
 
-// State ...
+// Mode ...
 const (
-	StateUnknown      = "Unknown"
-	StateResetting    = "Resetting"
-	StateUnsupported  = "Unsupported"
-	StateUnauthorized = "Unauthorized"
-	StatePoweredOff   = "PoweredOff"
-	StatePoweredOn    = "PoweredOn"
+	NonDiscoverable     Mode = iota // [Vol 3, Part C, 9.2.2]
+	LimitedDiscoverable             // [Vol 3, Part C, 9.2.3]
+	GeneralDiscoverable             // [Vol 3, Part C, 9.2.4]
 )

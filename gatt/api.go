@@ -3,7 +3,7 @@ package gatt
 import (
 	"net"
 
-	"github.com/currantlabs/bt/l2cap"
+	"github.com/currantlabs/bt/gap"
 	"github.com/currantlabs/bt/uuid"
 )
 
@@ -89,6 +89,6 @@ type Server interface {
 	// It removes all currently added services, if any.
 	SetServices(svcs []*Service) error
 
-	// Loop ...
-	Loop(l2c l2cap.Conn)
+	// Start ...
+	Start(p *gap.Peripheral)
 }

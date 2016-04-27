@@ -28,17 +28,16 @@ func discovered(a gap.Advertisement) {
 }
 
 func main() {
-	// Find an available HCI device
 	d, err := dev.New(-1)
 	if err != nil {
 		log.Fatalf("Failed to open HCI device, err: %s\n", err)
 	}
 
-	o, err := gap.NewObserver(d)
-	if err != nil {
+	o := &gap.Observer{}
+	if o.Init(d); err != nil {
 		log.Fatalf("Failed to create an observer, err: %s\n", err)
 	}
-	o.Scan(gap.FilterFunc(filter), gap.HandlerFunc(discovered))
+	o.Scan(gap.AdvFilterFunc(filter), gap.AdvHandlerFunc(discovered))
 
 	select {}
 }

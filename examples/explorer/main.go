@@ -16,12 +16,12 @@ import (
 )
 
 type explorer struct {
-	gap.Central
+	*gap.Central
 	found chan bool
 	done  chan bool
 }
 
-func newExplorer(c gap.Central) *explorer {
+func newExplorer(c *gap.Central) *explorer {
 	return &explorer{
 		Central: c,
 		found:   make(chan bool),
@@ -144,12 +144,12 @@ func main() {
 		log.Fatalf("Failed to open HCI device, err: %s\n", err)
 	}
 
-	c, err := gap.NewCentral(d)
-	if err != nil {
+	c := &gap.Central{}
+	if err := c.Init(d); err != nil {
 		log.Fatalf("Failed to create a central, err: %s\n", err)
 	}
 
 	e := newExplorer(c)
-	e.Scan(gap.FilterFunc(flt), e)
+	e.Scan(gap.AdvFilterFunc(flt), e)
 	e.Wait()
 }

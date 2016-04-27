@@ -2,7 +2,7 @@ package gatt
 
 import (
 	"github.com/currantlabs/bt/att"
-	"github.com/currantlabs/bt/l2cap"
+	"github.com/currantlabs/bt/gap"
 )
 
 // NewServer ...
@@ -34,6 +34,15 @@ func (s *server) SetServices(svcs []*Service) error {
 	return nil
 }
 
-func (s *server) Loop(l2c l2cap.Conn) {
-	att.NewServer(s.attrs, l2c, 1024).Loop()
+func (s *server) Start(p *gap.Peripheral) {
+	go func() {
+		for {
+			l2c, err := p.Accept()
+			if err != nil {
+				break
+			}
+			att.NewServer(s.attrs, l2c, 1024).Loop()
+			p.StartAdvertising()
+		}
+	}()
 }
