@@ -28,7 +28,7 @@ type NotificationHandler interface {
 
 // Client implementa an Attribute Protocol Client.
 type Client struct {
-	l2c  l2cap.Conn
+	l2c  *l2cap.Conn
 	rspc chan []byte
 
 	rxBuf   []byte
@@ -38,7 +38,7 @@ type Client struct {
 }
 
 // NewClient returns an Attribute Protocol Client.
-func NewClient(l2c l2cap.Conn, h NotificationHandler) *Client {
+func NewClient(l2c *l2cap.Conn, h NotificationHandler) *Client {
 	c := &Client{
 		l2c:     l2c,
 		rspc:    make(chan []byte),

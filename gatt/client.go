@@ -32,7 +32,7 @@ type Client struct {
 }
 
 // Init ...
-func (gc *Client) Init(l2c l2cap.Conn) error {
+func (gc *Client) Init(l2c *l2cap.Conn) error {
 	h := newNHandler()
 	gc.c = att.NewClient(l2c, h)
 	gc.handler = h

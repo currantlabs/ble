@@ -13,7 +13,7 @@ import (
 
 // Server implementas an ATT (Attribute Protocol) server.
 type Server struct {
-	l2c   l2cap.Conn
+	l2c   *l2cap.Conn
 	attrs *Range
 
 	// Refer to [Vol 3, Part F, 3.3.2 & 3.3.3] for the requirement of
@@ -26,7 +26,7 @@ type Server struct {
 }
 
 // NewServer returns an ATT (Attribute Protocol) server.
-func NewServer(a *Range, l2c l2cap.Conn, rxMTU int) *Server {
+func NewServer(a *Range, l2c *l2cap.Conn, rxMTU int) *Server {
 	// Although the rxBuf is initialized with the capacity of rxMTU, it is
 	// not discovered, and only the default ATT_MTU (23 bytes) of it shall
 	// be used until remote central request ExchangeMTU.
