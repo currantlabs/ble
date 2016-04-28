@@ -41,19 +41,6 @@ func (f NotifyHandlerFunc) ServeNotify(req Request, n Notifier) {
 	f(req, n)
 }
 
-// A IndicateHandler handles GATT requests.
-type IndicateHandler interface {
-	ServeIndicate(req Request, n Notifier)
-}
-
-// IndicateHandlerFunc is an adapter to allow the use of ordinary functions as Handlers.
-type IndicateHandlerFunc func(req Request, n Notifier)
-
-// ServeIndicate returns f(r, maxlen, offset).
-func (f IndicateHandlerFunc) ServeIndicate(req Request, n Notifier) {
-	f(req, n)
-}
-
 // Request ...
 type Request interface {
 	Data() []byte
@@ -71,8 +58,8 @@ type ResponseWriter interface {
 	// SetStatus reports the result of the request.
 	SetStatus(status AttError)
 
-	// // Server ...
-	Server() AttServer
+	// Notify ...
+	Notify(ind bool, h uint16, data []byte) (int, error)
 
 	// Len ...
 	Len() int

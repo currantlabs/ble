@@ -46,7 +46,15 @@ func NewServer(a *Range, l2c bt.Conn, rxMTU int) *Server {
 }
 
 // Notify sends notification to remote central.
-func (s *Server) Notify(h uint16, data []byte) (int, error) {
+func (s *Server) Notify(ind bool, h uint16, data []byte) (int, error) {
+	if ind {
+		return s.indicate(h, data)
+	}
+	return s.notify(h, data)
+}
+
+// notify sends notification to remote central.
+func (s *Server) notify(h uint16, data []byte) (int, error) {
 	// log.Printf("att: notifying 0x%04X, %s", h, string(data))
 
 	// Acquire and reuse notifyBuffer. Release it after usage.
@@ -65,8 +73,8 @@ func (s *Server) Notify(h uint16, data []byte) (int, error) {
 	return s.l2c.Write(rsp[:3+buf.Len()])
 }
 
-// Indicate sends indication to remote central.
-func (s *Server) Indicate(h uint16, data []byte) (int, error) {
+// indicate sends indication to remote central.
+func (s *Server) indicate(h uint16, data []byte) (int, error) {
 	// log.Printf("att: indicating 0x%04X, %s", h, string(data))
 
 	// Acquire and reuse indicateBuffer. Release it after usage.

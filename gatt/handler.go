@@ -23,58 +23,65 @@ type notifier struct {
 	send   func([]byte) (int, error)
 }
 
+func newNotifier(send func([]byte) (int, error)) *notifier {
+	n := &notifier{}
+	n.ctx, n.cancel = context.WithCancel(context.Background())
+	n.send = send
+	// n.maxlen = cap
+	return n
+}
+
 func (n *notifier) Context() context.Context    { return n.ctx }
 func (n *notifier) Write(b []byte) (int, error) { return n.send(b) }
 func (n *notifier) Cap() int                    { return n.maxlen }
 
-func config(c *char, p bt.Property, nh bt.NotifyHandler, ih bt.IndicateHandler) {
-	if c.cccd == nil {
-		cd := &desc{uuid: attrClientCharacteristicConfigUUID}
-		c.cccd = cd
-		var ccc uint16
-		cd.HandleRead(bt.ReadHandlerFunc(func(req bt.Request, rsp bt.ResponseWriter) {
-			binary.Write(rsp, binary.LittleEndian, ccc)
-		}))
-		cd.HandleWrite(bt.WriteHandlerFunc(func(req bt.Request, rsp bt.ResponseWriter) {
-			value := binary.LittleEndian.Uint16(req.Data())
-			if value&flagCCCNotify != 0 && c.nn == nil {
-				n := &notifier{}
-				n.ctx, n.cancel = context.WithCancel(context.Background())
-				n.send = func(b []byte) (int, error) { return rsp.Server().Notify(c.attr.vh, b) }
-				c.nn = n
-				go c.nh.ServeNotify(req, n)
-			}
-			if value&flagCCCNotify == 0 && c.nn != nil {
-				c.nn.cancel()
-				c.nn = nil
-			}
-			if value&flagCCCIndicate != 0 && c.in == nil {
-				n := &notifier{}
-				n.ctx, n.cancel = context.WithCancel(context.Background())
-				n.send = func(b []byte) (int, error) { return rsp.Server().Indicate(c.attr.vh, b) }
-				c.in = n
-				go c.ih.ServeIndicate(req, n)
-			}
-			if value&flagCCCIndicate == 0 && c.in != nil {
-				c.in.cancel()
-				c.in = nil
-			}
-			ccc = value
-		}))
-		c.descs = append(c.descs, c.cccd)
-	}
+func config(c *char, ind bool, h bt.NotifyHandler) {
 	switch {
-	case p == bt.CharNotify && nh != nil:
-		c.props |= p
-		c.nh = nh
-	case p == bt.CharIndicate && ih != nil:
-		c.props |= p
-		c.ih = ih
-	case p == bt.CharNotify && nh == nil:
-		c.nh = nh
-		c.props ^= p
-	case p == bt.CharIndicate && ih == nil:
-		c.ih = ih
-		c.props ^= p
+	case ind && h != nil:
+		c.props |= bt.CharIndicate
+		c.ih = h
+	case ind && h == nil:
+		c.props &= ^bt.CharIndicate
+		c.ih = h
+	case !ind && h != nil:
+		c.props |= bt.CharNotify
+		c.nh = h
+	case !ind && h == nil:
+		c.props &= ^bt.CharNotify
+		c.nh = h
 	}
+}
+
+func newCCCD(c *char) *desc {
+	var ccc uint16
+	var nn *notifier
+	var in *notifier
+
+	d := &desc{uuid: attrClientCharacteristicConfigUUID}
+
+	d.HandleRead(bt.ReadHandlerFunc(func(req bt.Request, rsp bt.ResponseWriter) {
+		binary.Write(rsp, binary.LittleEndian, ccc)
+	}))
+
+	d.HandleWrite(bt.WriteHandlerFunc(func(req bt.Request, rsp bt.ResponseWriter) {
+		newCCC := binary.LittleEndian.Uint16(req.Data())
+		if newCCC&cccNotify != 0 && ccc&cccNotify == 0 {
+			send := func(b []byte) (int, error) { return rsp.Notify(false, c.attr.vh, b) }
+			nn = newNotifier(send)
+			go c.nh.ServeNotify(req, nn)
+		}
+		if newCCC&cccNotify == 0 && ccc&cccNotify != 0 {
+			nn.cancel()
+		}
+		if newCCC&cccIndicate != 0 && ccc&cccIndicate == 0 {
+			send := func(b []byte) (int, error) { return rsp.Notify(true, c.attr.vh, b) }
+			in = newNotifier(send)
+			go c.ih.ServeNotify(req, in)
+		}
+		if newCCC&cccIndicate == 0 && ccc&cccIndicate != 0 {
+			in.cancel()
+		}
+		ccc = newCCC
+	}))
+	return d
 }

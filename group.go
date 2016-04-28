@@ -59,11 +59,7 @@ type Characteristic interface {
 
 	// HandleNotify makes the characteristic support notify requests, and routes the requests to h.
 	// HandleNotify must be called before the containing service is added to a server.
-	HandleNotify(h NotifyHandler) Characteristic
-
-	// HandleIndicate makes the characteristic support notify requests, and routes the requests to h.
-	// HandleIndicate must be called before the containing service is added to a server.
-	HandleIndicate(h IndicateHandler) Characteristic
+	HandleNotify(ind bool, h NotifyHandler) Characteristic
 
 	// AddDescriptor adds a descriptor to a characteristic.
 	// AddDescriptor panics if the characteristic already contains another descriptor with the same UUID.

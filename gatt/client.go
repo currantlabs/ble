@@ -33,7 +33,7 @@ type Client struct {
 }
 
 // Address ...
-func (p *Client) Address() net.HardwareAddr { return p.addr }
+func (p *Client) Address() bt.Addr { return p.addr }
 
 // Name ...
 func (p *Client) Name() string { return p.name }
@@ -193,16 +193,13 @@ func (p *Client) SetMTU(mtu int) error {
 	return err
 }
 
-// SetNotificationHandler ...
-func (p *Client) SetNotificationHandler(c bt.Characteristic, h bt.NotificationHandler) error {
+// Subscribe ...
+func (p *Client) Subscribe(c bt.Characteristic, ind bool, h bt.NotificationHandler) error {
 	char := c.(*char)
-	return p.setHandlers(char.cccd.attr.h, char.attr.vh, flagCCCNotify, h)
-}
-
-// SetIndicationHandler ...
-func (p *Client) SetIndicationHandler(c bt.Characteristic, h bt.NotificationHandler) error {
-	char := c.(*char)
-	return p.setHandlers(char.cccd.attr.h, char.attr.vh, flagCCCIndicate, h)
+	if ind {
+		return p.setHandlers(char.cccd.attr.h, char.attr.vh, cccIndicate, h)
+	}
+	return p.setHandlers(char.cccd.attr.h, char.attr.vh, cccNotify, h)
 }
 
 func (p *Client) setHandlers(cccdh, vh, flag uint16, h bt.NotificationHandler) error {
@@ -224,7 +221,7 @@ func (p *Client) setHandlers(cccdh, vh, flag uint16, h bt.NotificationHandler) e
 
 	v := make([]byte, 2)
 	binary.LittleEndian.PutUint16(v, s.ccc)
-	if flag == flagCCCNotify {
+	if flag == cccNotify {
 		s.nHandler = h
 	} else {
 		s.iHandler = h
@@ -232,8 +229,8 @@ func (p *Client) setHandlers(cccdh, vh, flag uint16, h bt.NotificationHandler) e
 	return p.c.Write(s.cccdh, v)
 }
 
-// ClearHandlers ...
-func (p *Client) ClearHandlers() error {
+// ClearSubscriptions ...
+func (p *Client) ClearSubscriptions() error {
 	for _, s := range p.handler.stubs {
 		if err := p.c.Write(s.cccdh, make([]byte, 2)); err != nil {
 			return err

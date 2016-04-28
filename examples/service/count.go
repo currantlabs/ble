@@ -27,7 +27,7 @@ func NewCountService() bt.Service {
 		}))
 
 	s.AddCharacteristic(uuid.MustParse("1c927b50-c116-11e3-8a33-0800200c9a66")).HandleNotify(
-		bt.NotifyHandlerFunc(func(req bt.Request, n bt.Notifier) {
+		false, bt.NotifyHandlerFunc(func(req bt.Request, n bt.Notifier) {
 			cnt := 0
 			log.Printf("count: Notification subscribed")
 			for {
@@ -47,8 +47,8 @@ func NewCountService() bt.Service {
 			}
 		}))
 
-	s.AddCharacteristic(uuid.MustParse("2da38c61-c116-11e3-8a33-0800200c9a66")).HandleIndicate(
-		bt.IndicateHandlerFunc(func(req bt.Request, n bt.Notifier) {
+	s.AddCharacteristic(uuid.MustParse("2da38c61-c116-11e3-8a33-0800200c9a66")).HandleNotify(
+		true, bt.NotifyHandlerFunc(func(req bt.Request, n bt.Notifier) {
 			cnt := 0
 			log.Printf("count: Indication subscribed")
 			for {

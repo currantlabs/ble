@@ -39,9 +39,7 @@ type char struct {
 	vattr attr
 
 	nh bt.NotifyHandler
-	ih bt.IndicateHandler
-	nn *notifier
-	in *notifier
+	ih bt.NotifyHandler
 }
 
 func (c *char) UUID() uuid.UUID              { return c.uuid }
@@ -66,13 +64,12 @@ func (c *char) HandleWrite(h bt.WriteHandler) bt.Characteristic {
 	return c
 }
 
-func (c *char) HandleNotify(h bt.NotifyHandler) bt.Characteristic {
-	config(c, bt.CharNotify, h, nil)
-	return c
-}
-
-func (c *char) HandleIndicate(h bt.IndicateHandler) bt.Characteristic {
-	config(c, bt.CharIndicate, nil, h)
+func (c *char) HandleNotify(ind bool, h bt.NotifyHandler) bt.Characteristic {
+	if c.cccd == nil {
+		c.cccd = newCCCD(c)
+		c.descs = append(c.descs, c.cccd)
+	}
+	config(c, ind, h)
 	return c
 }
 

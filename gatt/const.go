@@ -23,6 +23,6 @@ var (
 )
 
 const (
-	flagCCCNotify   = 0x0001
-	flagCCCIndicate = 0x0002
+	cccNotify   = 0x0001
+	cccIndicate = 0x0002
 )

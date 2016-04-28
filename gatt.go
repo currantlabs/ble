@@ -1,10 +1,6 @@
 package bt
 
-import (
-	"net"
-
-	"github.com/currantlabs/bt/uuid"
-)
+import "github.com/currantlabs/bt/uuid"
 
 // NotificationHandler ...
 type NotificationHandler func(req []byte)
@@ -12,7 +8,7 @@ type NotificationHandler func(req []byte)
 // Client ...
 type Client interface {
 	// Address is the platform specific unique ID of the remote peripheral, e.g. MAC for Linux, Client UUID for MacOS.
-	Address() net.HardwareAddr
+	Address() Addr
 
 	// Name returns the name of the remote peripheral.
 	// This can be the advertised name, if exists, or the GAP device name, which takes priority.
@@ -59,14 +55,11 @@ type Client interface {
 	// SetMTU sets the mtu for the remote peripheral.
 	SetMTU(mtu int) error
 
-	// SetNotificationHandler sets notifications for the value of a specified characteristic.
-	SetNotificationHandler(c Characteristic, h NotificationHandler) error
+	// Subscribe subscribes to indication (if ind is set true), or notification of a specified characteristic.
+	Subscribe(c Characteristic, ind bool, h NotificationHandler) error
 
-	// SetIndicationHandler sets indications for the value of a specified characteristic.
-	SetIndicationHandler(c Characteristic, h NotificationHandler) error
-
-	// ClearHandlers ...
-	ClearHandlers() error
+	// ClearSubscriptions clears all subscriptions of notification and indication.
+	ClearSubscriptions() error
 }
 
 // Server ...

@@ -52,7 +52,7 @@ func (e *explorer) explore(a net.HardwareAddr) {
 	}
 	defer close(e.done)
 	defer l2c.Close()
-	defer p.ClearHandlers()
+	defer p.ClearSubscriptions()
 
 	// Discovery services
 	ss, err := p.DiscoverServices(nil)
@@ -106,14 +106,14 @@ func (e *explorer) explore(a net.HardwareAddr) {
 			// Note: This can only be done after the descriptors (CCCD) are discovered.
 			if (c.Properties() & bt.CharNotify) != 0 {
 				f := func(b []byte) { fmt.Printf("Notified: % X | %q\n", b, b) }
-				if err := p.SetNotificationHandler(c, f); err != nil {
+				if err := p.Subscribe(c, false, f); err != nil {
 					fmt.Printf("Failed to subscribe characteristic, err: %s\n", err)
 					continue
 				}
 			}
 			if (c.Properties() & bt.CharIndicate) != 0 {
 				f := func(b []byte) { fmt.Printf("Indicated: % X | %q\n", b, b) }
-				if err := p.SetIndicationHandler(c, f); err != nil {
+				if err := p.Subscribe(c, true, f); err != nil {
 					fmt.Printf("Failed to subscribe characteristic, err: %s\n", err)
 					continue
 				}

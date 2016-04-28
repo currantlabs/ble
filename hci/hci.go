@@ -131,7 +131,6 @@ func (h *HCI) Init(id int) error {
 		MaximumCELength:       0x0000,    // N * 0.625 msec
 	}
 
-	// Register our own advertising report advHandler.
 	h.evth[0x3E] = h.handleLEMeta
 	h.evth[evt.CommandCompleteCode] = h.handleCommandComplete
 	h.evth[evt.CommandStatusCode] = h.handleCommandStatus

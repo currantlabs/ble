@@ -99,8 +99,10 @@ func (r *ResponseWriter) Status() bt.AttError { return r.status }
 // SetStatus reports the result of the request.
 func (r *ResponseWriter) SetStatus(status bt.AttError) { r.status = status }
 
-// Server ...
-func (r *ResponseWriter) Server() bt.AttServer { return r.svr }
+// Notify ...
+func (r *ResponseWriter) Notify(ind bool, h uint16, data []byte) (int, error) {
+	return r.svr.Notify(ind, h, data)
+}
 
 // Len ...
 func (r *ResponseWriter) Len() int { return r.buf.Len() }
