@@ -34,7 +34,9 @@ var funcMap = template.FuncMap{
 		var s string
 		switch v {
 		case "uint8":
-			s = fmt.Sprintf("func (r %s) %s () %s { return r[%d]}\n", n, k, v, cnt)
+			s += fmt.Sprintf("// %s ...\n", k)
+			s += fmt.Sprintf("func (r %s) %s () %s { return r[%d]}\n", n, k, v, cnt)
+			s += fmt.Sprintf("// Set%s ...\n", k)
 			if k == "AttributeOpcode" {
 				s += fmt.Sprintf("func (r %s) Set%s () { r[%d] = %s}", n, k, cnt, c)
 			} else {
@@ -42,32 +44,42 @@ var funcMap = template.FuncMap{
 			}
 			cnt++
 		case "uint16":
-			s = fmt.Sprintf("func (r %s) %s () %s { return binary.LittleEndian.Uint16(r[%d:])}\n", n, k, v, cnt)
+			s += fmt.Sprintf("// %s ...\n", k)
+			s += fmt.Sprintf("func (r %s) %s () %s { return binary.LittleEndian.Uint16(r[%d:])}\n", n, k, v, cnt)
+			s += fmt.Sprintf("// Set%s ...\n", k)
 			s += fmt.Sprintf("func (r %s) Set%s (v %s) { binary.LittleEndian.PutUint16(r[%d:], v)}", n, k, v, cnt)
 			cnt += 2
 		case "uint64":
-			s = fmt.Sprintf("func (r %s) %s () %s { return binary.LittleEndian.Uint64(r[%d:])}\n", n, k, v, cnt)
+			s += fmt.Sprintf("// %s ...\n", k)
+			s += fmt.Sprintf("func (r %s) %s () %s { return binary.LittleEndian.Uint64(r[%d:])}\n", n, k, v, cnt)
+			s += fmt.Sprintf("// Set%s ...\n", k)
 			s += fmt.Sprintf("func (r %s) Set%s (v %s) { binary.LittleEndian.PutUint64(r[%d:], v)}", n, k, v, cnt)
 			cnt += 8
 		case "[]byte":
-			s = fmt.Sprintf("func (r %s) %s () %s { return r[%d:]}\n", n, k, v, cnt)
+			s += fmt.Sprintf("// %s ...\n", k)
+			s += fmt.Sprintf("func (r %s) %s () %s { return r[%d:]}\n", n, k, v, cnt)
+			s += fmt.Sprintf("// Set%s ...\n", k)
 			s += fmt.Sprintf("func (r %s) Set%s (v %s) { copy(r[%d:], v)}", n, k, v, cnt)
 		case "[6]byte":
+			s += fmt.Sprintf("// %s ...\n", k)
 			s = fmt.Sprintf(`func (r %s) %s () %s {
 				 b:=[6]byte{}
 				 copy(b[:], r[%d:])
 				 return b
 				 }
 				 `, n, k, v, cnt)
+			s += fmt.Sprintf("// Set%s ...\n", k)
 			s += fmt.Sprintf(`func (r %s) Set%s (v %s) { copy(r[%d:%d+6], v[:]) }`, n, k, v, cnt, cnt)
 			cnt += 6
 		case "[12]byte":
-			s = fmt.Sprintf(`func (r %s) %s () %s {
+			s += fmt.Sprintf("// %s ...\n", k)
+			s += fmt.Sprintf(`func (r %s) %s () %s {
 				 b:=[12]byte{}
 				 copy(b[:], r[%d:])
 				 return b
 				 }
 				 `, n, k, v, cnt)
+			s += fmt.Sprintf("// Set%s ...\n", k)
 			s += fmt.Sprintf(`func (r %s) Set%s (v %s) { copy(r[%d:%d+12], v[:]) }`, n, k, v, cnt, cnt)
 			cnt += 12
 		default:

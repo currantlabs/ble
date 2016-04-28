@@ -1,4 +1,6 @@
-{{reset}}{{$n := (esc .Name)}}const {{$n}}Code = {{.Code}}
+{{reset}}{{$n := (esc .Name)}}
+// {{$n}}Code ...
+const {{$n}}Code = {{.Code}}
 {{$c := .Code}}// {{$n}} implements {{.Name}} ({{.Code}}) [{{.Spec}}].
 type {{$n}} []byte
 {{range .Param}} {{range $k, $v := .}} {{roy $n $c (esc $k) $v}} {{end}}
