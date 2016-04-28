@@ -194,32 +194,12 @@ func (h *HCI) Dial(a bt.Addr) (bt.Conn, error) {
 }
 
 func (h *HCI) init() error {
-	ResetRP := cmd.ResetRP{}
-	if err := h.Send(&cmd.Reset{}, &ResetRP); err != nil {
-		return err
-	}
-
 	ReadBDADDRRP := cmd.ReadBDADDRRP{}
 	if err := h.Send(&cmd.ReadBDADDR{}, &ReadBDADDRRP); err != nil {
 		return err
 	}
 	a := ReadBDADDRRP.BDADDR
 	h.addr = net.HardwareAddr([]byte{a[5], a[4], a[3], a[2], a[1], a[0]})
-
-	ReadLocalSupportedCommandsRP := cmd.ReadLocalSupportedCommandsRP{}
-	if err := h.Send(&cmd.ReadLocalSupportedCommands{}, &ReadLocalSupportedCommandsRP); err != nil {
-		return err
-	}
-
-	ReadLocalSupportedFeaturesRP := cmd.ReadLocalSupportedFeaturesRP{}
-	if err := h.Send(&cmd.ReadLocalSupportedFeatures{}, &ReadLocalSupportedFeaturesRP); err != nil {
-		return err
-	}
-
-	ReadLocalVersionInformationRP := cmd.ReadLocalVersionInformationRP{}
-	if err := h.Send(&cmd.ReadLocalVersionInformation{}, &ReadLocalVersionInformationRP); err != nil {
-		return err
-	}
 
 	ReadBufferSizeRP := cmd.ReadBufferSizeRP{}
 	if err := h.Send(&cmd.ReadBufferSize{}, &ReadBufferSizeRP); err != nil {
@@ -241,16 +221,6 @@ func (h *HCI) init() error {
 		h.bufSize = int(LEReadBufferSizeRP.HCLEDataPacketLength)
 	}
 
-	LEReadLocalSupportedFeaturesRP := cmd.LEReadLocalSupportedFeaturesRP{}
-	if err := h.Send(&cmd.LEReadLocalSupportedFeatures{}, &LEReadLocalSupportedFeaturesRP); err != nil {
-		return err
-	}
-
-	LEReadSupportedStatesRP := cmd.LEReadSupportedStatesRP{}
-	if err := h.Send(&cmd.LEReadSupportedStates{}, &LEReadSupportedStatesRP); err != nil {
-		return err
-	}
-
 	LEReadAdvertisingChannelTxPowerRP := cmd.LEReadAdvertisingChannelTxPowerRP{}
 	if err := h.Send(&cmd.LEReadAdvertisingChannelTxPower{}, &LEReadAdvertisingChannelTxPowerRP); err != nil {
 		return err
@@ -269,11 +239,6 @@ func (h *HCI) init() error {
 
 	WriteLEHostSupportRP := cmd.WriteLEHostSupportRP{}
 	if err := h.Send(&cmd.WriteLEHostSupport{LESupportedHost: 1, SimultaneousLEHost: 0}, &WriteLEHostSupportRP); err != nil {
-		return err
-	}
-
-	WriteClassOfDeviceRP := cmd.WriteClassOfDeviceRP{}
-	if err := h.Send(&cmd.WriteClassOfDevice{ClassOfDevice: [3]byte{0x40, 0x02, 0x04}}, &WriteClassOfDeviceRP); err != nil {
 		return err
 	}
 
