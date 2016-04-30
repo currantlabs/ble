@@ -3,9 +3,9 @@ package hci
 import (
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"sync"
+	"time"
 
 	"github.com/currantlabs/bt"
 	"github.com/currantlabs/bt/hci/cmd"
@@ -25,12 +25,6 @@ type CommandRP interface {
 	Unmarshal(b []byte) error
 }
 
-// CommandSender ...
-type CommandSender interface {
-	// Send sends a HCI Command and returns unserialized return parameter.
-	Send(Command, CommandRP) error
-}
-
 type handlerFn func(b []byte) error
 
 type pkt struct {
@@ -43,12 +37,12 @@ type HCI struct {
 	sync.Mutex
 	skt io.ReadWriteCloser
 
-	// cmdSender
-	sent  map[int]*pkt
-	chPkt chan *pkt
+	state State
 
 	// Host to Controller command flow control [Vol 2, Part E, 4.4]
-	chBufs chan []byte
+	sent      map[int]*pkt
+	chCmdPkt  chan *pkt
+	chCmdBufs chan []byte
 
 	// evtHub
 	evth map[int]handlerFn
@@ -78,8 +72,14 @@ type HCI struct {
 	// L2CAP connections
 	muConns      *sync.Mutex
 	conns        map[uint16]*Conn
-	chMasterConn chan *Conn
-	chSlaveConn  chan *Conn
+	chMasterConn chan *Conn // Peripheral accepts master connections.
+	chSlaveConn  chan *Conn // Central dials slave connections.
+
+	chDialerTmo   chan time.Time
+	chListenerTmo chan time.Time
+
+	err  error
+	done chan bool
 }
 
 // Init ...
@@ -90,8 +90,8 @@ func (h *HCI) Init(id int) error {
 	}
 	h.skt = skt
 
-	h.chPkt = make(chan *pkt)
-	h.chBufs = make(chan []byte, 8)
+	h.chCmdPkt = make(chan *pkt)
+	h.chCmdBufs = make(chan []byte, 8)
 	h.sent = make(map[int]*pkt)
 
 	h.evth = map[int]handlerFn{}
@@ -131,6 +131,13 @@ func (h *HCI) Init(id int) error {
 		MaximumCELength:       0x0000,    // 0x0000 - 0xFFFF; N * 0.625 msec
 	}
 
+	h.done = make(chan bool)
+
+	h.muConns = &sync.Mutex{}
+	h.conns = make(map[uint16]*Conn)
+	h.chMasterConn = make(chan *Conn) // Peripheral accepts master connection
+	h.chSlaveConn = make(chan *Conn)
+
 	h.evth[0x3E] = h.handleLEMeta
 	h.evth[evt.CommandCompleteCode] = h.handleCommandComplete
 	h.evth[evt.CommandStatusCode] = h.handleCommandStatus
@@ -153,11 +160,6 @@ func (h *HCI) Init(id int) error {
 	go h.mainLoop()
 	h.init()
 
-	h.muConns = &sync.Mutex{}
-	h.conns = make(map[uint16]*Conn)
-	h.chMasterConn = make(chan *Conn) // Peripheral accepts master connection
-	h.chSlaveConn = make(chan *Conn)
-
 	// Pre-allocate buffers with additional head room for lower layer headers.
 	// HCI header (1 Byte) + ACL Data Header (4 bytes) + L2CAP PDU (or fragment)
 	h.pool = NewPool(1+4+h.bufSize, h.bufCnt)
@@ -166,54 +168,31 @@ func (h *HCI) Init(id int) error {
 }
 
 // Stop ...
-func (h *HCI) Stop() error { return h.skt.Close() }
-
-// Accept returns a L2CAP master connection.
-func (h *HCI) Accept() (bt.Conn, error) {
-	return <-h.chSlaveConn, nil
+func (h *HCI) Stop() error {
+	return h.stop(nil)
 }
 
-// Close ...
-func (h *HCI) Close() error {
-	return nil
-}
-
-// Addr ...
-func (h *HCI) Addr() bt.Addr { return h.addr }
-
-// Dial ...
-func (h *HCI) Dial(a bt.Addr) (bt.Conn, error) {
-	b, ok := a.(net.HardwareAddr)
-	if !ok {
-		return nil, fmt.Errorf("invalid addr")
-	}
-	h.connParams.PeerAddress = [6]byte{b[5], b[4], b[3], b[2], b[1], b[0]}
-	h.Send(&h.connParams, nil)
-	c := <-h.chMasterConn
-	return c, nil
+// Error ...
+func (h *HCI) Error() error {
+	return h.err
 }
 
 func (h *HCI) init() error {
 	ReadBDADDRRP := cmd.ReadBDADDRRP{}
-	if err := h.Send(&cmd.ReadBDADDR{}, &ReadBDADDRRP); err != nil {
-		return err
-	}
+	h.Send(&cmd.ReadBDADDR{}, &ReadBDADDRRP)
+
 	a := ReadBDADDRRP.BDADDR
 	h.addr = net.HardwareAddr([]byte{a[5], a[4], a[3], a[2], a[1], a[0]})
 
 	ReadBufferSizeRP := cmd.ReadBufferSizeRP{}
-	if err := h.Send(&cmd.ReadBufferSize{}, &ReadBufferSizeRP); err != nil {
-		return err
-	}
+	h.Send(&cmd.ReadBufferSize{}, &ReadBufferSizeRP)
 
 	// Assume the buffers are shared between ACL-U and LE-U.
 	h.bufCnt = int(ReadBufferSizeRP.HCTotalNumACLDataPackets)
 	h.bufSize = int(ReadBufferSizeRP.HCACLDataPacketLength)
 
 	LEReadBufferSizeRP := cmd.LEReadBufferSizeRP{}
-	if err := h.Send(&cmd.LEReadBufferSize{}, &LEReadBufferSizeRP); err != nil {
-		return err
-	}
+	h.Send(&cmd.LEReadBufferSize{}, &LEReadBufferSizeRP)
 
 	if LEReadBufferSizeRP.HCTotalNumLEDataPackets != 0 {
 		// Okay, LE-U do have their own buffers.
@@ -222,80 +201,107 @@ func (h *HCI) init() error {
 	}
 
 	LEReadAdvertisingChannelTxPowerRP := cmd.LEReadAdvertisingChannelTxPowerRP{}
-	if err := h.Send(&cmd.LEReadAdvertisingChannelTxPower{}, &LEReadAdvertisingChannelTxPowerRP); err != nil {
-		return err
-	}
+	h.Send(&cmd.LEReadAdvertisingChannelTxPower{}, &LEReadAdvertisingChannelTxPowerRP)
+
 	h.txPwrLv = int(LEReadAdvertisingChannelTxPowerRP.TransmitPowerLevel)
 
 	LESetEventMaskRP := cmd.LESetEventMaskRP{}
-	if err := h.Send(&cmd.LESetEventMask{LEEventMask: 0x000000000000001F}, &LESetEventMaskRP); err != nil {
-		return err
-	}
+	h.Send(&cmd.LESetEventMask{LEEventMask: 0x000000000000001F}, &LESetEventMaskRP)
 
 	SetEventMaskRP := cmd.SetEventMaskRP{}
-	if err := h.Send(&cmd.SetEventMask{EventMask: 0x3dbff807fffbffff}, &SetEventMaskRP); err != nil {
-		return err
-	}
+	h.Send(&cmd.SetEventMask{EventMask: 0x3dbff807fffbffff}, &SetEventMaskRP)
 
 	WriteLEHostSupportRP := cmd.WriteLEHostSupportRP{}
-	if err := h.Send(&cmd.WriteLEHostSupport{LESupportedHost: 1, SimultaneousLEHost: 0}, &WriteLEHostSupportRP); err != nil {
-		return err
-	}
+	h.Send(&cmd.WriteLEHostSupport{LESupportedHost: 1, SimultaneousLEHost: 0}, &WriteLEHostSupportRP)
 
+	if h.err != nil {
+		return h.err
+	}
 	return nil
 }
 
 // Send ...
 func (h *HCI) Send(c Command, r CommandRP) error {
-	p := &pkt{c, make(chan []byte)}
-	h.chPkt <- p
-	b := <-p.done
-	if r == nil {
-		return nil
+	b, err := h.send(c)
+	if err != nil {
+		return err
 	}
-	return r.Unmarshal(b)
+	if r != nil {
+		return r.Unmarshal(b)
+	}
+	return nil
+}
+
+func (h *HCI) send(c Command) ([]byte, error) {
+	if h.err != nil {
+		return nil, h.err
+	}
+	p := &pkt{c, make(chan []byte)}
+	select {
+	case <-h.done:
+		return nil, h.err
+	case h.chCmdPkt <- p:
+	}
+
+	select {
+	case <-h.done:
+		return nil, h.err
+	case b := <-p.done:
+		return b, nil
+	}
 }
 
 func (h *HCI) cmdLoop() {
-	h.chBufs <- make([]byte, 64)
-	for p := range h.chPkt {
-		b := <-h.chBufs
-		c := p.cmd
-		b[0] = byte(pktTypeCommand) // HCI header
-		b[1] = byte(c.OpCode())
-		b[2] = byte(c.OpCode() >> 8)
-		b[3] = byte(c.Len())
-		if err := c.Marshal(b[4:]); err != nil {
-			log.Printf("hci: failed to marshal cmd")
+	h.chCmdBufs <- make([]byte, 64)
+	for {
+		select {
+		case <-h.done:
 			return
-		}
+		case p := <-h.chCmdPkt:
+			b := <-h.chCmdBufs
+			c := p.cmd
+			b[0] = byte(pktTypeCommand) // HCI header
+			b[1] = byte(c.OpCode())
+			b[2] = byte(c.OpCode() >> 8)
+			b[3] = byte(c.Len())
+			if err := c.Marshal(b[4:]); err != nil {
+				h.stop(fmt.Errorf("hci: failed to marshal cmd"))
+				return
+			}
 
-		h.sent[c.OpCode()] = p // TODO: lock
-		if n, err := h.skt.Write(b[:4+c.Len()]); err != nil {
-			log.Printf("hci: failed to send cmd")
-		} else if n != 4+c.Len() {
-			log.Printf("hci: failed to send whole cmd pkt to hci socket")
+			h.sent[c.OpCode()] = p // TODO: lock
+			if n, err := h.skt.Write(b[:4+c.Len()]); err != nil {
+				h.stop(fmt.Errorf("hci: failed to send cmd"))
+			} else if n != 4+c.Len() {
+				h.stop(fmt.Errorf("hci: failed to send whole cmd pkt to hci socket"))
+			}
 		}
 	}
 }
 
 func (h *HCI) mainLoop() {
 	b := make([]byte, 4096)
+	defer close(h.done)
 	for {
 		n, err := h.skt.Read(b)
-		if err != nil {
-			return
-		}
-		if n == 0 {
+		if n == 0 || err != nil {
+			h.err = fmt.Errorf("skt: %s", err)
 			return
 		}
 		p := make([]byte, n)
 		copy(p, b)
 		if err := h.handlePkt(p); err != nil {
-			log.Printf("HCI: %s", err)
-
+			h.err = fmt.Errorf("skt: %s", err)
+			return
 		}
 	}
+}
+
+func (h *HCI) stop(err error) error {
+	if err := h.skt.Close(); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (h *HCI) handlePkt(b []byte) error {
@@ -309,9 +315,7 @@ func (h *HCI) handlePkt(b []byte) error {
 	case pktTypeSCOData:
 		return fmt.Errorf("HCI: unsupported sco packet: [ % X ]", b)
 	case pktTypeEvent:
-		// return h.evt.handleEvt(b)
-		go h.handleEvt(b)
-		return nil
+		return h.handleEvt(b)
 	case pktTypeVendor:
 		return fmt.Errorf("HCI: unsupported vendor packet: [ % X ]", b)
 	default:
@@ -366,7 +370,7 @@ func (h *HCI) handleLEAdvertisingReport(b []byte) error {
 func (h *HCI) handleCommandComplete(b []byte) error {
 	e := evt.CommandComplete(b)
 	for i := 0; i < int(e.NumHCICommandPackets()); i++ {
-		h.chBufs <- make([]byte, 64)
+		h.chCmdBufs <- make([]byte, 64)
 	}
 
 	// NOP command, used for flow control purpose [Vol 2, Part E, 4.4]
@@ -384,7 +388,7 @@ func (h *HCI) handleCommandComplete(b []byte) error {
 func (h *HCI) handleCommandStatus(b []byte) error {
 	e := evt.CommandStatus(b)
 	for i := 0; i < int(e.NumHCICommandPackets()); i++ {
-		h.chBufs <- make([]byte, 64)
+		h.chCmdBufs <- make([]byte, 64)
 	}
 
 	p, found := h.sent[int(e.CommandOpcode())]

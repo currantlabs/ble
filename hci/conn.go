@@ -300,11 +300,6 @@ func (c *Conn) SetTxMTU(mtu int) {
 	c.txMPS = mtu
 }
 
-// Parameters ...
-func (c *Conn) Parameters() evt.LEConnectionComplete {
-	return c.param
-}
-
 // pkt implements HCI ACL Data Packet [Vol 2, Part E, 5.4.2]
 // Packet boundary flags , bit[5:6] of handle field's MSB
 // Broadcast flags. bit[7:8] of handle field's MSB
