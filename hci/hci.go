@@ -54,6 +54,8 @@ type HCI struct {
 	addr    net.HardwareAddr
 	txPwrLv int
 
+	state      map[int]bool
+	stateMu    *sync.Mutex
 	advParams  cmd.LESetAdvertisingParameters
 	advData    cmd.LESetAdvertisingData
 	scanResp   cmd.LESetScanResponseData
@@ -70,8 +72,8 @@ type HCI struct {
 	// L2CAP connections
 	muConns      *sync.Mutex
 	conns        map[uint16]*Conn
-	chMasterConn chan *Conn // Peripheral accepts master connections.
-	chSlaveConn  chan *Conn // Central dials slave connections.
+	chMasterConn chan *Conn // Dial returns master connections.
+	chSlaveConn  chan *Conn // Peripheral accept slave connections.
 
 	chDialerTmo   chan time.Time
 	chListenerTmo chan time.Time
@@ -95,6 +97,8 @@ func (h *HCI) Init(id int) error {
 	h.evth = map[int]handlerFn{}
 	h.subh = map[int]handlerFn{}
 
+	h.state = map[int]bool{}
+	h.stateMu = &sync.Mutex{}
 	h.scanParams = cmd.LESetScanParameters{
 		LEScanType:           0x01,   // 0x00: passive, 0x01: active
 		LEScanInterval:       0x0004, // 0x0004 - 0x4000; N * 0.625msec
@@ -133,7 +137,7 @@ func (h *HCI) Init(id int) error {
 
 	h.muConns = &sync.Mutex{}
 	h.conns = make(map[uint16]*Conn)
-	h.chMasterConn = make(chan *Conn) // Peripheral accepts master connection
+	h.chMasterConn = make(chan *Conn)
 	h.chSlaveConn = make(chan *Conn)
 
 	h.evth[0x3E] = h.handleLEMeta
@@ -425,7 +429,9 @@ func (h *HCI) handleDisconnectionComplete(b []byte) error {
 		return fmt.Errorf("l2cap: disconnecting an invalid handle %04X", e.ConnectionHandle())
 	}
 	close(c.chInPkt)
-
+	if c.param.Role() == roleSlave && h.state[listening] {
+		go h.update(listen)
+	}
 	// When a connection disconnects, all the sent packets and weren't acked yet
 	// will be recylecd. [Vol2, Part E 4.1.1]
 	c.txBuffer.PutAll()

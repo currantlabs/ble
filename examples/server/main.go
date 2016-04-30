@@ -35,11 +35,6 @@ func main() {
 		log.Fatalf("can't set advertisement: %s", err)
 	}
 
-	if err := h.Advertise(); err != nil {
-		log.Fatalf("can't advertise: %s", err)
-
-	}
-
 	if err := s.Start(h); err != nil {
 		log.Fatalf("can't start gatt server: %s", err)
 	}

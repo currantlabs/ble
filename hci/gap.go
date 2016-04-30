@@ -30,6 +30,22 @@ type AdvParams struct {
 	AdvertisingFilterPolicy uint8
 }
 
+// ConnParams implements LE Create Connection (0x08|0x000D) [Vol 2, Part E, 7.8.12]
+type ConnParams struct {
+	LEScanInterval        uint16
+	LEScanWindow          uint16
+	InitiatorFilterPolicy uint8
+	PeerAddressType       uint8
+	PeerAddress           [6]byte
+	OwnAddressType        uint8
+	ConnIntervalMin       uint16
+	ConnIntervalMax       uint16
+	ConnLatency           uint16
+	SupervisionTimeout    uint16
+	MinimumCELength       uint16
+	MaximumCELength       uint16
+}
+
 // SetAdvHandler ...
 func (h *HCI) SetAdvHandler(af bt.AdvFilter, ah bt.AdvHandler) error {
 	h.advFilter, h.advHandler = af, ah
@@ -39,19 +55,14 @@ func (h *HCI) SetAdvHandler(af bt.AdvFilter, ah bt.AdvHandler) error {
 // SetScanParams sets scanning parameters.
 func (h *HCI) SetScanParams(p ScanParams) error {
 	h.scanParams = cmd.LESetScanParameters(p)
-	return sendAndChk(h, &h.scanParams)
+	return h.update(scanUpdate)
 }
 
 // Scan starts scanning.
-func (h *HCI) Scan() error {
-	sendAndChk(h, &h.scanParams)
-	return sendAndChk(h, &cmd.LESetScanEnable{LEScanEnable: 1})
-}
+func (h *HCI) Scan() error { return h.update(scanEnable) }
 
 // StopScanning stops scanning.
-func (h *HCI) StopScanning() error {
-	return sendAndChk(h, &cmd.LESetScanEnable{LEScanEnable: 0})
-}
+func (h *HCI) StopScanning() error { return h.update(scanDisable) }
 
 // SetAdvertisement sets advertising data and scanResp.
 func (h *HCI) SetAdvertisement(ad []byte, sr []byte) error {
@@ -65,35 +76,36 @@ func (h *HCI) SetAdvertisement(ad []byte, sr []byte) error {
 	h.scanResp.ScanResponseDataLength = uint8(len(sr))
 	copy(h.scanResp.ScanResponseData[:], sr)
 
-	if err := sendAndChk(h, &h.advData); err != nil {
-		return err
-	}
-
-	return sendAndChk(h, &h.scanResp)
+	return h.update(advUpdate)
 }
 
-// SetAdvParams sets advertising parameters to the controller.
+// SetAdvParams sets advertising parameters.
 func (h *HCI) SetAdvParams(p AdvParams) error {
-	cp := cmd.LESetAdvertisingParameters(p)
-	return sendAndChk(h, &cp)
+	h.advParams = cmd.LESetAdvertisingParameters(p)
+	return h.update(advUpdate)
 }
 
 // Advertise starts advertising.
-func (h *HCI) Advertise() error {
-	return sendAndChk(h, &cmd.LESetAdvertiseEnable{AdvertisingEnable: 1})
-}
+func (h *HCI) Advertise() error { return h.update(advEnable) }
 
 // StopAdvertising stops advertising.
-func (h *HCI) StopAdvertising() error {
-	return sendAndChk(h, &cmd.LESetAdvertiseEnable{AdvertisingEnable: 0})
-}
+func (h *HCI) StopAdvertising() error { return h.update(advDisable) }
 
-// Accept returns a L2CAP master connection.
+// Accept starts advertising and accepts connection.
 func (h *HCI) Accept() (bt.Conn, error) {
+	if err := h.update(listen); err != nil {
+		if e, ok := err.(ErrCommand); !ok || e != 0x0C {
+			return nil, err
+		}
+	}
 	select {
 	case <-h.done:
 		return nil, h.err
 	case c := <-h.chSlaveConn:
+		h.stateMu.Lock()
+		h.state[advertising] = false
+		h.state[listening] = false
+		h.stateMu.Unlock()
 		return c, nil
 	case <-h.chListenerTmo:
 		return nil, fmt.Errorf("listner timed out")
@@ -109,32 +121,122 @@ func (h *HCI) Close() error {
 }
 
 // Addr ...
-func (h *HCI) Addr() bt.Addr {
-	return h.addr
-}
+func (h *HCI) Addr() bt.Addr { return h.addr }
 
 // Dial ...
 func (h *HCI) Dial(a bt.Addr) (bt.Conn, error) {
-	if h.err != nil {
-		return nil, h.err
-	}
 	b, ok := a.(net.HardwareAddr)
 	if !ok {
 		return nil, fmt.Errorf("invalid addr")
 	}
 	h.connParams.PeerAddress = [6]byte{b[5], b[4], b[3], b[2], b[1], b[0]}
-	sendAndChk(h, &h.connParams)
-	c := <-h.chMasterConn
-	return c, nil
+	h.update(dial)
+	defer h.update(dialCancel)
+	select {
+	case <-h.done:
+		return nil, h.err
+	case c := <-h.chMasterConn:
+		return c, nil
+	case <-h.chDialerTmo:
+		return nil, fmt.Errorf("dialer timed out")
+	}
+}
+
+// SetConnParams ...
+func (h *HCI) SetConnParams(p ConnParams) error {
+	h.connParams = cmd.LECreateConnection(p)
+	return nil
 }
 
 func sendAndChk(h *HCI, c Command) error {
-	b, err := h.send(c)
-	if err != nil {
+	if b, err := h.send(c); err != nil {
 		return err
-	}
-	if len(b) > 0 && b[0] != 0x00 {
+	} else if len(b) > 0 && b[0] != 0x00 {
 		return ErrCommand(b[0])
 	}
 	return nil
+}
+
+const (
+	advEnable = iota
+	advDisable
+	advUpdate
+	scanEnable
+	scanDisable
+	scanUpdate
+	dial
+	dialCancel
+	dialUpdate
+	listen
+	listenCancel
+	listenUpdate
+)
+
+const (
+	advertising = iota
+	scanning
+	dialing
+	listening
+)
+
+func (h *HCI) update(op int) error {
+	h.stateMu.Lock()
+	defer h.stateMu.Unlock()
+	var err error
+	switch {
+	case op == scanEnable && !h.state[scanning]:
+		sendAndChk(h, &h.scanParams)
+		err = sendAndChk(h, &cmd.LESetScanEnable{LEScanEnable: 1})
+		if err == nil {
+			h.state[scanning] = true
+		}
+	case op == scanDisable && h.state[scanning]:
+		h.state[scanning] = false
+		err = sendAndChk(h, &cmd.LESetScanEnable{LEScanEnable: 0})
+	case op == scanUpdate && h.state[scanning]:
+		sendAndChk(h, &cmd.LESetScanEnable{LEScanEnable: 0})
+		err = sendAndChk(h, &cmd.LESetScanEnable{LEScanEnable: 1})
+		if err == nil {
+			h.state[scanning] = true
+		}
+	case op == advEnable && !h.state[advertising]:
+		sendAndChk(h, &h.advParams)
+		sendAndChk(h, &h.advData)
+		sendAndChk(h, &h.scanResp)
+		err = sendAndChk(h, &cmd.LESetAdvertiseEnable{AdvertisingEnable: 1})
+		if err == nil {
+			h.state[advertising] = true
+		}
+	case op == advDisable && h.state[advertising]:
+		h.state[advertising] = false
+		err = sendAndChk(h, &cmd.LESetAdvertiseEnable{AdvertisingEnable: 0})
+	case op == advUpdate && h.state[advertising]:
+		sendAndChk(h, &cmd.LESetAdvertiseEnable{AdvertisingEnable: 0})
+		err = sendAndChk(h, &cmd.LESetAdvertiseEnable{AdvertisingEnable: 1})
+		if err == nil {
+			h.state[advertising] = true
+		}
+	case op == dial && !h.state[dialing]:
+		h.state[dialing] = true
+		err = sendAndChk(h, &h.connParams)
+	case op == dialCancel && h.state[dialing]:
+		h.state[dialing] = false
+		err = sendAndChk(h, &cmd.LECreateConnectionCancel{})
+	case op == dialUpdate && h.state[dialing]:
+		sendAndChk(h, &cmd.LECreateConnectionCancel{})
+		err = sendAndChk(h, &h.connParams)
+	case op == listen && !h.state[advertising]:
+		h.state[listening] = true
+		sendAndChk(h, &h.advParams)
+		sendAndChk(h, &h.advData)
+		sendAndChk(h, &h.scanResp)
+		err = sendAndChk(h, &cmd.LESetAdvertiseEnable{AdvertisingEnable: 1})
+		if err == nil {
+			h.state[advertising] = true
+		}
+	case op == listenCancel && h.state[listening]:
+		h.state[listening] = false
+	case op == listenUpdate && h.state[listening]:
+	}
+	return err
 }

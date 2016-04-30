@@ -45,7 +45,7 @@ type Addr interface {
 
 // A Listener is a le for L2CAP protocol.
 type Listener interface {
-	// Accept waits for and returns the next connection to the le.
+	// Accept starts advertising and accepts connection.
 	Accept() (Conn, error)
 
 	// Close closes the le.
