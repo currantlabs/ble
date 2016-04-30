@@ -26,8 +26,7 @@ type Service interface {
 	Characteristics() []Characteristic
 
 	// AddCharacteristic adds a characteristic to a service.
-	// AddCharacteristic panics if the service already contains another
-	// characteristic with the same UUID.
+	// AddCharacteristic panics if the service already contains another characteristic with the same UUID.
 	AddCharacteristic(u uuid.UUID) Characteristic
 }
 
@@ -42,14 +41,14 @@ type Characteristic interface {
 	// Descriptors returns the contained descriptors of this characteristic.
 	Descriptors() []Descriptor
 
+	// SetValue makes the characteristic support read requests, and returns a static value.
 	// SetValue panics if the characteristic has been configured with a ReadHandler.
-	// SetValue makes the characteristic support the requests, and returns a static attr.
 	// SetValue must be called before the containing service is added to a server.
 	SetValue(b []byte) Characteristic
 
-	// HandleRead makes the characteristic support the requests, and routes the requests to h.
-	// HandleRead must be called before the containing service is added to a server.
+	// HandleRead makes the characteristic support read requests, and routes the requests to h.
 	// HandleRead panics if the characteristic has been configured with a static attr.
+	// HandleRead must be called before the containing service is added to a server.
 	HandleRead(h ReadHandler) Characteristic
 
 	// HandleWrite makes the characteristic support write and write-no-response requests, and routes the requests to h.
@@ -71,12 +70,12 @@ type Descriptor interface {
 	// UUID returns the UUID of the descriptor.
 	UUID() uuid.UUID
 
-	// SetValue makes the descriptor support the requests, and returns a static attr.
+	// SetValue makes the descriptor support read requests, and returns a static attr.
 	// SetValue must be called before the containing service is added to a server.
 	// SetValue panics if the descriptor has already configured with a ReadHandler.
 	SetValue(b []byte) Descriptor
 
-	// HandleRead makes the descriptor support the requests, and routes the requests to h.
+	// HandleRead makes the descriptor support write requests, and routes the requests to h.
 	// HandleRead must be called before the containing service is added to a server.
 	// HandleRead panics if the descriptor has been configured with a static attr.
 	HandleRead(h ReadHandler) Descriptor
