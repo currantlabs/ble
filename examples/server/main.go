@@ -28,12 +28,21 @@ func main() {
 
 	h := &hci.HCI{}
 	if err := h.Init(-1); err != nil {
-		log.Fatalf("Failed to open device, err: %s", err)
+		log.Fatalf("Failed to open HCI device, err: %s\n", err)
 	}
 
-	h.SetAdvertisement(ad, sr)
-	h.Advertise()
-	s.Start(h)
+	if err := h.SetAdvertisement(ad, sr); err != nil {
+		log.Fatalf("can't set advertisement: %s", err)
+	}
+
+	if err := h.Advertise(); err != nil {
+		log.Fatalf("can't advertise: %s", err)
+
+	}
+
+	if err := s.Start(h); err != nil {
+		log.Fatalf("can't start gatt server: %s", err)
+	}
 
 	select {}
 }

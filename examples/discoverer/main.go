@@ -31,11 +31,16 @@ func discovered(a bt.Advertisement) {
 func main() {
 	h := &hci.HCI{}
 	if err := h.Init(-1); err != nil {
-		log.Fatalf("Failed to open HCI device, err: %s\n", err)
+		log.Fatalf("can't open HCI device, err: %s\n", err)
 	}
 
-	h.SetAdvHandler(bt.AdvFilterFunc(filter), bt.AdvHandlerFunc(discovered))
-	h.Scan()
+	if err := h.SetAdvHandler(bt.AdvFilterFunc(filter), bt.AdvHandlerFunc(discovered)); err != nil {
+		log.Fatalf("can't set adv handler: %s", err)
+	}
+
+	if err := h.Scan(); err != nil {
+		log.Fatalf("can't scan: %s", err)
+	}
 
 	select {}
 }

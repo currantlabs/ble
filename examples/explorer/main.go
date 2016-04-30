@@ -141,7 +141,7 @@ func main() {
 
 	h := &hci.HCI{}
 	if err := h.Init(-1); err != nil {
-		log.Fatalf("Failed to open HCI device, err: %s\n", err)
+		log.Fatalf("can't open HCI device, err: %s\n", err)
 	}
 
 	e := newExplorer(h)
