@@ -9,24 +9,6 @@ import (
 	"github.com/currantlabs/bt/hci/cmd"
 )
 
-// State describe the operation of the Link Layer.
-type State string
-
-// Link Layer States [Vol 6, Part B, 1.1]
-const (
-	Unknown     State = "Unknown"
-	Standby     State = "Standby"
-	Advertising State = "Advertising"
-	Scanning    State = "Scanning"
-	Initiating  State = "Initiating"
-	Connection  State = "Connection"
-)
-
-// State returns current state of the HCI device.
-func (h *HCI) State() State {
-	return h.state
-}
-
 // ScanParams implements LE Set Scan Parameters (0x08|0x000B) [Vol 2, Part E, 7.8.10]
 type ScanParams struct {
 	LEScanType           uint8
@@ -92,19 +74,16 @@ func (h *HCI) SetAdvertisement(ad []byte, sr []byte) error {
 
 // SetAdvParams sets advertising parameters to the controller.
 func (h *HCI) SetAdvParams(p AdvParams) error {
-	h.advParams = cmd.LESetAdvertisingParameters(p)
-	return sendAndChk(h, &h.advParams)
+	cp := cmd.LESetAdvertisingParameters(p)
+	return sendAndChk(h, &cp)
 }
 
-// Advertise starts advertising if the device wasn't in advertising state.
+// Advertise starts advertising.
 func (h *HCI) Advertise() error {
-	if err := sendAndChk(h, &h.advParams); err != nil {
-		return err
-	}
 	return sendAndChk(h, &cmd.LESetAdvertiseEnable{AdvertisingEnable: 1})
 }
 
-// StopAdvertising stops advertising if the device was in advertising state.
+// StopAdvertising stops advertising.
 func (h *HCI) StopAdvertising() error {
 	return sendAndChk(h, &cmd.LESetAdvertiseEnable{AdvertisingEnable: 0})
 }

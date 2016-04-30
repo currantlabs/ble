@@ -37,8 +37,6 @@ type HCI struct {
 	sync.Mutex
 	skt io.ReadWriteCloser
 
-	state State
-
 	// Host to Controller command flow control [Vol 2, Part E, 4.4]
 	sent      map[int]*pkt
 	chCmdPkt  chan *pkt
