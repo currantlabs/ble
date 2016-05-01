@@ -2,6 +2,7 @@ package hci
 
 import (
 	"fmt"
+	"log"
 	"net"
 
 	"github.com/currantlabs/bt"
@@ -55,14 +56,14 @@ func (h *HCI) SetAdvHandler(af bt.AdvFilter, ah bt.AdvHandler) error {
 // SetScanParams sets scanning parameters.
 func (h *HCI) SetScanParams(p ScanParams) error {
 	h.scanParams = cmd.LESetScanParameters(p)
-	return h.update(scanUpdate)
+	return h.setState(ScanningUpdated)
 }
 
 // Scan starts scanning.
-func (h *HCI) Scan() error { return h.update(scanEnable) }
+func (h *HCI) Scan() error { return h.setState(Scanning) }
 
 // StopScanning stops scanning.
-func (h *HCI) StopScanning() error { return h.update(scanDisable) }
+func (h *HCI) StopScanning() error { return h.setState(ScanningStopped) }
 
 // SetAdvertisement sets advertising data and scanResp.
 func (h *HCI) SetAdvertisement(ad []byte, sr []byte) error {
@@ -76,38 +77,34 @@ func (h *HCI) SetAdvertisement(ad []byte, sr []byte) error {
 	h.scanResp.ScanResponseDataLength = uint8(len(sr))
 	copy(h.scanResp.ScanResponseData[:], sr)
 
-	return h.update(advUpdate)
+	return h.setState(AdvertisingUpdated)
 }
 
 // SetAdvParams sets advertising parameters.
 func (h *HCI) SetAdvParams(p AdvParams) error {
 	h.advParams = cmd.LESetAdvertisingParameters(p)
-	return h.update(advUpdate)
+	return h.setState(AdvertisingUpdated)
 }
 
 // Advertise starts advertising.
-func (h *HCI) Advertise() error { return h.update(advEnable) }
+func (h *HCI) Advertise() error { return h.setState(Advertising) }
 
 // StopAdvertising stops advertising.
-func (h *HCI) StopAdvertising() error { return h.update(advDisable) }
+func (h *HCI) StopAdvertising() error { return h.setState(AdvertisingStopped) }
 
 // Accept starts advertising and accepts connection.
 func (h *HCI) Accept() (bt.Conn, error) {
-	if err := h.update(listen); err != nil {
-		if e, ok := err.(ErrCommand); !ok || e != 0x0C {
-			return nil, err
-		}
+	if err := h.setState(Listening); err != nil {
+		return nil, err
 	}
 	select {
 	case <-h.done:
 		return nil, h.err
 	case c := <-h.chSlaveConn:
-		h.stateMu.Lock()
-		h.state[advertising] = false
-		h.state[listening] = false
-		h.stateMu.Unlock()
+		h.setState(CentralConnected)
 		return c, nil
 	case <-h.chListenerTmo:
+		h.setState(ListeningCanceled)
 		return nil, fmt.Errorf("listner timed out")
 	}
 }
@@ -130,14 +127,15 @@ func (h *HCI) Dial(a bt.Addr) (bt.Conn, error) {
 		return nil, fmt.Errorf("invalid addr")
 	}
 	h.connParams.PeerAddress = [6]byte{b[5], b[4], b[3], b[2], b[1], b[0]}
-	h.update(dial)
-	defer h.update(dialCancel)
+	h.setState(Dialing)
 	select {
 	case <-h.done:
 		return nil, h.err
 	case c := <-h.chMasterConn:
+		h.setState(DialingStopped)
 		return c, nil
 	case <-h.chDialerTmo:
+		h.setState(DialingCanceled)
 		return nil, fmt.Errorf("dialer timed out")
 	}
 }
@@ -157,19 +155,33 @@ func sendAndChk(h *HCI, c Command) error {
 	return nil
 }
 
+// State ...
+type State int
+
+type nextState struct {
+	s    State
+	done chan error
+}
+
+// State ...
 const (
-	advEnable = iota
-	advDisable
-	advUpdate
-	scanEnable
-	scanDisable
-	scanUpdate
-	dial
-	dialCancel
-	dialUpdate
-	listen
-	listenCancel
-	listenUpdate
+	Advertising            State = iota
+	AdvertisingStopped     State = iota
+	AdvertisingUpdated     State = iota
+	Scanning               State = iota
+	ScanningStopped        State = iota
+	ScanningUpdated        State = iota
+	Dialing                State = iota
+	DialingStopped         State = iota
+	DialingCanceled        State = iota
+	DialingUpdated         State = iota
+	PeripheralConnected    State = iota
+	PeripheralDisconnected State = iota
+	Listening              State = iota
+	ListeningCanceled      State = iota
+	ListeningUpdated       State = iota
+	CentralConnected       State = iota
+	CentralDisconnected    State = iota
 )
 
 const (
@@ -179,64 +191,151 @@ const (
 	listening
 )
 
-func (h *HCI) update(op int) error {
+func (h *HCI) stateLoop() {
+	for {
+		select {
+		case <-h.done:
+			return
+		case s := <-h.chState:
+			h.handleState(s)
+		}
+	}
+}
+
+func (h *HCI) setState(s State) error {
+	n := nextState{s: s, done: make(chan error)}
+	h.chState <- n
+	return <-n.done
+}
+
+func (h *HCI) handleState(n nextState) {
 	h.stateMu.Lock()
 	defer h.stateMu.Unlock()
 	var err error
-	switch {
-	case op == scanEnable && !h.state[scanning]:
+	defer func() { n.done <- err }()
+
+	switch n.s {
+	case Scanning:
+		if h.state[scanning] {
+			return
+		}
 		sendAndChk(h, &h.scanParams)
-		err = sendAndChk(h, &cmd.LESetScanEnable{LEScanEnable: 1})
-		if err == nil {
+		if err = sendAndChk(h, &cmd.LESetScanEnable{LEScanEnable: 1}); err == nil {
 			h.state[scanning] = true
 		}
-	case op == scanDisable && h.state[scanning]:
-		h.state[scanning] = false
+	case ScanningStopped:
+		if h.state[scanning] {
+			return
+		}
 		err = sendAndChk(h, &cmd.LESetScanEnable{LEScanEnable: 0})
-	case op == scanUpdate && h.state[scanning]:
+		h.state[scanning] = false
+	case ScanningUpdated:
+		if h.state[scanning] {
+			return
+		}
 		sendAndChk(h, &cmd.LESetScanEnable{LEScanEnable: 0})
 		err = sendAndChk(h, &cmd.LESetScanEnable{LEScanEnable: 1})
 		if err == nil {
 			h.state[scanning] = true
 		}
-	case op == advEnable && !h.state[advertising]:
+	case Advertising:
+		if h.state[advertising] {
+			return
+		}
 		sendAndChk(h, &h.advParams)
 		sendAndChk(h, &h.advData)
 		sendAndChk(h, &h.scanResp)
-		err = sendAndChk(h, &cmd.LESetAdvertiseEnable{AdvertisingEnable: 1})
-		if err == nil {
+		if err = sendAndChk(h, &cmd.LESetAdvertiseEnable{AdvertisingEnable: 1}); err == nil {
 			h.state[advertising] = true
 		}
-	case op == advDisable && h.state[advertising]:
+	case AdvertisingStopped:
+		if !h.state[advertising] {
+			return
+		}
 		h.state[advertising] = false
 		err = sendAndChk(h, &cmd.LESetAdvertiseEnable{AdvertisingEnable: 0})
-	case op == advUpdate && h.state[advertising]:
+	case AdvertisingUpdated:
+		if !h.state[advertising] {
+			return
+		}
 		sendAndChk(h, &cmd.LESetAdvertiseEnable{AdvertisingEnable: 0})
-		err = sendAndChk(h, &cmd.LESetAdvertiseEnable{AdvertisingEnable: 1})
-		if err == nil {
+		if err = sendAndChk(h, &cmd.LESetAdvertiseEnable{AdvertisingEnable: 1}); err == nil {
 			h.state[advertising] = true
 		}
-	case op == dial && !h.state[dialing]:
-		h.state[dialing] = true
-		err = sendAndChk(h, &h.connParams)
-	case op == dialCancel && h.state[dialing]:
+	case Dialing:
+		if h.state[dialing] {
+			return
+		}
+		if err = sendAndChk(h, &h.connParams); err == nil {
+			h.state[dialing] = true
+		}
+	case PeripheralConnected:
+		h.state[dialing] = false
+	case PeripheralDisconnected:
+		if !h.state[dialing] {
+			return
+		}
+		if err = sendAndChk(h, &h.connParams); err == nil {
+			h.state[dialing] = true
+		}
+	case DialingCanceled:
+		if !h.state[dialing] {
+			return
+		}
 		h.state[dialing] = false
 		err = sendAndChk(h, &cmd.LECreateConnectionCancel{})
-	case op == dialUpdate && h.state[dialing]:
+	case DialingUpdated:
+		if !h.state[dialing] {
+			return
+		}
 		sendAndChk(h, &cmd.LECreateConnectionCancel{})
-		err = sendAndChk(h, &h.connParams)
-	case op == listen && !h.state[advertising]:
+		if err = sendAndChk(h, &h.connParams); err == nil {
+
+		}
+	case Listening:
+		if h.state[listening] && h.state[advertising] {
+			return
+		}
 		h.state[listening] = true
 		sendAndChk(h, &h.advParams)
 		sendAndChk(h, &h.advData)
 		sendAndChk(h, &h.scanResp)
-		err = sendAndChk(h, &cmd.LESetAdvertiseEnable{AdvertisingEnable: 1})
-		if err == nil {
+		if err = sendAndChk(h, &cmd.LESetAdvertiseEnable{AdvertisingEnable: 1}); err == nil {
 			h.state[advertising] = true
+		} else if e, ok := err.(ErrCommand); ok && e == 0x0C {
+			err = nil
+			log.Printf("reaches connection limit")
 		}
-	case op == listenCancel && h.state[listening]:
+	case CentralConnected:
+		if !h.state[listening] {
+			return
+		}
 		h.state[listening] = false
-	case op == listenUpdate && h.state[listening]:
+		h.state[advertising] = false
+	case CentralDisconnected:
+		if h.state[listening] && h.state[advertising] {
+			return
+		}
+		sendAndChk(h, &h.advParams)
+		sendAndChk(h, &h.advData)
+		sendAndChk(h, &h.scanResp)
+		if err = sendAndChk(h, &cmd.LESetAdvertiseEnable{AdvertisingEnable: 1}); err == nil {
+			h.state[advertising] = true
+			log.Printf("under connection limit")
+		} else if e, ok := err.(ErrCommand); ok && e == 0x0C {
+			err = nil
+			log.Printf("still reaches connection limit")
+		}
+	case ListeningCanceled:
+		if !h.state[listening] {
+			return
+		}
+		h.state[listening] = false
+		h.state[advertising] = false
+	case ListeningUpdated:
 	}
-	return err
+	h.stateChanged(n.s)
+}
+
+func (h *HCI) stateChanged(s State) {
 }

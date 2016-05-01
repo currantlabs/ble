@@ -55,6 +55,7 @@ type HCI struct {
 	txPwrLv int
 
 	state      map[int]bool
+	chState    chan nextState
 	stateMu    *sync.Mutex
 	advParams  cmd.LESetAdvertisingParameters
 	advData    cmd.LESetAdvertisingData
@@ -98,6 +99,7 @@ func (h *HCI) Init(id int) error {
 	h.subh = map[int]handlerFn{}
 
 	h.state = map[int]bool{}
+	h.chState = make(chan nextState, 10)
 	h.stateMu = &sync.Mutex{}
 	h.scanParams = cmd.LESetScanParameters{
 		LEScanType:           0x01,   // 0x00: passive, 0x01: active
@@ -160,6 +162,7 @@ func (h *HCI) Init(id int) error {
 	// evt.LERemoteConnectionParameterRequestSubCode: bt.todo),
 	go h.cmdLoop()
 	go h.mainLoop()
+	go h.stateLoop()
 	h.init()
 
 	// Pre-allocate buffers with additional head room for lower layer headers.
@@ -429,9 +432,10 @@ func (h *HCI) handleDisconnectionComplete(b []byte) error {
 		return fmt.Errorf("l2cap: disconnecting an invalid handle %04X", e.ConnectionHandle())
 	}
 	close(c.chInPkt)
-	if c.param.Role() == roleSlave && h.state[listening] {
-		go h.update(listen)
+	if c.param.Role() == roleSlave {
+		h.setState(CentralDisconnected)
 	}
+	h.setState(PeripheralDisconnected)
 	// When a connection disconnects, all the sent packets and weren't acked yet
 	// will be recylecd. [Vol2, Part E 4.1.1]
 	c.txBuffer.PutAll()
