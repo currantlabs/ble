@@ -433,9 +433,10 @@ func (h *HCI) handleDisconnectionComplete(b []byte) error {
 	}
 	close(c.chInPkt)
 	if c.param.Role() == roleSlave {
-		h.setState(CentralDisconnected)
+		go h.setState(CentralDisconnected)
+	} else {
+		go h.setState(PeripheralDisconnected)
 	}
-	h.setState(PeripheralDisconnected)
 	// When a connection disconnects, all the sent packets and weren't acked yet
 	// will be recylecd. [Vol2, Part E 4.1.1]
 	c.txBuffer.PutAll()
