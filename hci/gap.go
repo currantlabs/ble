@@ -156,7 +156,7 @@ func sendAndChk(h *HCI, c Command) error {
 }
 
 // State ...
-type State int
+type State string
 
 type nextState struct {
 	s    State
@@ -165,23 +165,23 @@ type nextState struct {
 
 // State ...
 const (
-	Advertising            State = iota
-	AdvertisingStopped     State = iota
-	AdvertisingUpdated     State = iota
-	Scanning               State = iota
-	ScanningStopped        State = iota
-	ScanningUpdated        State = iota
-	Dialing                State = iota
-	DialingStopped         State = iota
-	DialingCanceled        State = iota
-	DialingUpdated         State = iota
-	PeripheralConnected    State = iota
-	PeripheralDisconnected State = iota
-	Listening              State = iota
-	ListeningCanceled      State = iota
-	ListeningUpdated       State = iota
-	CentralConnected       State = iota
-	CentralDisconnected    State = iota
+	Advertising            State = "Advertising"
+	AdvertisingStopped     State = "AdvertisingStopped"
+	AdvertisingUpdated     State = "AdvertisingUpdated"
+	Scanning               State = "Scanning"
+	ScanningStopped        State = "ScanningStopped"
+	ScanningUpdated        State = "ScanningUpdated"
+	Dialing                State = "Dialing"
+	DialingStopped         State = "DialingStopped"
+	DialingCanceled        State = "DialingCanceled"
+	DialingUpdated         State = "DialingUpdated"
+	PeripheralConnected    State = "PeripheralConnected"
+	PeripheralDisconnected State = "PeripheralDisconnected"
+	Listening              State = "Listening"
+	ListeningCanceled      State = "ListeningCanceled"
+	ListeningUpdated       State = "ListeningUpdated"
+	CentralConnected       State = "CentralConnected"
+	CentralDisconnected    State = "CentralDisconnected"
 )
 
 const (
