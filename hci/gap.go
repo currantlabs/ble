@@ -4,10 +4,13 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"sync"
+	"time"
 
 	"github.com/currantlabs/bt"
 	"github.com/currantlabs/bt/adv"
 	"github.com/currantlabs/bt/hci/cmd"
+	"github.com/pkg/errors"
 )
 
 // ScanParams implements LE Set Scan Parameters (0x08|0x000B) [Vol 2, Part E, 7.8.10]
@@ -47,23 +50,24 @@ type ConnParams struct {
 	MaximumCELength       uint16
 }
 
+// Addr ...
+func (h *HCI) Addr() bt.Addr { return h.addr }
+
 // SetAdvHandler ...
 func (h *HCI) SetAdvHandler(af bt.AdvFilter, ah bt.AdvHandler) error {
 	h.advFilter, h.advHandler = af, ah
 	return nil
 }
 
-// SetScanParams sets scanning parameters.
-func (h *HCI) SetScanParams(p ScanParams) error {
-	h.scanParams = cmd.LESetScanParameters(p)
-	return h.setState(ScanningUpdated)
+// Scan starts scanning.
+func (h *HCI) Scan() error {
+	return h.states.set(Scanning)
 }
 
-// Scan starts scanning.
-func (h *HCI) Scan() error { return h.setState(Scanning) }
-
 // StopScanning stops scanning.
-func (h *HCI) StopScanning() error { return h.setState(ScanningStopped) }
+func (h *HCI) StopScanning() error {
+	return h.states.set(StopScanning)
+}
 
 // SetAdvertisement sets advertising data and scanResp.
 func (h *HCI) SetAdvertisement(ad []byte, sr []byte) error {
@@ -71,41 +75,75 @@ func (h *HCI) SetAdvertisement(ad []byte, sr []byte) error {
 		return bt.ErrEIRPacketTooLong
 	}
 
-	h.advData.AdvertisingDataLength = uint8(len(ad))
-	copy(h.advData.AdvertisingData[:], ad)
+	h.states.Lock()
+	h.states.advData.AdvertisingDataLength = uint8(len(ad))
+	copy(h.states.advData.AdvertisingData[:], ad)
 
-	h.scanResp.ScanResponseDataLength = uint8(len(sr))
-	copy(h.scanResp.ScanResponseData[:], sr)
+	h.states.scanResp.ScanResponseDataLength = uint8(len(sr))
+	copy(h.states.scanResp.ScanResponseData[:], sr)
+	h.states.Unlock()
 
-	return h.setState(AdvertisingUpdated)
-}
-
-// SetAdvParams sets advertising parameters.
-func (h *HCI) SetAdvParams(p AdvParams) error {
-	h.advParams = cmd.LESetAdvertisingParameters(p)
-	return h.setState(AdvertisingUpdated)
+	return h.states.set(AdvertisingUpdated)
 }
 
 // Advertise starts advertising.
-func (h *HCI) Advertise() error { return h.setState(Advertising) }
+func (h *HCI) Advertise() error {
+	return h.states.set(Advertising)
+}
 
 // StopAdvertising stops advertising.
-func (h *HCI) StopAdvertising() error { return h.setState(AdvertisingStopped) }
+func (h *HCI) StopAdvertising() error {
+	return h.states.set(StopAdvertising)
+}
 
 // Accept starts advertising and accepts connection.
 func (h *HCI) Accept() (bt.Conn, error) {
-	if err := h.setState(Listening); err != nil {
+	if err := h.states.set(Listening); err != nil {
 		return nil, err
+	}
+	var tmo <-chan time.Time
+	if h.listenerTmo != time.Duration(0) {
+		tmo = time.After(h.listenerTmo)
 	}
 	select {
 	case <-h.done:
 		return nil, h.err
 	case c := <-h.chSlaveConn:
-		h.setState(CentralConnected)
+		h.states.set(CentralConnected)
 		return c, nil
-	case <-h.chListenerTmo:
-		h.setState(ListeningCanceled)
+	case <-tmo:
+		h.states.set(StopListening)
 		return nil, fmt.Errorf("listner timed out")
+	}
+}
+
+// Dial ...
+func (h *HCI) Dial(a bt.Addr) (bt.Conn, error) {
+	b, ok := a.(net.HardwareAddr)
+	if !ok {
+		return nil, ErrInvalidAddr
+	}
+	h.states.Lock()
+	h.states.connParams.PeerAddress = [6]byte{b[5], b[4], b[3], b[2], b[1], b[0]}
+	h.states.Unlock()
+	if err := h.states.set(Dialing); err != nil {
+		return nil, err
+	}
+	defer h.states.set(StopDialing)
+	var tmo <-chan time.Time
+	if h.dialerTmo != time.Duration(0) {
+		tmo = time.After(h.dialerTmo)
+	}
+	select {
+	case <-h.done:
+		return nil, h.err
+	case c := <-h.chMasterConn:
+		return c, nil
+	case <-tmo:
+		if err := h.states.set(DialingCanceling); err == nil {
+			return <-h.chMasterConn, nil
+		}
+		return <-h.chMasterConn, fmt.Errorf("dialer timed out")
 	}
 }
 
@@ -117,42 +155,28 @@ func (h *HCI) Close() error {
 	return nil
 }
 
-// Addr ...
-func (h *HCI) Addr() bt.Addr { return h.addr }
+// SetScanParams sets scanning parameters.
+func (h *HCI) SetScanParams(p ScanParams) error {
+	h.states.Lock()
+	h.states.scanParams = cmd.LESetScanParameters(p)
+	h.states.Unlock()
+	return h.states.set(ScanningUpdated)
+}
 
-// Dial ...
-func (h *HCI) Dial(a bt.Addr) (bt.Conn, error) {
-	b, ok := a.(net.HardwareAddr)
-	if !ok {
-		return nil, fmt.Errorf("invalid addr")
-	}
-	h.connParams.PeerAddress = [6]byte{b[5], b[4], b[3], b[2], b[1], b[0]}
-	h.setState(Dialing)
-	select {
-	case <-h.done:
-		return nil, h.err
-	case c := <-h.chMasterConn:
-		h.setState(DialingStopped)
-		return c, nil
-	case <-h.chDialerTmo:
-		h.setState(DialingCanceled)
-		return nil, fmt.Errorf("dialer timed out")
-	}
+// SetAdvParams sets advertising parameters.
+func (h *HCI) SetAdvParams(p AdvParams) error {
+	h.states.Lock()
+	h.states.advParams = cmd.LESetAdvertisingParameters(p)
+	h.states.Unlock()
+	return h.states.set(AdvertisingUpdated)
 }
 
 // SetConnParams ...
 func (h *HCI) SetConnParams(p ConnParams) error {
-	h.connParams = cmd.LECreateConnection(p)
-	return nil
-}
-
-func sendAndChk(h *HCI, c Command) error {
-	if b, err := h.send(c); err != nil {
-		return err
-	} else if len(b) > 0 && b[0] != 0x00 {
-		return ErrCommand(b[0])
-	}
-	return nil
+	h.states.Lock()
+	h.states.connParams = cmd.LECreateConnection(p)
+	h.states.Unlock()
+	return h.states.set(DialingUpdated)
 }
 
 // State ...
@@ -166,176 +190,262 @@ type nextState struct {
 // State ...
 const (
 	Advertising            State = "Advertising"
-	AdvertisingStopped     State = "AdvertisingStopped"
+	StopAdvertising        State = "StopAdvertising"
 	AdvertisingUpdated     State = "AdvertisingUpdated"
 	Scanning               State = "Scanning"
-	ScanningStopped        State = "ScanningStopped"
+	StopScanning           State = "StopScanning"
 	ScanningUpdated        State = "ScanningUpdated"
 	Dialing                State = "Dialing"
-	DialingStopped         State = "DialingStopped"
-	DialingCanceled        State = "DialingCanceled"
+	DialingCanceling       State = "DialingCanceling"
+	StopDialing            State = "StopDialing"
 	DialingUpdated         State = "DialingUpdated"
 	PeripheralConnected    State = "PeripheralConnected"
 	PeripheralDisconnected State = "PeripheralDisconnected"
 	Listening              State = "Listening"
-	ListeningCanceled      State = "ListeningCanceled"
+	StopListening          State = "StopListening"
 	ListeningUpdated       State = "ListeningUpdated"
 	CentralConnected       State = "CentralConnected"
 	CentralDisconnected    State = "CentralDisconnected"
 )
 
-const (
-	advertising = iota
-	scanning
-	dialing
-	listening
-)
+type states struct {
+	sync.Mutex
 
-func (h *HCI) stateLoop() {
+	hci *HCI
+
+	isAdvertising bool
+	isScanning    bool
+	isDialing     bool
+	isListening   bool
+
+	chState chan nextState
+
+	advEnable   cmd.LESetAdvertiseEnable
+	advDisable  cmd.LESetAdvertiseEnable
+	scanEnable  cmd.LESetScanEnable
+	scanDisable cmd.LESetScanEnable
+	connCancel  cmd.LECreateConnectionCancel
+
+	advData    cmd.LESetAdvertisingData
+	scanResp   cmd.LESetScanResponseData
+	advParams  cmd.LESetAdvertisingParameters
+	scanParams cmd.LESetScanParameters
+	connParams cmd.LECreateConnection
+
+	done chan bool
+
+	err error
+}
+
+func (s *states) init(h *HCI) {
+	s.hci = h
+	s.chState = make(chan nextState, 10)
+
+	s.scanEnable = cmd.LESetScanEnable{LEScanEnable: 1}
+	s.scanDisable = cmd.LESetScanEnable{LEScanEnable: 0}
+	s.advEnable = cmd.LESetAdvertiseEnable{AdvertisingEnable: 1}
+	s.advDisable = cmd.LESetAdvertiseEnable{AdvertisingEnable: 0}
+	s.scanParams = cmd.LESetScanParameters{
+		LEScanType:           0x01,   // 0x00: passive, 0x01: active
+		LEScanInterval:       0x0004, // 0x0004 - 0x4000; N * 0.625msec
+		LEScanWindow:         0x0004, // 0x0004 - 0x4000; N * 0.625msec
+		OwnAddressType:       0x00,   // 0x00: public, 0x01: random
+		ScanningFilterPolicy: 0x00,   // 0x00: accept all, 0x01: ignore non-white-listed.
+	}
+	s.advParams = cmd.LESetAdvertisingParameters{
+		AdvertisingIntervalMin:  0x0020,    // 0x0020 - 0x4000; N * 0.625 msec
+		AdvertisingIntervalMax:  0x0020,    // 0x0020 - 0x4000; N * 0.625 msec
+		AdvertisingType:         0x00,      // 00: ADV_IND, 0x01: DIRECT(HIGH), 0x02: SCAN, 0x03: NONCONN, 0x04: DIRECT(LOW)
+		OwnAddressType:          0x00,      // 0x00: public, 0x01: random
+		DirectAddressType:       0x00,      // 0x00: public, 0x01: random
+		DirectAddress:           [6]byte{}, // Public or Random Address of the Device to be connected
+		AdvertisingChannelMap:   0x7,       // 0x07 0x01: ch37, 0x2: ch38, 0x4: ch39
+		AdvertisingFilterPolicy: 0x00,
+	}
+	s.connParams = cmd.LECreateConnection{
+		LEScanInterval:        0x0004,    // 0x0004 - 0x4000; N * 0.625 msec
+		LEScanWindow:          0x0004,    // 0x0004 - 0x4000; N * 0.625 msec
+		InitiatorFilterPolicy: 0x00,      // White list is not used
+		PeerAddressType:       0x00,      // Public Device Address
+		PeerAddress:           [6]byte{}, //
+		OwnAddressType:        0x00,      // Public Device Address
+		ConnIntervalMin:       0x0006,    // 0x0006 - 0x0C80; N * 1.25 msec
+		ConnIntervalMax:       0x0006,    // 0x0006 - 0x0C80; N * 1.25 msec
+		ConnLatency:           0x0000,    // 0x0000 - 0x01F3; N * 1.25 msec
+		SupervisionTimeout:    0x0048,    // 0x000A - 0x0C80; N * 10 msec
+		MinimumCELength:       0x0000,    // 0x0000 - 0xFFFF; N * 0.625 msec
+		MaximumCELength:       0x0000,    // 0x0000 - 0xFFFF; N * 0.625 msec
+	}
+
+	s.done = make(chan bool)
+	go s.loop()
+	s.set(AdvertisingUpdated)
+	s.set(ScanningUpdated)
+}
+
+func (s *states) close() {
+	close(s.done)
+}
+
+func (s *states) loop() {
 	for {
 		select {
-		case <-h.done:
+		case <-s.done:
 			return
-		case s := <-h.chState:
-			h.handleState(s)
+		case next := <-s.chState:
+			s.handle(next)
 		}
 	}
 }
 
-func (h *HCI) setState(s State) error {
-	n := nextState{s: s, done: make(chan error)}
-	h.chState <- n
+func (s *states) set(next State) error {
+	n := nextState{s: next, done: make(chan error)}
+	s.chState <- n
 	return <-n.done
 }
 
-func (h *HCI) handleState(n nextState) {
-	h.stateMu.Lock()
-	defer h.stateMu.Unlock()
-	var err error
-	defer func() { n.done <- err }()
-
-	switch n.s {
-	case Scanning:
-		if h.state[scanning] {
-			return
-		}
-		sendAndChk(h, &h.scanParams)
-		if err = sendAndChk(h, &cmd.LESetScanEnable{LEScanEnable: 1}); err == nil {
-			h.state[scanning] = true
-		}
-	case ScanningStopped:
-		if h.state[scanning] {
-			return
-		}
-		err = sendAndChk(h, &cmd.LESetScanEnable{LEScanEnable: 0})
-		h.state[scanning] = false
-	case ScanningUpdated:
-		if h.state[scanning] {
-			return
-		}
-		sendAndChk(h, &cmd.LESetScanEnable{LEScanEnable: 0})
-		err = sendAndChk(h, &cmd.LESetScanEnable{LEScanEnable: 1})
-		if err == nil {
-			h.state[scanning] = true
-		}
-	case Advertising:
-		if h.state[advertising] {
-			return
-		}
-		sendAndChk(h, &h.advParams)
-		sendAndChk(h, &h.advData)
-		sendAndChk(h, &h.scanResp)
-		if err = sendAndChk(h, &cmd.LESetAdvertiseEnable{AdvertisingEnable: 1}); err == nil {
-			h.state[advertising] = true
-		}
-	case AdvertisingStopped:
-		if !h.state[advertising] {
-			return
-		}
-		h.state[advertising] = false
-		err = sendAndChk(h, &cmd.LESetAdvertiseEnable{AdvertisingEnable: 0})
-	case AdvertisingUpdated:
-		if !h.state[advertising] {
-			return
-		}
-		sendAndChk(h, &cmd.LESetAdvertiseEnable{AdvertisingEnable: 0})
-		if err = sendAndChk(h, &cmd.LESetAdvertiseEnable{AdvertisingEnable: 1}); err == nil {
-			h.state[advertising] = true
-		}
-	case Dialing:
-		if h.state[dialing] {
-			return
-		}
-		if err = sendAndChk(h, &h.connParams); err == nil {
-			h.state[dialing] = true
-		}
-	case PeripheralConnected:
-		h.state[dialing] = false
-	case PeripheralDisconnected:
-		if !h.state[dialing] {
-			return
-		}
-		if err = sendAndChk(h, &h.connParams); err == nil {
-			h.state[dialing] = true
-		}
-	case DialingCanceled:
-		if !h.state[dialing] {
-			return
-		}
-		h.state[dialing] = false
-		err = sendAndChk(h, &cmd.LECreateConnectionCancel{})
-	case DialingUpdated:
-		if !h.state[dialing] {
-			return
-		}
-		sendAndChk(h, &cmd.LECreateConnectionCancel{})
-		if err = sendAndChk(h, &h.connParams); err == nil {
-
-		}
-	case Listening:
-		if h.state[listening] && h.state[advertising] {
-			return
-		}
-		h.state[listening] = true
-		sendAndChk(h, &h.advParams)
-		sendAndChk(h, &h.advData)
-		sendAndChk(h, &h.scanResp)
-		if err = sendAndChk(h, &cmd.LESetAdvertiseEnable{AdvertisingEnable: 1}); err == nil {
-			h.state[advertising] = true
-		} else if e, ok := err.(ErrCommand); ok && e == 0x0C {
-			err = nil
-			log.Printf("reaches connection limit")
-		}
-	case CentralConnected:
-		if !h.state[listening] {
-			return
-		}
-		h.state[listening] = false
-		h.state[advertising] = false
-	case CentralDisconnected:
-		if h.state[listening] && h.state[advertising] {
-			return
-		}
-		sendAndChk(h, &h.advParams)
-		sendAndChk(h, &h.advData)
-		sendAndChk(h, &h.scanResp)
-		if err = sendAndChk(h, &cmd.LESetAdvertiseEnable{AdvertisingEnable: 1}); err == nil {
-			h.state[advertising] = true
-			log.Printf("under connection limit")
-		} else if e, ok := err.(ErrCommand); ok && e == 0x0C {
-			err = nil
-			log.Printf("still reaches connection limit")
-		}
-	case ListeningCanceled:
-		if !h.state[listening] {
-			return
-		}
-		h.state[listening] = false
-		h.state[advertising] = false
-	case ListeningUpdated:
+func (s *states) send(c Command) error {
+	if s.err != nil {
+		return s.err
 	}
-	h.stateChanged(n.s)
+	if b, err := s.hci.send(c); err != nil {
+		s.err = err
+	} else if len(b) > 0 && b[0] != 0x00 {
+		s.err = ErrCommand(b[0])
+	}
+	return s.err
 }
 
-func (h *HCI) stateChanged(s State) {
+func (s *states) handle(n nextState) {
+	s.err = nil
+	log.Printf("state: %s +", n.s)
+	defer func() {
+		log.Printf("state: %s -", n.s)
+		n.done <- errors.Wrapf(s.err, "state: %s", n.s)
+	}()
+	switch n.s {
+	case Scanning:
+		if s.isScanning {
+			return
+		}
+		if s.isDialing {
+			s.err = errors.Wrapf(ErrBusyScanning, "scan:")
+		}
+		if s.send(&s.scanEnable) == nil {
+			s.isScanning = true
+		}
+		if s.err == ErrDisallowed {
+			log.Printf("scan: over maximum connections.")
+			s.err = nil
+		}
+	case StopScanning:
+		if !s.isScanning {
+			return
+		}
+		s.isScanning = false
+		s.send(&s.scanDisable)
+	case ScanningUpdated:
+		if s.isScanning {
+			s.send(&s.scanDisable)
+		}
+		s.send(&s.scanParams)
+		if s.isScanning {
+			s.send(&s.scanEnable)
+		}
+	case Advertising:
+		if s.isAdvertising {
+			return
+		}
+		if s.isListening {
+			s.err = errors.Wrapf(ErrBusyListening, "advertise:")
+			return
+		}
+		if s.send(&s.advEnable) == nil {
+			s.isAdvertising = true
+		}
+	case StopAdvertising:
+		if !s.isAdvertising {
+			return
+		}
+		s.isAdvertising = false
+		s.send(&s.advDisable)
+	case AdvertisingUpdated:
+		if s.isAdvertising {
+			s.send(&s.advDisable)
+		}
+		s.send(&s.advParams)
+		s.send(&s.advData)
+		s.send(&s.scanResp)
+		if s.isAdvertising {
+			s.send(&s.advEnable)
+		}
+	case Dialing:
+		if s.isScanning {
+			s.err = errors.Wrapf(ErrBusyScanning, "dial:")
+			return
+		}
+		if s.isDialing {
+			s.err = errors.Wrapf(ErrBusyDialing, "dial:")
+			return
+		}
+		s.send(&s.connParams)
+		if s.err == nil || s.err == ErrDisallowed {
+			s.err = nil
+			s.isDialing = true
+			return
+		}
+	case StopDialing:
+		s.isDialing = false
+	case DialingCanceling:
+		s.isDialing = false
+		s.send(&s.connCancel)
+	case DialingUpdated:
+		if !s.isDialing {
+			return
+		}
+		if s.send(&s.connCancel) == ErrDisallowed {
+			s.err = nil
+		}
+		s.send(&s.connParams)
+	case PeripheralConnected:
+	case PeripheralDisconnected:
+		if !s.isDialing {
+			return
+		}
+		if s.send(&s.connParams) == ErrDisallowed {
+			s.err = nil
+		}
+	case Listening:
+		if s.isListening {
+			s.err = errors.Wrapf(ErrBusyListening, "listen:")
+			return
+		}
+		if s.isAdvertising {
+			s.err = errors.Wrapf(ErrBusyAdvertising, "listen:")
+			return
+		}
+		s.isListening = true
+		if s.send(&s.advEnable) == ErrDisallowed {
+			s.err = nil
+			log.Printf("listen: over maximum connections.")
+		}
+	case CentralConnected:
+		s.isListening = false
+	case CentralDisconnected:
+		if !s.isListening {
+			return
+		}
+		if s.send(&s.advEnable) == nil {
+			log.Printf("listen: under maximum connections.")
+		} else if s.err == ErrDisallowed {
+			s.err = nil
+			log.Printf("listen: over maximum connections.")
+		}
+	case StopListening:
+		s.isListening = false
+		if s.send(&s.advDisable) == ErrDisallowed {
+			s.err = nil
+		}
+	case ListeningUpdated:
+	}
 }

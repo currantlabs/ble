@@ -54,14 +54,7 @@ type HCI struct {
 	addr    net.HardwareAddr
 	txPwrLv int
 
-	state      map[int]bool
-	chState    chan nextState
-	stateMu    *sync.Mutex
-	advParams  cmd.LESetAdvertisingParameters
-	advData    cmd.LESetAdvertisingData
-	scanResp   cmd.LESetScanResponseData
-	scanParams cmd.LESetScanParameters
-	connParams cmd.LECreateConnection
+	states states
 
 	advFilter  bt.AdvFilter
 	advHandler bt.AdvHandler
@@ -76,8 +69,8 @@ type HCI struct {
 	chMasterConn chan *Conn // Dial returns master connections.
 	chSlaveConn  chan *Conn // Peripheral accept slave connections.
 
-	chDialerTmo   chan time.Time
-	chListenerTmo chan time.Time
+	dialerTmo   time.Duration
+	listenerTmo time.Duration
 
 	err  error
 	done chan bool
@@ -97,43 +90,6 @@ func (h *HCI) Init(id int) error {
 
 	h.evth = map[int]handlerFn{}
 	h.subh = map[int]handlerFn{}
-
-	h.state = map[int]bool{}
-	h.chState = make(chan nextState, 10)
-	h.stateMu = &sync.Mutex{}
-	h.scanParams = cmd.LESetScanParameters{
-		LEScanType:           0x01,   // 0x00: passive, 0x01: active
-		LEScanInterval:       0x0004, // 0x0004 - 0x4000; N * 0.625msec
-		LEScanWindow:         0x0004, // 0x0004 - 0x4000; N * 0.625msec
-		OwnAddressType:       0x00,   // 0x00: public, 0x01: random
-		ScanningFilterPolicy: 0x00,   // 0x00: accept all, 0x01: ignore non-white-listed.
-	}
-
-	h.advParams = cmd.LESetAdvertisingParameters{
-		AdvertisingIntervalMin:  0x0020,    // 0x0020 - 0x4000; N * 0.625 msec
-		AdvertisingIntervalMax:  0x0020,    // 0x0020 - 0x4000; N * 0.625 msec
-		AdvertisingType:         0x00,      // 00: ADV_IND, 0x01: DIRECT(HIGH), 0x02: SCAN, 0x03: NONCONN, 0x04: DIRECT(LOW)
-		OwnAddressType:          0x00,      // 0x00: public, 0x01: random
-		DirectAddressType:       0x00,      // 0x00: public, 0x01: random
-		DirectAddress:           [6]byte{}, // Public or Random Address of the Device to be connected
-		AdvertisingChannelMap:   0x7,       // 0x07 0x01: ch37, 0x2: ch38, 0x4: ch39
-		AdvertisingFilterPolicy: 0x00,
-	}
-
-	h.connParams = cmd.LECreateConnection{
-		LEScanInterval:        0x0004,    // 0x0004 - 0x4000; N * 0.625 msec
-		LEScanWindow:          0x0004,    // 0x0004 - 0x4000; N * 0.625 msec
-		InitiatorFilterPolicy: 0x00,      // White list is not used
-		PeerAddressType:       0x00,      // Public Device Address
-		PeerAddress:           [6]byte{}, //
-		OwnAddressType:        0x00,      // Public Device Address
-		ConnIntervalMin:       0x0006,    // 0x0006 - 0x0C80; N * 1.25 msec
-		ConnIntervalMax:       0x0006,    // 0x0006 - 0x0C80; N * 1.25 msec
-		ConnLatency:           0x0000,    // 0x0000 - 0x01F3; N * 1.25 msec
-		SupervisionTimeout:    0x0048,    // 0x000A - 0x0C80; N * 10 msec
-		MinimumCELength:       0x0000,    // 0x0000 - 0xFFFF; N * 0.625 msec
-		MaximumCELength:       0x0000,    // 0x0000 - 0xFFFF; N * 0.625 msec
-	}
 
 	h.done = make(chan bool)
 
@@ -162,8 +118,8 @@ func (h *HCI) Init(id int) error {
 	// evt.LERemoteConnectionParameterRequestSubCode: bt.todo),
 	go h.cmdLoop()
 	go h.mainLoop()
-	go h.stateLoop()
 	h.init()
+	h.states.init(h)
 
 	// Pre-allocate buffers with additional head room for lower layer headers.
 	// HCI header (1 Byte) + ACL Data Header (4 bytes) + L2CAP PDU (or fragment)
@@ -411,10 +367,17 @@ func (h *HCI) handleLEConnectionComplete(b []byte) error {
 	h.conns[e.ConnectionHandle()] = c
 	h.muConns.Unlock()
 	if e.Role() == roleMaster {
-		h.chMasterConn <- c
+		if e.Status() == 0x00 {
+			h.chMasterConn <- c
+		} else if ErrCommand(e.Status()) == ErrConnID {
+			// nil for a canceled connection.
+			h.chMasterConn <- nil
+		}
 		return nil
 	}
-	h.chSlaveConn <- c
+	if e.Status() == 0x00 {
+		h.chSlaveConn <- c
+	}
 	return nil
 }
 
@@ -433,9 +396,9 @@ func (h *HCI) handleDisconnectionComplete(b []byte) error {
 	}
 	close(c.chInPkt)
 	if c.param.Role() == roleSlave {
-		go h.setState(CentralDisconnected)
+		go h.states.set(CentralDisconnected)
 	} else {
-		go h.setState(PeripheralDisconnected)
+		go h.states.set(PeripheralDisconnected)
 	}
 	// When a connection disconnects, all the sent packets and weren't acked yet
 	// will be recylecd. [Vol2, Part E 4.1.1]

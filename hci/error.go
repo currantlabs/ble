@@ -1,5 +1,16 @@
 package hci
 
+import "errors"
+
+// errors
+var (
+	ErrBusyScanning    = errors.New("busy scanning")
+	ErrBusyAdvertising = errors.New("busy advertising")
+	ErrBusyDialing     = errors.New("busy dialing")
+	ErrBusyListening   = errors.New("busy listening")
+	ErrInvalidAddr     = errors.New("invalid address")
+)
+
 // HCI Command Errors  [Vol2, Part D, 1.3 ]
 // FIXME: Terrible shorthand. Name them properly.
 const (
