@@ -264,7 +264,7 @@ func (s *Server) handleFindByTypeValueRequest(r FindByTypeValueRequest) []byte {
 			// Since ResponseWriter caps the value at the capacity,
 			// we allocate one extra byte, and the written length.
 			buf2 := bytes.NewBuffer(make([]byte, 0, len(s.txBuf)-7+1))
-			e := a.HandleATT(r, &ResponseWriter{svr: s, buf: buf2})
+			e := a.HandleATT(s.l2c, r, &ResponseWriter{svr: s, buf: buf2})
 			if e != bt.ErrSuccess || buf2.Len() > len(s.txBuf)-7 {
 				return NewErrorResponse(r.AttributeOpcode(), r.StartingHandle(), bt.ErrInvalidHandle)
 			}
@@ -311,7 +311,7 @@ func (s *Server) handleReadByTypeRequest(r ReadByTypeRequest) []byte {
 		v := a.Value()
 		if v == nil {
 			buf2 := bytes.NewBuffer(make([]byte, 0, len(s.txBuf)-2))
-			if e := a.HandleATT(r, &ResponseWriter{svr: s, buf: buf2}); e != bt.ErrSuccess {
+			if e := a.HandleATT(s.l2c, r, &ResponseWriter{svr: s, buf: buf2}); e != bt.ErrSuccess {
 				// Return if the first value read cause an error.
 				if dlen == 0 {
 					return NewErrorResponse(r.AttributeOpcode(), r.StartingHandle(), e)
@@ -369,7 +369,7 @@ func (s *Server) handleReadRequest(r ReadRequest) []byte {
 
 	// Pass the request to upper layer with the ResponseWriter, which caps
 	// the buffer to a valid length of payload.
-	if e := a.HandleATT(r, &ResponseWriter{svr: s, buf: buf}); e != bt.ErrSuccess {
+	if e := a.HandleATT(s.l2c, r, &ResponseWriter{svr: s, buf: buf}); e != bt.ErrSuccess {
 		return NewErrorResponse(r.AttributeOpcode(), r.AttributeHandle(), e)
 	}
 	return rsp[:1+buf.Len()]
@@ -401,7 +401,7 @@ func (s *Server) handleReadBlobRequest(r ReadBlobRequest) []byte {
 
 	// Pass the request to upper layer with the ResponseWriter, which caps
 	// the buffer to a valid length of payload.
-	if e := a.HandleATT(r, &ResponseWriter{svr: s, buf: buf}); e != bt.ErrSuccess {
+	if e := a.HandleATT(s.l2c, r, &ResponseWriter{svr: s, buf: buf}); e != bt.ErrSuccess {
 		return NewErrorResponse(r.AttributeOpcode(), r.AttributeHandle(), e)
 	}
 	return rsp[:1+buf.Len()]
@@ -427,7 +427,7 @@ func (s *Server) handleReadByGroupRequest(r ReadByGroupTypeRequest) []byte {
 		v := a.Value()
 		if v == nil {
 			buf2 := bytes.NewBuffer(make([]byte, buf.Cap()-buf.Len()-4))
-			if e := a.HandleATT(r, &ResponseWriter{svr: s, buf: buf2}); e != bt.ErrSuccess {
+			if e := a.HandleATT(s.l2c, r, &ResponseWriter{svr: s, buf: buf2}); e != bt.ErrSuccess {
 				return NewErrorResponse(r.AttributeOpcode(), r.StartingHandle(), e)
 			}
 			v = buf2.Bytes()
@@ -471,7 +471,7 @@ func (s *Server) handleWriteRequest(r WriteRequest) []byte {
 	if a == nil {
 		return NewErrorResponse(r.AttributeOpcode(), r.AttributeHandle(), bt.ErrWriteNotPerm)
 	}
-	if e := a.HandleATT(r, &ResponseWriter{svr: s}); e != bt.ErrSuccess {
+	if e := a.HandleATT(s.l2c, r, &ResponseWriter{svr: s}); e != bt.ErrSuccess {
 		return NewErrorResponse(r.AttributeOpcode(), r.AttributeHandle(), e)
 	}
 	return []byte{WriteResponseCode}
@@ -494,7 +494,7 @@ func (s *Server) handleWriteCommand(r WriteCommand) []byte {
 	if a == nil {
 		return nil
 	}
-	if e := a.HandleATT(r, nil); e != bt.ErrSuccess {
+	if e := a.HandleATT(s.l2c, r, nil); e != bt.ErrSuccess {
 		return nil
 	}
 	return nil

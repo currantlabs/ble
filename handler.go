@@ -43,6 +43,7 @@ func (f NotifyHandlerFunc) ServeNotify(req Request, n Notifier) {
 
 // Request ...
 type Request interface {
+	Conn() Conn
 	Data() []byte
 	Offset() int
 }

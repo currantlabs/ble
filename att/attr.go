@@ -15,7 +15,7 @@ type Attribute interface {
 	EndingHandle() uint16
 	Type() uuid.UUID
 
-	HandleATT(req []byte, resp *ResponseWriter) bt.AttError
+	HandleATT(conn bt.Conn, req []byte, resp *ResponseWriter) bt.AttError
 	Value() []byte
 }
 

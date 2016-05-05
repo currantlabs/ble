@@ -38,8 +38,8 @@ func (v *attr) Value() []byte        { return v.v }
 func (v *attr) Handle() uint16       { return v.h }
 func (v *attr) EndingHandle() uint16 { return v.endh }
 func (v *attr) Type() uuid.UUID      { return v.typ }
-func (v *attr) HandleATT(req []byte, rsp *att.ResponseWriter) bt.AttError {
-	r := &request{}
+func (v *attr) HandleATT(conn bt.Conn, req []byte, rsp *att.ResponseWriter) bt.AttError {
+	r := &request{conn: conn}
 	rsp.SetStatus(bt.ErrSuccess)
 	switch req[0] {
 	case att.ReadByTypeRequestCode:

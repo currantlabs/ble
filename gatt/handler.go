@@ -9,12 +9,14 @@ import (
 )
 
 type request struct {
+	conn   bt.Conn
 	data   []byte
 	offset int
 }
 
-func (r *request) Data() []byte { return r.data }
-func (r *request) Offset() int  { return r.offset }
+func (r *request) Conn() bt.Conn { return r.conn }
+func (r *request) Data() []byte  { return r.data }
+func (r *request) Offset() int   { return r.offset }
 
 type notifier struct {
 	ctx    context.Context
