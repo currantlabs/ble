@@ -14,7 +14,7 @@ func filter(a bt.Advertisement) bool {
 	if p.LocalName() == "Gopher" {
 		return true
 	}
-	fmt.Printf("filtered ...\n")
+	fmt.Printf("%s: filtered ...\n", a.Address())
 	return false
 }
 
@@ -36,6 +36,16 @@ func main() {
 
 	if err := h.SetAdvHandler(bt.AdvFilterFunc(filter), bt.AdvHandlerFunc(discovered)); err != nil {
 		log.Fatalf("can't set adv handler: %s", err)
+	}
+
+	if err := h.SetScanParams(hci.ScanParams{
+		LEScanType:           0x01,   // 0x00: passive, 0x01: active
+		LEScanInterval:       0x0004, // 0x0004 - 0x4000; N * 0.625msec
+		LEScanWindow:         0x0004, // 0x0004 - 0x4000; N * 0.625msec
+		OwnAddressType:       0x00,   // 0x00: public, 0x01: random
+		ScanningFilterPolicy: 0x00,   // 0x00: accept all, 0x01: ignore non-white-listed.
+	}); err != nil {
+		log.Fatalf("can't set scan params: %s", err)
 	}
 
 	if err := h.Scan(); err != nil {
