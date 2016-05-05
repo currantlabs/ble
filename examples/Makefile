@@ -23,7 +23,7 @@ prepare:
 	$(Q) mkdir -p bin
 
 run-%:
-	sudo go run $(patsubst run-%,%,$@)/*.go
+	sudo LOGXI=${LOGXI} go run $(patsubst run-%,%,$@)/*.go
 
 $(PROGS):
 	$(Q) echo Building bin/$@ ...
