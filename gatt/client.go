@@ -14,8 +14,9 @@ import (
 func NewClient(l2c bt.Conn) *Client {
 	h := newNHandler()
 	p := &Client{
-		c:       att.NewClient(l2c, h),
+		addr:    l2c.RemoteAddr().(net.HardwareAddr),
 		handler: h,
+		c:       att.NewClient(l2c, h),
 	}
 	go p.c.Loop()
 	return p
