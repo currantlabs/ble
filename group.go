@@ -27,7 +27,11 @@ type Service interface {
 
 	// AddCharacteristic adds a characteristic to a service.
 	// AddCharacteristic panics if the service already contains another characteristic with the same UUID.
-	AddCharacteristic(u uuid.UUID) Characteristic
+	AddCharacteristic(c Characteristic) Characteristic
+
+	// NewCharacteristic adds a characteristic to a service.
+	// NewCharacteristic panics if the service already contains another characteristic with the same UUID.
+	NewCharacteristic(u uuid.UUID) Characteristic
 }
 
 // A Characteristic is a GATT characteristic.
@@ -62,7 +66,11 @@ type Characteristic interface {
 
 	// AddDescriptor adds a descriptor to a characteristic.
 	// AddDescriptor panics if the characteristic already contains another descriptor with the same UUID.
-	AddDescriptor(u uuid.UUID) Descriptor
+	AddDescriptor(d Descriptor) Descriptor
+
+	// NewDescriptor adds a descriptor to a characteristic.
+	// NewDescriptor panics if the characteristic already contains another descriptor with the same UUID.
+	NewDescriptor(u uuid.UUID) Descriptor
 }
 
 // Descriptor is a GATT descriptor

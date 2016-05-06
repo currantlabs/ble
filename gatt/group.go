@@ -8,6 +8,9 @@ import (
 // NewService returns a GATT service.
 func NewService(u uuid.UUID) bt.Service { return &svc{uuid: u} }
 
+// NewCharacteristic returns a GATT characteristic.
+func NewCharacteristic(u uuid.UUID) bt.Characteristic { return &char{uuid: u} }
+
 type svc struct {
 	uuid  uuid.UUID
 	chars []bt.Characteristic
@@ -18,13 +21,17 @@ type svc struct {
 func (s *svc) UUID() uuid.UUID                      { return s.uuid }
 func (s *svc) Characteristics() []bt.Characteristic { return s.chars }
 
-func (s *svc) AddCharacteristic(u uuid.UUID) bt.Characteristic {
+func (s *svc) NewCharacteristic(u uuid.UUID) bt.Characteristic {
+	return s.AddCharacteristic(&char{uuid: u})
+}
+
+func (s *svc) AddCharacteristic(c bt.Characteristic) bt.Characteristic {
+	u := c.UUID()
 	for _, c := range s.chars {
 		if c.UUID().Equal(u) {
 			panic("Service already contains a characteristic with uuid " + u.String())
 		}
 	}
-	c := &char{uuid: u}
 	s.chars = append(s.chars, c)
 	return c
 }
@@ -73,13 +80,17 @@ func (c *char) HandleNotify(ind bool, h bt.NotifyHandler) bt.Characteristic {
 	return c
 }
 
-func (c *char) AddDescriptor(u uuid.UUID) bt.Descriptor {
+func (c *char) NewDescriptor(u uuid.UUID) bt.Descriptor {
+	return c.AddDescriptor(&desc{uuid: u})
+}
+
+func (c *char) AddDescriptor(d bt.Descriptor) bt.Descriptor {
+	u := d.UUID()
 	for _, d := range c.descs {
 		if d.UUID().Equal(u) {
-			panic("Service already contains a characteristic with uuid " + u.String())
+			panic("Characteristic already contains a descriptor with uuid " + u.String())
 		}
 	}
-	d := &desc{uuid: u}
 	c.descs = append(c.descs, d)
 	return d
 }
