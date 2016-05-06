@@ -2,6 +2,7 @@ package gatt
 
 import (
 	"log"
+	"sync"
 
 	"github.com/currantlabs/bt"
 	"github.com/currantlabs/bt/att"
@@ -14,19 +15,27 @@ func NewServer() *Server {
 
 // Server ...
 type Server struct {
-	svcs  []bt.Service
-	attrs *att.Range
+	sync.Mutex
+
+	svcs    []bt.Service
+	attrs   *att.Range
+	changed bool
 }
 
 // AddService ...
 func (s *Server) AddService(svc bt.Service) bt.Service {
+	s.Lock()
+	defer s.Unlock()
+	s.changed = true
 	s.svcs = append(s.svcs, svc)
-	s.attrs = genAttr(s.svcs, uint16(1)) // ble attrs start at 1
 	return svc
 }
 
 // RemoveAllServices ...
 func (s *Server) RemoveAllServices() error {
+	s.Lock()
+	defer s.Unlock()
+	s.changed = true
 	s.svcs = nil
 	s.attrs = nil
 	return nil
@@ -34,14 +43,22 @@ func (s *Server) RemoveAllServices() error {
 
 // SetServices ...
 func (s *Server) SetServices(svcs []bt.Service) error {
+	s.Lock()
+	defer s.Unlock()
+	s.changed = true
 	s.RemoveAllServices()
 	s.svcs = append(s.svcs, svcs...)
-	s.attrs = genAttr(s.svcs, uint16(1)) // ble attrs start at 1
 	return nil
 }
 
 // Start ...
 func (s *Server) Start(p bt.Peripheral) error {
+	s.Lock()
+	if s.changed {
+		s.changed = false
+		s.attrs = genAttr(s.svcs, uint16(1)) // ble attrs start at 1
+	}
+	s.Unlock()
 	go func() {
 		for {
 			l2c, err := p.Accept()
@@ -49,6 +66,12 @@ func (s *Server) Start(p bt.Peripheral) error {
 				log.Printf("can't accept: %s", err)
 				return
 			}
+			s.Lock()
+			if s.changed {
+				s.changed = false
+				s.attrs = genAttr(s.svcs, uint16(1)) // ble attrs start at 1
+			}
+			s.Unlock()
 			go att.NewServer(s.attrs, l2c, 1024).Loop()
 		}
 	}()
@@ -57,5 +80,7 @@ func (s *Server) Start(p bt.Peripheral) error {
 
 // Stop ...
 func (s *Server) Stop() error {
+	s.Lock()
+	defer s.Unlock()
 	return nil
 }
