@@ -22,10 +22,10 @@ var gapCharAppearanceGenericComputer = []byte{0x00, 0x80}
 // NewGapService ...
 func NewGapService(name string) bt.Service {
 	s := gatt.NewService(attrGAPUUID)
-	s.AddCharacteristic(attrDeviceNameUUID).SetValue([]byte(name))
-	s.AddCharacteristic(attrAppearanceUUID).SetValue(gapCharAppearanceGenericComputer)
-	s.AddCharacteristic(attrPeripheralPrivacyUUID).SetValue([]byte{0x00})
-	s.AddCharacteristic(attrReconnectionAddrUUID).SetValue([]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
-	s.AddCharacteristic(attrPeferredParamsUUID).SetValue([]byte{0x06, 0x00, 0x06, 0x00, 0x00, 0x00, 0xd0, 0x07})
+	s.NewCharacteristic(attrDeviceNameUUID).SetValue([]byte(name))
+	s.NewCharacteristic(attrAppearanceUUID).SetValue(gapCharAppearanceGenericComputer)
+	s.NewCharacteristic(attrPeripheralPrivacyUUID).SetValue([]byte{0x00})
+	s.NewCharacteristic(attrReconnectionAddrUUID).SetValue([]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
+	s.NewCharacteristic(attrPeferredParamsUUID).SetValue([]byte{0x06, 0x00, 0x06, 0x00, 0x00, 0x00, 0xd0, 0x07})
 	return s
 }
