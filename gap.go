@@ -1,6 +1,10 @@
 package bt
 
-import "io"
+import (
+	"io"
+
+	"golang.org/x/net/context"
+)
 
 // Broadcaster ...
 type Broadcaster interface {
@@ -65,6 +69,12 @@ type Dialer interface {
 // Currently, it only supports LE-U logical transport, and not ACL-U.
 type Conn interface {
 	io.ReadWriteCloser
+
+	// Context returns the context that is used by this Conn.
+	Context() context.Context
+
+	// SetContext sets the context that is used by this Conn.
+	SetContext(ctx context.Context)
 
 	// LocalAddr returns local device's MAC address.
 	LocalAddr() Addr

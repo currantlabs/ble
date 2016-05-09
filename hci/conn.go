@@ -8,6 +8,8 @@ import (
 	"log"
 	"net"
 
+	"golang.org/x/net/context"
+
 	"github.com/currantlabs/bt"
 	"github.com/currantlabs/bt/hci/cmd"
 	"github.com/currantlabs/bt/hci/evt"
@@ -16,6 +18,7 @@ import (
 // Conn ...
 type Conn struct {
 	hci *HCI
+	ctx context.Context
 
 	param evt.LEConnectionComplete
 
@@ -69,6 +72,7 @@ type Conn struct {
 func newConn(h *HCI, param evt.LEConnectionComplete) *Conn {
 	c := &Conn{
 		hci:   h,
+		ctx:   context.Background(),
 		param: param,
 
 		rxMTU: 23,
@@ -100,6 +104,16 @@ func newConn(h *HCI, param evt.LEConnectionComplete) *Conn {
 		}
 	}()
 	return c
+}
+
+// Context returns the context that is used by this Conn.
+func (c *Conn) Context() context.Context {
+	return c.ctx
+}
+
+// SetContext sets the context that is used by this Conn.
+func (c *Conn) SetContext(ctx context.Context) {
+	c.ctx = ctx
 }
 
 // Read copies re-assembled L2CAP PDUs into sdu.
