@@ -18,8 +18,8 @@ type Server struct {
 
 	// Refer to [Vol 3, Part F, 3.3.2 & 3.3.3] for the requirement of
 	// sequential request-response protocol, and transactions.
+	rxMTU     int
 	txBuf     []byte
-	rxBuf     []byte
 	chNotBuf  chan []byte
 	chIndBuf  chan []byte
 	chConfirm chan bool
@@ -34,8 +34,8 @@ func NewServer(a *Range, l2c bt.Conn, rxMTU int) *Server {
 		l2c:   l2c,
 		attrs: a,
 
+		rxMTU:     rxMTU,
 		txBuf:     make([]byte, 23, 23),
-		rxBuf:     make([]byte, rxMTU, rxMTU),
 		chNotBuf:  make(chan []byte, 1),
 		chIndBuf:  make(chan []byte, 1),
 		chConfirm: make(chan bool, 1),
@@ -107,17 +107,44 @@ func (s *Server) indicate(h uint16, data []byte) (int, error) {
 
 // Loop accepts incoming ATT request, and respond response.
 func (s *Server) Loop() {
-	for {
-		n, err := s.l2c.Read(s.rxBuf)
-		if n == 0 || err != nil {
-			s.close()
-			break
+	type sbuf struct {
+		buf []byte
+		len int
+	}
+	pool := make(chan *sbuf, 2)
+	pool <- &sbuf{buf: make([]byte, s.rxMTU)}
+	pool <- &sbuf{buf: make([]byte, s.rxMTU)}
+
+	seq := make(chan *sbuf)
+	go func() {
+		b := <-pool
+		for {
+			n, err := s.l2c.Read(b.buf)
+			if n == 0 || err != nil {
+				close(seq)
+				s.close()
+				return
+			}
+			if b.buf[0] == HandleValueConfirmationCode {
+				select {
+				case s.chConfirm <- true:
+				default:
+					log.Printf("svr: recieved a spurious confirmation")
+				}
+				continue
+			}
+			b.len = n
+			seq <- b   // Send the current request for handling
+			b = <-pool // Swap the buffer for next incoming request.
 		}
-		if rsp := s.handleRequest(s.rxBuf[:n]); rsp != nil {
+	}()
+	for req := range seq {
+		if rsp := s.handleRequest(req.buf[:req.len]); rsp != nil {
 			if len(rsp) != 0 {
 				s.l2c.Write(rsp)
 			}
 		}
+		pool <- req
 	}
 }
 
@@ -153,12 +180,6 @@ func (s *Server) handleRequest(b []byte) []byte {
 		ExecuteWriteRequestCode,
 		SignedWriteCommandCode:
 		fallthrough
-	case HandleValueConfirmationCode:
-		select {
-		case s.chConfirm <- true:
-		default:
-			log.Printf("recieved a spurious confirmation")
-		}
 	default:
 		resp = NewErrorResponse(reqType, 0x0000, bt.ErrReqNotSupp)
 	}
@@ -178,7 +199,7 @@ func (s *Server) handleExchangeMTURequest(r ExchangeMTURequest) []byte {
 
 	txMTU := int(r.ClientRxMTU())
 	s.l2c.SetTxMTU(txMTU)
-	s.l2c.SetRxMTU(len(s.rxBuf))
+	s.l2c.SetRxMTU(s.rxMTU)
 
 	if txMTU != len(s.txBuf) {
 		// Apply the txMTU afer this response has been sent and before
@@ -194,7 +215,7 @@ func (s *Server) handleExchangeMTURequest(r ExchangeMTURequest) []byte {
 
 	rsp := ExchangeMTUResponse(s.txBuf)
 	rsp.SetAttributeOpcode()
-	rsp.SetServerRxMTU(uint16(len(s.rxBuf)))
+	rsp.SetServerRxMTU(uint16(s.rxMTU))
 	return rsp[:3]
 }
 
