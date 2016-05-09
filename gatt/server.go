@@ -4,6 +4,8 @@ import (
 	"log"
 	"sync"
 
+	"golang.org/x/net/context"
+
 	"github.com/currantlabs/bt"
 	"github.com/currantlabs/bt/att"
 )
@@ -66,12 +68,18 @@ func (s *Server) Start(p bt.Peripheral) error {
 				log.Printf("can't accept: %s", err)
 				return
 			}
+
+			// Initialize the per-connection cccd values.
+			l2c.SetContext(context.WithValue(l2c.Context(), "ccc", make(map[uint16]uint16)))
+
+			// Re-generate attributes if the services has been changed
 			s.Lock()
 			if s.changed {
 				s.changed = false
 				s.attrs = genAttr(s.svcs, uint16(1)) // ble attrs start at 1
 			}
 			s.Unlock()
+
 			go att.NewServer(s.attrs, l2c, 1024).Loop()
 		}
 	}()

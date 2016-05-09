@@ -55,17 +55,21 @@ func config(c *char, ind bool, h bt.NotifyHandler) {
 }
 
 func newCCCD(c *char) *desc {
-	var ccc uint16
 	var nn *notifier
 	var in *notifier
 
 	d := &desc{uuid: attrClientCharacteristicConfigUUID}
 
 	d.HandleRead(bt.ReadHandlerFunc(func(req bt.Request, rsp bt.ResponseWriter) {
+		cccs := req.Conn().Context().Value("ccc").(map[uint16]uint16)
+		ccc := cccs[c.attr.Handle()]
 		binary.Write(rsp, binary.LittleEndian, ccc)
 	}))
 
 	d.HandleWrite(bt.WriteHandlerFunc(func(req bt.Request, rsp bt.ResponseWriter) {
+		cccs := req.Conn().Context().Value("ccc").(map[uint16]uint16)
+		ccc := cccs[c.attr.Handle()]
+
 		newCCC := binary.LittleEndian.Uint16(req.Data())
 		if newCCC&cccNotify != 0 && ccc&cccNotify == 0 {
 			send := func(b []byte) (int, error) { return rsp.Notify(false, c.attr.vh, b) }
@@ -83,7 +87,7 @@ func newCCCD(c *char) *desc {
 		if newCCC&cccIndicate == 0 && ccc&cccIndicate != 0 {
 			in.cancel()
 		}
-		ccc = newCCC
+		cccs[c.attr.Handle()] = newCCC
 	}))
 	return d
 }
