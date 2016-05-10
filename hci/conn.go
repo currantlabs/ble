@@ -11,6 +11,7 @@ import (
 	"golang.org/x/net/context"
 
 	"github.com/currantlabs/bt"
+	"github.com/currantlabs/bt/att"
 	"github.com/currantlabs/bt/hci/cmd"
 	"github.com/currantlabs/bt/hci/evt"
 )
@@ -22,20 +23,20 @@ type Conn struct {
 
 	param evt.LEConnectionComplete
 
-	// Maximum Transmission Unit (MTU) is the maximum size of payload data
-	// which the upper layer entity is capable of accepting. [Vol 3, Part A, 1.4]
+	// While MTU is the maximum size of payload data that the upper layer (ATT)
+	// can accept, the MPS is the maximum PDU payload size this L2CAP implementation
+	// supports. When segmantation is not used, the MPS should be made to the same
+	// values of MTUs [Vol 3, Part A, 1.4].
+	//
 	// For LE-U logical transport, the L2CAP implementations should support
 	// a minimum of 23 bytes, which are also the default values before the
 	// upper layer (ATT) optionally reconfigures them [Vol 3, Part A, 3.2.8].
 	rxMTU int
 	txMTU int
-
-	// Maximum PDU payload Size (MPS) is the maximum size of payload data
-	// which the L2CAP layer entity is capable of accepting.
-	// When segmantation is not used, the MPS should be made to the same
-	// values of MTUs [Vol 3, Part A, 1.4].
 	rxMPS int
-	txMPS int
+
+	// leFrame is set to be true when the LE Credit based flow control is used.
+	leFrame bool
 
 	// Signaling MTUs are The maximum size of command information that the
 	// L2CAP layer entity is capable of accepting.
@@ -59,9 +60,6 @@ type Conn struct {
 	chInPkt chan packet
 	chInPDU chan pdu
 
-	// leFrame is set to be true when the LE Credit based flow control is used.
-	leFrame bool
-
 	// Host to Controller Data Flow Control pkt-based Data flow control for LE-U [Vol 2, Part E, 4.1.1]
 	// chSentBufs tracks the HCI buffer occupied by this connection.
 	txBuffer *Client
@@ -75,14 +73,13 @@ func newConn(h *HCI, param evt.LEConnectionComplete) *Conn {
 		ctx:   context.Background(),
 		param: param,
 
-		rxMTU: 23,
-		txMTU: 23,
+		rxMTU: att.DefaultMTU,
+		txMTU: att.DefaultMTU,
 
-		rxMPS: 23,
-		txMPS: 23,
+		rxMPS: att.DefaultMTU,
 
-		sigRxMTU: 512,
-		sigTxMTU: 23,
+		sigRxMTU: att.MaxMTU,
+		sigTxMTU: att.DefaultMTU,
 
 		chInPkt: make(chan packet, 16),
 		chInPDU: make(chan pdu, 16),
@@ -141,7 +138,6 @@ func (c *Conn) Read(sdu []byte) (int, error) {
 		p := <-c.chInPDU
 		buf.Write(pdu(p).payload())
 	}
-	// log.Printf("Read(): %d [ % X ]", slen, sdu[:slen])
 	return slen, nil
 }
 
@@ -150,13 +146,10 @@ func (c *Conn) Write(sdu []byte) (int, error) {
 	if len(sdu) > c.txMTU {
 		return 0, io.ErrShortWrite
 	}
-	if len(sdu) > c.txMPS && !c.leFrame {
-		return 0, io.ErrShortWrite
-	}
 
 	plen := len(sdu)
-	if plen > c.txMPS {
-		plen = c.txMPS
+	if plen > c.txMTU {
+		plen = c.txMTU
 	}
 	b := make([]byte, 4+plen)
 	binary.LittleEndian.PutUint16(b[0:2], uint16(len(sdu)))
@@ -175,8 +168,8 @@ func (c *Conn) Write(sdu []byte) (int, error) {
 
 	for len(sdu) > 0 {
 		plen := len(sdu)
-		if plen > c.txMPS {
-			plen = c.txMPS
+		if plen > c.txMTU {
+			plen = c.txMTU
 		}
 		n, err := c.writePDU(cidLEAtt, sdu[:plen])
 		sent += n
@@ -285,9 +278,7 @@ func (c *Conn) Close() error {
 }
 
 // LocalAddr returns local device's MAC address.
-func (c *Conn) LocalAddr() bt.Addr {
-	return c.hci.Addr()
-}
+func (c *Conn) LocalAddr() bt.Addr { return c.hci.Addr() }
 
 // RemoteAddr returns remote device's MAC address.
 func (c *Conn) RemoteAddr() bt.Addr {
@@ -298,21 +289,14 @@ func (c *Conn) RemoteAddr() bt.Addr {
 // RxMTU returns the MTU which the upper layer is capable of accepting.
 func (c *Conn) RxMTU() int { return c.rxMTU }
 
-// SetRxMTU sets the MTU which the upper layer of remote device is capable of accepting.
-func (c *Conn) SetRxMTU(mtu int) {
-	c.rxMTU = mtu
-	c.rxMPS = mtu
-}
+// SetRxMTU sets the MTU which the upper layer is capable of accepting.
+func (c *Conn) SetRxMTU(mtu int) { c.rxMTU, c.rxMPS = mtu, mtu }
 
-// TxMTU returns the MTU which the upper layer of remote device is capable of accepting.
+// TxMTU returns the MTU which the remote device is capable of accepting.
 func (c *Conn) TxMTU() int { return c.txMTU }
 
-// SetTxMTU sets the MTU which the upper layer is capable of accepting.
-func (c *Conn) SetTxMTU(mtu int) {
-	log.Printf("Set MTU: %d", mtu)
-	c.txMTU = mtu
-	c.txMPS = mtu
-}
+// SetTxMTU sets the MTU which the remote device is capable of accepting.
+func (c *Conn) SetTxMTU(mtu int) { c.txMTU = mtu }
 
 // pkt implements HCI ACL Data Packet [Vol 2, Part E, 5.4.2]
 // Packet boundary flags , bit[5:6] of handle field's MSB

@@ -2,23 +2,10 @@ package att
 
 import (
 	"encoding/binary"
-	"errors"
 	"time"
 
 	"github.com/currantlabs/bt"
 	"github.com/currantlabs/bt/uuid"
-)
-
-var (
-	// ErrInvalidArgument means one or more of the arguments are invalid.
-	ErrInvalidArgument = errors.New("invalid argument")
-
-	// ErrInvalidResponse means one or more of the response fields are invalid.
-	ErrInvalidResponse = errors.New("invalid response")
-
-	// ErrSeqProtoTimeout means the request hasn't been acknowledged in 30 seconds.
-	// [Vol 3, Part F, 3.3.3]
-	ErrSeqProtoTimeout = errors.New("req timeout")
 )
 
 // NotificationHandler handles notification or indication.
@@ -43,7 +30,7 @@ func NewClient(l2c bt.Conn, h NotificationHandler) *Client {
 		l2c:     l2c,
 		rspc:    make(chan []byte),
 		chTxBuf: make(chan []byte, 1),
-		rxBuf:   make([]byte, 65535),
+		rxBuf:   make([]byte, MaxMTU),
 		chErr:   make(chan error, 1),
 		handler: h,
 	}
@@ -54,7 +41,7 @@ func NewClient(l2c bt.Conn, h NotificationHandler) *Client {
 // ExchangeMTU informs the server of the client’s maximum receive MTU size and
 // request the server to respond with its maximum receive MTU size. [Vol 3, Part F, 3.4.2.1]
 func (c *Client) ExchangeMTU(clientRxMTU int) (serverRxMTU int, err error) {
-	if clientRxMTU < 23 || clientRxMTU > 65535 {
+	if clientRxMTU < DefaultMTU || clientRxMTU > MaxMTU {
 		return 0, ErrInvalidArgument
 	}
 
@@ -64,6 +51,9 @@ func (c *Client) ExchangeMTU(clientRxMTU int) (serverRxMTU int, err error) {
 	txBuf := <-c.chTxBuf
 	defer func() { c.chTxBuf <- txBuf }()
 
+	// Let L2CAP know the MTU we can handle.
+	c.l2c.SetRxMTU(clientRxMTU)
+
 	req := ExchangeMTURequest(txBuf[:3])
 	req.SetAttributeOpcode()
 	req.SetClientRxMTU(uint16(clientRxMTU))
@@ -72,9 +62,6 @@ func (c *Client) ExchangeMTU(clientRxMTU int) (serverRxMTU int, err error) {
 	if err != nil {
 		return 0, err
 	}
-
-	// Let L2CAP know the MTU we can handle.
-	c.l2c.SetRxMTU(clientRxMTU)
 
 	// Convert and validate the response.
 	rsp := ExchangeMTUResponse(b)

@@ -6,7 +6,7 @@ import (
 	"golang.org/x/net/context"
 )
 
-// Broadcaster ...
+// A Broadcaster is a device that sends advertising events.
 type Broadcaster interface {
 	// SetAdvertisement ...
 	SetAdvertisement(ad []byte, sr []byte) error
@@ -18,13 +18,13 @@ type Broadcaster interface {
 	StopAdvertising() error
 }
 
-// Peripheral ...
+// A Peripheral is a device that accepts the establishment of an LE physical link.
 type Peripheral interface {
 	Broadcaster
 	Listener
 }
 
-// Observer ...
+// Observer a device that receives advertising events.
 type Observer interface {
 	// SetAdvHandler ...
 	SetAdvHandler(af AdvFilter, ah AdvHandler) error
@@ -36,7 +36,7 @@ type Observer interface {
 	StopScanning() error
 }
 
-// Central ...
+// A Central is a device that initiates the establishment of a physical connection.
 type Central interface {
 	Observer
 	Dialer
@@ -52,21 +52,20 @@ type Listener interface {
 	// Accept starts advertising and accepts connection.
 	Accept() (Conn, error)
 
-	// Close closes the le.
+	// Close closes the listner.
 	// Any blocked Accept operations will be unblocked and return errors.
 	Close() error
 
-	// Addr returns the le's network address.
+	// Addr returns the listener's network address.
 	Addr() Addr
 }
 
-// Dialer ...
+// A Dialer contains options for connecting to an address.
 type Dialer interface {
 	Dial(Addr) (Conn, error)
 }
 
 // Conn implements a L2CAP connection.
-// Currently, it only supports LE-U logical transport, and not ACL-U.
 type Conn interface {
 	io.ReadWriteCloser
 
@@ -82,15 +81,15 @@ type Conn interface {
 	// RemoteAddr returns remote device's MAC address.
 	RemoteAddr() Addr
 
-	// RxMTU returns the MTU which the upper layer is capable of accepting.
+	// RxMTU returns the ATT_MTU which the local device is capable of accepting.
 	RxMTU() int
 
-	// SetRxMTU sets the MTU which the upper layer of remote device is capable of accepting.
+	// SetRxMTU sets the ATT_MTU which the local device is capable of accepting.
 	SetRxMTU(mtu int)
 
-	// TxMTU returns the MTU which the upper layer of remote device is capable of accepting.
+	// TxMTU returns the ATT_MTU which the remote device is capable of accepting.
 	TxMTU() int
 
-	// SetTxMTU sets the MTU which the upper layer is capable of accepting.
+	// SetTxMTU sets the ATT_MTU which the remote device is capable of accepting.
 	SetTxMTU(mtu int)
 }

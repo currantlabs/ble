@@ -5,7 +5,7 @@ import "github.com/currantlabs/bt/uuid"
 // NotificationHandler ...
 type NotificationHandler func(req []byte)
 
-// Client ...
+// A Client is a GATT client.
 type Client interface {
 	// Address is the platform specific unique ID of the remote peripheral, e.g. MAC for Linux, Client UUID for MacOS.
 	Address() Addr
@@ -52,8 +52,9 @@ type Client interface {
 	// ReadRSSI retrieves the current RSSI value for the remote peripheral.
 	ReadRSSI() int
 
-	// SetMTU sets the mtu for the remote peripheral.
-	SetMTU(mtu int) error
+	// ExchangeMTU exchange local MTU with the remote server.
+	// Before the exchange, both client and server shall not send attribute values larger than 20 bytes.
+	ExchangeMTU(rxMTU int) (txMTU int, err error)
 
 	// Subscribe subscribes to indication (if ind is set true), or notification of a specified characteristic.
 	Subscribe(c Characteristic, ind bool, h NotificationHandler) error
@@ -62,7 +63,7 @@ type Client interface {
 	ClearSubscriptions() error
 }
 
-// Server ...
+// A Server is a GATT server.
 type Server interface {
 	// AddService add a service to database.
 	AddService(svc Service) Service

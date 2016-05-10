@@ -1,6 +1,7 @@
 package gatt
 
 import (
+	"fmt"
 	"log"
 	"sync"
 
@@ -55,6 +56,11 @@ func (s *Server) SetServices(svcs []bt.Service) error {
 
 // Start ...
 func (s *Server) Start(p bt.Peripheral) error {
+	mtu := att.DefaultMTU
+	mtu = att.MaxMTU // TODO: get this from user using Option.
+	if mtu > att.MaxMTU {
+		return fmt.Errorf("maximum ATT_MTU is %d", att.MaxMTU)
+	}
 	s.Lock()
 	if s.changed {
 		s.changed = false
@@ -71,6 +77,7 @@ func (s *Server) Start(p bt.Peripheral) error {
 
 			// Initialize the per-connection cccd values.
 			l2c.SetContext(context.WithValue(l2c.Context(), "ccc", make(map[uint16]uint16)))
+			l2c.SetRxMTU(mtu)
 
 			// Re-generate attributes if the services has been changed
 			s.Lock()
@@ -80,7 +87,13 @@ func (s *Server) Start(p bt.Peripheral) error {
 			}
 			s.Unlock()
 
-			go att.NewServer(s.attrs, l2c, 1024).Loop()
+			as, err := att.NewServer(s.attrs, l2c)
+			if err != nil {
+				log.Printf("can't create ATT server: %s", err)
+				continue
+
+			}
+			go as.Loop()
 		}
 	}()
 	return nil

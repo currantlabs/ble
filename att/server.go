@@ -3,6 +3,7 @@ package att
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"io"
 	"log"
 	"time"
@@ -26,7 +27,11 @@ type Server struct {
 }
 
 // NewServer returns an ATT (Attribute Protocol) server.
-func NewServer(a *Range, l2c bt.Conn, rxMTU int) *Server {
+func NewServer(a *Range, l2c bt.Conn) (*Server, error) {
+	mtu := l2c.RxMTU()
+	if mtu < DefaultMTU || mtu > MaxMTU {
+		return nil, fmt.Errorf("invalid MTU")
+	}
 	// Although the rxBuf is initialized with the capacity of rxMTU, it is
 	// not discovered, and only the default ATT_MTU (23 bytes) of it shall
 	// be used until remote central request ExchangeMTU.
@@ -34,15 +39,15 @@ func NewServer(a *Range, l2c bt.Conn, rxMTU int) *Server {
 		l2c:   l2c,
 		attrs: a,
 
-		rxMTU:     rxMTU,
-		txBuf:     make([]byte, 23, 23),
+		rxMTU:     mtu,
+		txBuf:     make([]byte, DefaultMTU, DefaultMTU),
 		chNotBuf:  make(chan []byte, 1),
 		chIndBuf:  make(chan []byte, 1),
-		chConfirm: make(chan bool, 1),
+		chConfirm: make(chan bool),
 	}
-	s.chNotBuf <- make([]byte, 23, 23)
-	s.chIndBuf <- make([]byte, 23, 23)
-	return s
+	s.chNotBuf <- make([]byte, DefaultMTU, DefaultMTU)
+	s.chIndBuf <- make([]byte, DefaultMTU, DefaultMTU)
+	return s, nil
 }
 
 // Notify sends notification to remote central.
@@ -55,8 +60,6 @@ func (s *Server) Notify(ind bool, h uint16, data []byte) (int, error) {
 
 // notify sends notification to remote central.
 func (s *Server) notify(h uint16, data []byte) (int, error) {
-	// log.Printf("att: notifying 0x%04X, %s", h, string(data))
-
 	// Acquire and reuse notifyBuffer. Release it after usage.
 	nBuf := <-s.chNotBuf
 	defer func() { s.chNotBuf <- nBuf }()
@@ -75,8 +78,6 @@ func (s *Server) notify(h uint16, data []byte) (int, error) {
 
 // indicate sends indication to remote central.
 func (s *Server) indicate(h uint16, data []byte) (int, error) {
-	// log.Printf("att: indicating 0x%04X, %s", h, string(data))
-
 	// Acquire and reuse indicateBuffer. Release it after usage.
 	iBuf := <-s.chIndBuf
 	defer func() { s.chIndBuf <- iBuf }()
@@ -199,7 +200,6 @@ func (s *Server) handleExchangeMTURequest(r ExchangeMTURequest) []byte {
 
 	txMTU := int(r.ClientRxMTU())
 	s.l2c.SetTxMTU(txMTU)
-	s.l2c.SetRxMTU(s.rxMTU)
 
 	if txMTU != len(s.txBuf) {
 		// Apply the txMTU afer this response has been sent and before
