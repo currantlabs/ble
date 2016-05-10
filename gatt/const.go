@@ -2,6 +2,13 @@ package gatt
 
 import "github.com/currantlabs/bt/uuid"
 
+// DefaultMTU defines the default MTU of ATT protocol excluding ATT header.
+const DefaultMTU = 23 - 3
+
+// MaxMTU is maximum of ATT_MTU, which is 512 bytes of value length excluding ATT header.
+// The maximum length of an attribute value shall be 512 octets [Vol 3, Part F, 3.2.9]
+const MaxMTU = 512
+
 var (
 	attrGAPUUID  = uuid.UUID16(0x1800)
 	attrGATTUUID = uuid.UUID16(0x1801)

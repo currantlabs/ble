@@ -85,7 +85,7 @@ func (c *Client) ExchangeMTU(clientRxMTU int) (serverRxMTU int, err error) {
 		txBuf = make([]byte, txMTU, txMTU)
 	}
 
-	return 0, nil
+	return txMTU, nil
 }
 
 // FindInformation obtains the mapping of attribute handles with their associated types.

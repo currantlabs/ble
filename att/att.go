@@ -2,7 +2,7 @@ package att
 
 import "errors"
 
-// DefaultMTU 23 defines the default MTU of ATT protocol.
+// DefaultMTU defines the default MTU of ATT protocol.
 const DefaultMTU = 23
 
 // MaxMTU is maximum of ATT_MTU, which is 512 bytes of value length and 3 bytes of header.

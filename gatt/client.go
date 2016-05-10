@@ -188,10 +188,14 @@ func (p *Client) WriteDescriptor(d bt.Descriptor, v []byte) error {
 // ReadRSSI ...
 func (p *Client) ReadRSSI() int { return -1 }
 
-// SetMTU ...
-func (p *Client) SetMTU(mtu int) error {
-	_, err := p.c.ExchangeMTU(mtu)
-	return err
+// ExchangeMTU informs the server of the client’s maximum receive MTU size and
+// request the server to respond with its maximum receive MTU size. [Vol 3, Part F, 3.4.2.1]
+func (p *Client) ExchangeMTU(mtu int) (int, error) {
+	txMTU, err := p.c.ExchangeMTU(mtu + 3)
+	if err != nil {
+		return 0, err
+	}
+	return txMTU - 3, nil
 }
 
 // Subscribe ...
