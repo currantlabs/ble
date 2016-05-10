@@ -181,7 +181,7 @@ func (s *Server) handleRequest(b []byte) []byte {
 		SignedWriteCommandCode:
 		fallthrough
 	default:
-		resp = NewErrorResponse(reqType, 0x0000, bt.ErrReqNotSupp)
+		resp = newErrorResponse(reqType, 0x0000, bt.ErrReqNotSupp)
 	}
 	// log.Printf("att: rsp: % X", resp)
 	return resp
@@ -194,7 +194,7 @@ func (s *Server) handleExchangeMTURequest(r ExchangeMTURequest) []byte {
 	case len(r) != 3:
 		fallthrough
 	case r.ClientRxMTU() < 23:
-		return NewErrorResponse(r.AttributeOpcode(), 0x0000, bt.ErrInvalidPDU)
+		return newErrorResponse(r.AttributeOpcode(), 0x0000, bt.ErrInvalidPDU)
 	}
 
 	txMTU := int(r.ClientRxMTU())
@@ -224,9 +224,9 @@ func (s *Server) handleFindInformationRequest(r FindInformationRequest) []byte {
 	// Validate the request.
 	switch {
 	case len(r) != 5:
-		return NewErrorResponse(r.AttributeOpcode(), 0x0000, bt.ErrInvalidPDU)
+		return newErrorResponse(r.AttributeOpcode(), 0x0000, bt.ErrInvalidPDU)
 	case r.StartingHandle() == 0 || r.StartingHandle() > r.EndingHandle():
-		return NewErrorResponse(r.AttributeOpcode(), r.StartingHandle(), bt.ErrInvalidHandle)
+		return newErrorResponse(r.AttributeOpcode(), r.StartingHandle(), bt.ErrInvalidHandle)
 	}
 
 	rsp := FindInformationResponse(s.txBuf)
@@ -258,7 +258,7 @@ func (s *Server) handleFindInformationRequest(r FindInformationRequest) []byte {
 
 	// Nothing has been found.
 	if rsp.Format() == 0 {
-		return NewErrorResponse(r.AttributeOpcode(), r.StartingHandle(), bt.ErrAttrNotFound)
+		return newErrorResponse(r.AttributeOpcode(), r.StartingHandle(), bt.ErrAttrNotFound)
 	}
 	return rsp[:2+buf.Len()]
 }
@@ -268,9 +268,9 @@ func (s *Server) handleFindByTypeValueRequest(r FindByTypeValueRequest) []byte {
 	// Validate the request.
 	switch {
 	case len(r) < 7:
-		return NewErrorResponse(r.AttributeOpcode(), 0x0000, bt.ErrInvalidPDU)
+		return newErrorResponse(r.AttributeOpcode(), 0x0000, bt.ErrInvalidPDU)
 	case r.StartingHandle() == 0 || r.StartingHandle() > r.EndingHandle():
-		return NewErrorResponse(r.AttributeOpcode(), r.StartingHandle(), bt.ErrInvalidHandle)
+		return newErrorResponse(r.AttributeOpcode(), r.StartingHandle(), bt.ErrInvalidHandle)
 	}
 
 	rsp := FindByTypeValueResponse(s.txBuf)
@@ -287,7 +287,7 @@ func (s *Server) handleFindByTypeValueRequest(r FindByTypeValueRequest) []byte {
 			buf2 := bytes.NewBuffer(make([]byte, 0, len(s.txBuf)-7+1))
 			e := a.HandleATT(s.l2c, r, &ResponseWriter{svr: s, buf: buf2})
 			if e != bt.ErrSuccess || buf2.Len() > len(s.txBuf)-7 {
-				return NewErrorResponse(r.AttributeOpcode(), r.StartingHandle(), bt.ErrInvalidHandle)
+				return newErrorResponse(r.AttributeOpcode(), r.StartingHandle(), bt.ErrInvalidHandle)
 			}
 			endh = a.Handle()
 		}
@@ -301,7 +301,7 @@ func (s *Server) handleFindByTypeValueRequest(r FindByTypeValueRequest) []byte {
 		binary.Write(buf, binary.LittleEndian, endh)
 	}
 	if buf.Len() == 0 {
-		return NewErrorResponse(r.AttributeOpcode(), r.StartingHandle(), bt.ErrAttrNotFound)
+		return newErrorResponse(r.AttributeOpcode(), r.StartingHandle(), bt.ErrAttrNotFound)
 	}
 
 	return rsp[:1+buf.Len()]
@@ -312,9 +312,9 @@ func (s *Server) handleReadByTypeRequest(r ReadByTypeRequest) []byte {
 	// Validate the request.
 	switch {
 	case len(r) != 7 && len(r) != 21:
-		return NewErrorResponse(r.AttributeOpcode(), 0x0000, bt.ErrInvalidPDU)
+		return newErrorResponse(r.AttributeOpcode(), 0x0000, bt.ErrInvalidPDU)
 	case r.StartingHandle() == 0 || r.StartingHandle() > r.EndingHandle():
-		return NewErrorResponse(r.AttributeOpcode(), r.StartingHandle(), bt.ErrInvalidHandle)
+		return newErrorResponse(r.AttributeOpcode(), r.StartingHandle(), bt.ErrInvalidHandle)
 	}
 
 	rsp := ReadByTypeResponse(s.txBuf)
@@ -335,7 +335,7 @@ func (s *Server) handleReadByTypeRequest(r ReadByTypeRequest) []byte {
 			if e := a.HandleATT(s.l2c, r, &ResponseWriter{svr: s, buf: buf2}); e != bt.ErrSuccess {
 				// Return if the first value read cause an error.
 				if dlen == 0 {
-					return NewErrorResponse(r.AttributeOpcode(), r.StartingHandle(), e)
+					return newErrorResponse(r.AttributeOpcode(), r.StartingHandle(), e)
 				}
 				// Otherwise, skip to the next one.
 				break
@@ -359,7 +359,7 @@ func (s *Server) handleReadByTypeRequest(r ReadByTypeRequest) []byte {
 		binary.Write(buf, binary.LittleEndian, v[:dlen-2])
 	}
 	if dlen == 0 {
-		return NewErrorResponse(r.AttributeOpcode(), r.StartingHandle(), bt.ErrAttrNotFound)
+		return newErrorResponse(r.AttributeOpcode(), r.StartingHandle(), bt.ErrAttrNotFound)
 	}
 	return rsp[:2+buf.Len()]
 }
@@ -369,7 +369,7 @@ func (s *Server) handleReadRequest(r ReadRequest) []byte {
 	// Validate the request.
 	switch {
 	case len(r) != 3:
-		return NewErrorResponse(r.AttributeOpcode(), 0x0000, bt.ErrInvalidPDU)
+		return newErrorResponse(r.AttributeOpcode(), 0x0000, bt.ErrInvalidPDU)
 	}
 
 	rsp := ReadResponse(s.txBuf)
@@ -379,7 +379,7 @@ func (s *Server) handleReadRequest(r ReadRequest) []byte {
 
 	a, ok := s.attrs.at(r.AttributeHandle())
 	if !ok {
-		return NewErrorResponse(r.AttributeOpcode(), r.AttributeHandle(), bt.ErrInvalidHandle)
+		return newErrorResponse(r.AttributeOpcode(), r.AttributeHandle(), bt.ErrInvalidHandle)
 	}
 
 	// Simple case. Read-only, no-authorization, no-authentication.
@@ -391,7 +391,7 @@ func (s *Server) handleReadRequest(r ReadRequest) []byte {
 	// Pass the request to upper layer with the ResponseWriter, which caps
 	// the buffer to a valid length of payload.
 	if e := a.HandleATT(s.l2c, r, &ResponseWriter{svr: s, buf: buf}); e != bt.ErrSuccess {
-		return NewErrorResponse(r.AttributeOpcode(), r.AttributeHandle(), e)
+		return newErrorResponse(r.AttributeOpcode(), r.AttributeHandle(), e)
 	}
 	return rsp[:1+buf.Len()]
 }
@@ -401,12 +401,12 @@ func (s *Server) handleReadBlobRequest(r ReadBlobRequest) []byte {
 	// Validate the request.
 	switch {
 	case len(r) != 5:
-		return NewErrorResponse(r.AttributeOpcode(), 0x0000, bt.ErrInvalidPDU)
+		return newErrorResponse(r.AttributeOpcode(), 0x0000, bt.ErrInvalidPDU)
 	}
 
 	a, ok := s.attrs.at(r.AttributeHandle())
 	if !ok {
-		return NewErrorResponse(r.AttributeOpcode(), r.AttributeHandle(), bt.ErrInvalidHandle)
+		return newErrorResponse(r.AttributeOpcode(), r.AttributeHandle(), bt.ErrInvalidHandle)
 	}
 
 	rsp := ReadBlobResponse(s.txBuf)
@@ -423,7 +423,7 @@ func (s *Server) handleReadBlobRequest(r ReadBlobRequest) []byte {
 	// Pass the request to upper layer with the ResponseWriter, which caps
 	// the buffer to a valid length of payload.
 	if e := a.HandleATT(s.l2c, r, &ResponseWriter{svr: s, buf: buf}); e != bt.ErrSuccess {
-		return NewErrorResponse(r.AttributeOpcode(), r.AttributeHandle(), e)
+		return newErrorResponse(r.AttributeOpcode(), r.AttributeHandle(), e)
 	}
 	return rsp[:1+buf.Len()]
 }
@@ -433,9 +433,9 @@ func (s *Server) handleReadByGroupRequest(r ReadByGroupTypeRequest) []byte {
 	// Validate the request.
 	switch {
 	case len(r) != 7 && len(r) != 21:
-		return NewErrorResponse(r.AttributeOpcode(), 0x0000, bt.ErrInvalidPDU)
+		return newErrorResponse(r.AttributeOpcode(), 0x0000, bt.ErrInvalidPDU)
 	case r.StartingHandle() == 0 || r.StartingHandle() > r.EndingHandle():
-		return NewErrorResponse(r.AttributeOpcode(), r.StartingHandle(), bt.ErrInvalidHandle)
+		return newErrorResponse(r.AttributeOpcode(), r.StartingHandle(), bt.ErrInvalidHandle)
 	}
 
 	rsp := ReadByGroupTypeResponse(s.txBuf)
@@ -449,7 +449,7 @@ func (s *Server) handleReadByGroupRequest(r ReadByGroupTypeRequest) []byte {
 		if v == nil {
 			buf2 := bytes.NewBuffer(make([]byte, buf.Cap()-buf.Len()-4))
 			if e := a.HandleATT(s.l2c, r, &ResponseWriter{svr: s, buf: buf2}); e != bt.ErrSuccess {
-				return NewErrorResponse(r.AttributeOpcode(), r.StartingHandle(), e)
+				return newErrorResponse(r.AttributeOpcode(), r.StartingHandle(), e)
 			}
 			v = buf2.Bytes()
 		}
@@ -470,7 +470,7 @@ func (s *Server) handleReadByGroupRequest(r ReadByGroupTypeRequest) []byte {
 		binary.Write(buf, binary.LittleEndian, v[:dlen-4])
 	}
 	if dlen == 0 {
-		return NewErrorResponse(r.AttributeOpcode(), r.StartingHandle(), bt.ErrAttrNotFound)
+		return newErrorResponse(r.AttributeOpcode(), r.StartingHandle(), bt.ErrAttrNotFound)
 	}
 	return rsp[:2+buf.Len()]
 }
@@ -480,20 +480,20 @@ func (s *Server) handleWriteRequest(r WriteRequest) []byte {
 	// Validate the request.
 	switch {
 	case len(r) < 3:
-		return NewErrorResponse(r.AttributeOpcode(), 0x0000, bt.ErrInvalidPDU)
+		return newErrorResponse(r.AttributeOpcode(), 0x0000, bt.ErrInvalidPDU)
 	}
 
 	a, ok := s.attrs.at(r.AttributeHandle())
 	if !ok {
-		return NewErrorResponse(r.AttributeOpcode(), r.AttributeHandle(), bt.ErrInvalidHandle)
+		return newErrorResponse(r.AttributeOpcode(), r.AttributeHandle(), bt.ErrInvalidHandle)
 	}
 
 	// We don't support write to static value. Pass the request to upper layer.
 	if a == nil {
-		return NewErrorResponse(r.AttributeOpcode(), r.AttributeHandle(), bt.ErrWriteNotPerm)
+		return newErrorResponse(r.AttributeOpcode(), r.AttributeHandle(), bt.ErrWriteNotPerm)
 	}
 	if e := a.HandleATT(s.l2c, r, &ResponseWriter{svr: s}); e != bt.ErrSuccess {
-		return NewErrorResponse(r.AttributeOpcode(), r.AttributeHandle(), e)
+		return newErrorResponse(r.AttributeOpcode(), r.AttributeHandle(), e)
 	}
 	return []byte{WriteResponseCode}
 }
@@ -519,4 +519,13 @@ func (s *Server) handleWriteCommand(r WriteCommand) []byte {
 		return nil
 	}
 	return nil
+}
+
+func newErrorResponse(op byte, h uint16, s bt.AttError) []byte {
+	r := ErrorResponse(make([]byte, 5))
+	r.SetAttributeOpcode()
+	r.SetRequestOpcodeInError(op)
+	r.SetAttributeInError(h)
+	r.SetErrorCode(uint8(s))
+	return r
 }
