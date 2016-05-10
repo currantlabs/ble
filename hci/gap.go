@@ -2,7 +2,6 @@ package hci
 
 import (
 	"fmt"
-	"log"
 	"net"
 	"sync"
 	"time"
@@ -10,8 +9,11 @@ import (
 	"github.com/currantlabs/bt"
 	"github.com/currantlabs/bt/adv"
 	"github.com/currantlabs/bt/hci/cmd"
+	"github.com/mgutz/logxi/v1"
 	"github.com/pkg/errors"
 )
+
+var logger = log.New("state")
 
 // ScanParams implements LE Set Scan Parameters (0x08|0x000B) [Vol 2, Part E, 7.8.10]
 type ScanParams struct {
@@ -324,9 +326,9 @@ func (s *states) send(c Command) error {
 
 func (s *states) handle(n nextState) {
 	s.err = nil
-	log.Printf("state: %s +", n.s)
+	logger.Info(string(n.s) + " +")
 	defer func() {
-		log.Printf("state: %s -", n.s)
+		logger.Info(string(n.s) + " -")
 		n.done <- s.err
 	}()
 	switch n.s {
@@ -342,7 +344,7 @@ func (s *states) handle(n nextState) {
 			s.isScanning = true
 		}
 		if s.err == ErrDisallowed {
-			log.Printf("scan: over maximum connections.")
+			logger.Info("scan: over maximum connections.")
 			s.err = nil
 		}
 	case StopScanning:
@@ -434,7 +436,7 @@ func (s *states) handle(n nextState) {
 		s.isListening = true
 		if s.send(&s.advEnable) == ErrDisallowed {
 			s.err = nil
-			log.Printf("listen: over maximum connections.")
+			logger.Info("listen: over maximum connections.")
 		}
 	case CentralConnected:
 		s.isListening = false
@@ -443,10 +445,10 @@ func (s *states) handle(n nextState) {
 			return
 		}
 		if s.send(&s.advEnable) == nil {
-			log.Printf("listen: under maximum connections.")
+			logger.Info("listen: under maximum connections.")
 		} else if s.err == ErrDisallowed {
 			s.err = nil
-			log.Printf("listen: over maximum connections.")
+			logger.Info("listen: over maximum connections.")
 		}
 	case StopListening:
 		s.isListening = false
