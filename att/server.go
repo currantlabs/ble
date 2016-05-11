@@ -354,6 +354,8 @@ func (s *Server) handleReadByTypeRequest(r ReadByTypeRequest) []byte {
 			rsp.SetLength(uint8(dlen))
 		} else if 2+len(v) != dlen {
 			break
+		} else if buf.Len()+dlen > buf.Cap() {
+			break
 		}
 		binary.Write(buf, binary.LittleEndian, a.Handle())
 		binary.Write(buf, binary.LittleEndian, v[:dlen-2])
@@ -463,6 +465,8 @@ func (s *Server) handleReadByGroupRequest(r ReadByGroupTypeRequest) []byte {
 			}
 			rsp.SetLength(uint8(dlen))
 		} else if 4+len(v) != dlen {
+			break
+		} else if buf.Len()+dlen > buf.Cap() {
 			break
 		}
 		binary.Write(buf, binary.LittleEndian, a.Handle())
