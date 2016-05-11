@@ -60,7 +60,13 @@ func (h *HCI) SetAdvHandler(af bt.AdvFilter, ah bt.AdvHandler) error {
 }
 
 // Scan starts scanning.
-func (h *HCI) Scan() error {
+func (h *HCI) Scan(allowDup bool) error {
+	h.states.Lock()
+	h.states.scanEnable.FilterDuplicates = 1
+	if allowDup {
+		h.states.scanEnable.FilterDuplicates = 0
+	}
+	h.states.Unlock()
 	return h.states.set(Scanning)
 }
 

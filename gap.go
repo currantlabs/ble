@@ -29,8 +29,8 @@ type Observer interface {
 	// SetAdvHandler ...
 	SetAdvHandler(af AdvFilter, ah AdvHandler) error
 
-	// Scan starts scanning.
-	Scan() error
+	// Scan starts scanning. Duplicated advertisements will be filtered out if allowDup is set to false.
+	Scan(allowDup bool) error
 
 	// StopScanning stops scanning.
 	StopScanning() error
