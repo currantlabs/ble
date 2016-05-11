@@ -6,14 +6,24 @@ func (e CommandComplete) NumHCICommandPackets() uint8 { return e[0] }
 func (e CommandComplete) CommandOpcode() uint16       { return binary.LittleEndian.Uint16(e[1:]) }
 func (e CommandComplete) ReturnParameters() []byte    { return e[3:] }
 
+// Per-spec [Vol 2, Part E, 7.7.19], the packet structure should be:
+//
+//     NumOfHandle, HandleA, HandleB, CompPktNumA, CompPktNumB
+//
+// But we got the actual packet from BCM20702A1 with the following structure instead.
+//
+//     NumOfHandle, HandleA, CompPktNumA, HandleB, CompPktNumB
+//              02,   40 00,       01 00,   41 00,       01 00
+
 func (e NumberOfCompletedPackets) NumberOfHandles() uint8 { return e[0] }
 func (e NumberOfCompletedPackets) ConnectionHandle(i int) uint16 {
-	return binary.LittleEndian.Uint16(e[1+i*2:])
+	// return binary.LittleEndian.Uint16(e[1+i*2:])
+	return binary.LittleEndian.Uint16(e[1+i*4:])
 }
 func (e NumberOfCompletedPackets) HCNumOfCompletedPackets(i int) uint16 {
-	return binary.LittleEndian.Uint16(e[1+int(e.NumberOfHandles())*2:])
+	// return binary.LittleEndian.Uint16(e[1+int(e.NumberOfHandles())*2:])
+	return binary.LittleEndian.Uint16(e[1+i*4+2:])
 }
-
 func (e LEAdvertisingReport) SubeventCode() uint8     { return e[0] }
 func (e LEAdvertisingReport) NumReports() uint8       { return e[1] }
 func (e LEAdvertisingReport) EventType(i int) uint8   { return e[2+i] }
