@@ -327,7 +327,7 @@ func (s *states) handle(n nextState) {
 	log.Printf("state: %s +", n.s)
 	defer func() {
 		log.Printf("state: %s -", n.s)
-		n.done <- errors.Wrapf(s.err, "state: %s", n.s)
+		n.done <- s.err
 	}()
 	switch n.s {
 	case Scanning:
@@ -335,7 +335,7 @@ func (s *states) handle(n nextState) {
 			return
 		}
 		if s.isDialing {
-			s.err = errors.Wrapf(ErrBusyScanning, "scan:")
+			s.err = errors.Wrapf(ErrBusyScanning, "scan")
 		}
 		if s.send(&s.scanEnable) == nil {
 			s.isScanning = true
@@ -363,7 +363,7 @@ func (s *states) handle(n nextState) {
 			return
 		}
 		if s.isListening {
-			s.err = errors.Wrapf(ErrBusyListening, "advertise:")
+			s.err = errors.Wrapf(ErrBusyListening, "advertise")
 			return
 		}
 		if s.send(&s.advEnable) == nil {
@@ -387,11 +387,11 @@ func (s *states) handle(n nextState) {
 		}
 	case Dialing:
 		if s.isScanning {
-			s.err = errors.Wrapf(ErrBusyScanning, "dial:")
+			s.err = errors.Wrapf(ErrBusyScanning, "dial")
 			return
 		}
 		if s.isDialing {
-			s.err = errors.Wrapf(ErrBusyDialing, "dial:")
+			s.err = errors.Wrapf(ErrBusyDialing, "dial")
 			return
 		}
 		s.send(&s.connParams)
@@ -423,11 +423,11 @@ func (s *states) handle(n nextState) {
 		}
 	case Listening:
 		if s.isListening {
-			s.err = errors.Wrapf(ErrBusyListening, "listen:")
+			s.err = errors.Wrapf(ErrBusyListening, "listen")
 			return
 		}
 		if s.isAdvertising {
-			s.err = errors.Wrapf(ErrBusyAdvertising, "listen:")
+			s.err = errors.Wrapf(ErrBusyAdvertising, "listen")
 			return
 		}
 		s.isListening = true
