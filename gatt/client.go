@@ -14,9 +14,9 @@ import (
 func NewClient(l2c bt.Conn) *Client {
 	h := newNHandler()
 	p := &Client{
-		addr:    l2c.RemoteAddr().(net.HardwareAddr),
 		handler: h,
 		c:       att.NewClient(l2c, h),
+		l2c:     l2c,
 	}
 	go p.c.Loop()
 	return p
@@ -27,14 +27,14 @@ type Client struct {
 	svcs []bt.Service
 
 	name string
-	addr net.HardwareAddr
 
 	handler *nHandlers
 	c       *att.Client
+	l2c     bt.Conn
 }
 
 // Address ...
-func (p *Client) Address() bt.Addr { return p.addr }
+func (p *Client) Address() bt.Addr { return p.l2c.RemoteAddr().(net.HardwareAddr) }
 
 // Name ...
 func (p *Client) Name() string { return p.name }
@@ -242,6 +242,11 @@ func (p *Client) ClearSubscriptions() error {
 		}
 	}
 	return nil
+}
+
+// CancelConnection disconnects the connection.
+func (p *Client) CancelConnection() error {
+	return p.l2c.Close()
 }
 
 type nHandlers struct {

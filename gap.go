@@ -8,13 +8,13 @@ import (
 
 // A Broadcaster is a device that sends advertising events.
 type Broadcaster interface {
-	// SetAdvertisement ...
+	// SetAdvertisement sets advertising data and scan response.
 	SetAdvertisement(ad []byte, sr []byte) error
 
-	// Advertise ...
+	// Advertise starts advertising.
 	Advertise() error
 
-	// StopAdvertising ...
+	// StopAdvertising stops advertising.
 	StopAdvertising() error
 }
 
@@ -24,9 +24,9 @@ type Peripheral interface {
 	Listener
 }
 
-// Observer a device that receives advertising events.
+// An Observer is a device that receives advertising events.
 type Observer interface {
-	// SetAdvHandler ...
+	// SetAdvHandler sets filter, handler.
 	SetAdvHandler(af AdvFilter, ah AdvHandler) error
 
 	// Scan starts scanning. Duplicated advertisements will be filtered out if allowDup is set to false.
@@ -47,7 +47,7 @@ type Addr interface {
 	String() string
 }
 
-// A Listener is a le for L2CAP protocol.
+// A Listener is a listener for L2CAP protocol.
 type Listener interface {
 	// Accept starts advertising and accepts connection.
 	Accept() (Conn, error)
@@ -56,7 +56,7 @@ type Listener interface {
 	// Any blocked Accept operations will be unblocked and return errors.
 	Close() error
 
-	// Addr returns the listener's network address.
+	// Addr returns the listener's device address.
 	Addr() Addr
 }
 
@@ -75,10 +75,10 @@ type Conn interface {
 	// SetContext sets the context that is used by this Conn.
 	SetContext(ctx context.Context)
 
-	// LocalAddr returns local device's MAC address.
+	// LocalAddr returns local device's address.
 	LocalAddr() Addr
 
-	// RemoteAddr returns remote device's MAC address.
+	// RemoteAddr returns remote device's address.
 	RemoteAddr() Addr
 
 	// RxMTU returns the ATT_MTU which the local device is capable of accepting.

@@ -61,6 +61,9 @@ type Client interface {
 
 	// ClearSubscriptions clears all subscriptions of notification and indication.
 	ClearSubscriptions() error
+
+	// CancelConnection disconnects the connection.
+	CancelConnection() error
 }
 
 // A Server is a GATT server.
