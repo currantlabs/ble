@@ -249,6 +249,7 @@ func (s *Server) handleFindInformationRequest(r FindInformationRequest) []byte {
 		if rsp.Format() == 0x02 && a.Type().Len() != 16 {
 			break
 		}
+
 		if buf.Len()+2+a.Type().Len() > buf.Cap() {
 			break
 		}
@@ -294,6 +295,7 @@ func (s *Server) handleFindByTypeValueRequest(r FindByTypeValueRequest) []byte {
 		if !(uuid.UUID(v).Equal(uuid.UUID(r.AttributeValue()))) {
 			continue
 		}
+
 		if buf.Len()+4 > buf.Cap() {
 			break
 		}
@@ -354,7 +356,9 @@ func (s *Server) handleReadByTypeRequest(r ReadByTypeRequest) []byte {
 			rsp.SetLength(uint8(dlen))
 		} else if 2+len(v) != dlen {
 			break
-		} else if buf.Len()+dlen > buf.Cap() {
+		}
+
+		if buf.Len()+dlen > buf.Cap() {
 			break
 		}
 		binary.Write(buf, binary.LittleEndian, a.Handle())
@@ -466,7 +470,9 @@ func (s *Server) handleReadByGroupRequest(r ReadByGroupTypeRequest) []byte {
 			rsp.SetLength(uint8(dlen))
 		} else if 4+len(v) != dlen {
 			break
-		} else if buf.Len()+dlen > buf.Cap() {
+		}
+
+		if buf.Len()+dlen > buf.Cap() {
 			break
 		}
 		binary.Write(buf, binary.LittleEndian, a.Handle())
