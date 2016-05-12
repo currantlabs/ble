@@ -1,4 +1,4 @@
-package service
+package lib
 
 import (
 	"github.com/currantlabs/bt"

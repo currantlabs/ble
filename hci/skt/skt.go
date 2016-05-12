@@ -138,7 +138,7 @@ func open(fd, n int) (*skt, error) {
 
 	sa := unix.SockaddrHCI{Dev: uint16(n), Channel: unix.HCI_CHANNEL_USER}
 	if err := unix.Bind(fd, &sa); err != nil {
-		log.Printf("dev: %s can't bind to hci user channel, err: %s.", name, err)
+		log.Printf("dev: %s can't bind to hci user channel: %s.", name, err)
 		return nil, err
 	}
 	return &skt{

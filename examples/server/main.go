@@ -4,38 +4,39 @@ import (
 	"log"
 
 	"github.com/currantlabs/bt/adv"
-	"github.com/currantlabs/bt/examples/service"
+	"github.com/currantlabs/bt/examples/lib"
 	"github.com/currantlabs/bt/gatt"
 	"github.com/currantlabs/bt/hci"
 )
 
 func main() {
-	s := gatt.NewServer()
-	s.AddService(service.NewGapService("Gopher"))
-	s.AddService(service.NewGattService())
+	svr := gatt.NewServer()
+	svr.AddService(lib.NewGapService("Gopher"))
+	svr.AddService(lib.NewGattService())
 
-	// A simple count service for demo.
-	s1 := s.AddService(service.NewCountService())
+	testSvc := svr.AddService(gatt.NewService(lib.TestSvcUUID))
+	testSvc.AddCharacteristic(lib.NewCountChar())
+	testSvc.AddCharacteristic(lib.NewEchoChar())
 
-	// A fake battery service for demo.
-	s2 := s.AddService(service.NewBatteryService())
+	batSvc := svr.AddService(lib.NewBatteryService())
 
-	// Crafting the advertising data packet
+	// Crafting advertising data and response data packets.
 	ad := adv.Packet(nil).AppendFlags(adv.FlagGeneralDiscoverable | adv.FlagLEOnly)
-	ad = ad.AppendAllUUID(s1.UUID()).AppendAllUUID(s2.UUID())
-
+	ad = ad.AppendAllUUID(testSvc.UUID()).AppendAllUUID(batSvc.UUID())
 	sr := adv.Packet(nil).AppendCompleteName("Gopher")
 
-	h := &hci.HCI{}
-	if err := h.Init(-1); err != nil {
-		log.Fatalf("Failed to open HCI device, err: %s\n", err)
+	// hci.HCI implements bt.Peripheral.
+	dev := new(hci.HCI)
+	if err := dev.Init(-1); err != nil {
+		log.Fatalf("can't open HCI device: %svr\n", err)
 	}
 
-	if err := h.SetAdvertisement(ad, sr); err != nil {
+	if err := dev.SetAdvertisement(ad, sr); err != nil {
 		log.Fatalf("can't set advertisement: %s", err)
 	}
 
-	if err := s.Start(h); err != nil {
+	// Attach and starts the GATT server to the Peripheral device.
+	if err := svr.Start(dev); err != nil {
 		log.Fatalf("can't start gatt server: %s", err)
 	}
 

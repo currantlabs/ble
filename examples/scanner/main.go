@@ -18,8 +18,8 @@ func filter(a bt.Advertisement) bool {
 	return false
 }
 
-func discovered(a bt.Advertisement) {
-	// Show event level info, and raw data.
+func handle(a bt.Advertisement) {
+	// Show event info, and raw data.
 	fmt.Printf("%s: EvtType %d, AddrType %d, RSSI %d, Data [%X]\n",
 		a.Address(), a.EventType(), a.AddressType(), a.RSSI(), a.Data())
 
@@ -29,16 +29,14 @@ func discovered(a bt.Advertisement) {
 }
 
 func main() {
-	h := &hci.HCI{}
-	if err := h.Init(-1); err != nil {
-		log.Fatalf("can't open HCI device, err: %s\n", err)
+	// hci.HCI implements bt.Scanner.
+	dev := new(hci.HCI)
+	if err := dev.Init(-1); err != nil {
+		log.Fatalf("can't open HCI device: %s\n", err)
 	}
 
-	if err := h.SetAdvHandler(bt.AdvFilterFunc(filter), bt.AdvHandlerFunc(discovered)); err != nil {
-		log.Fatalf("can't set adv handler: %s", err)
-	}
-
-	if err := h.SetScanParams(hci.ScanParams{
+	// Overwrite default scanning parameters (optional).
+	if err := dev.SetScanParams(hci.ScanParams{
 		LEScanType:           0x01,   // 0x00: passive, 0x01: active
 		LEScanInterval:       0x0004, // 0x0004 - 0x4000; N * 0.625msec
 		LEScanWindow:         0x0004, // 0x0004 - 0x4000; N * 0.625msec
@@ -48,7 +46,11 @@ func main() {
 		log.Fatalf("can't set scan params: %s", err)
 	}
 
-	if err := h.Scan(); err != nil {
+	if err := dev.SetAdvHandler(bt.AdvFilterFunc(filter), bt.AdvHandlerFunc(handle)); err != nil {
+		log.Fatalf("can't set adv handler: %s", err)
+	}
+
+	if err := dev.Scan(false); err != nil {
 		log.Fatalf("can't scan: %s", err)
 	}
 
