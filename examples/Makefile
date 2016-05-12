@@ -1,4 +1,5 @@
-PROGS ?= $(notdir $(shell go list ./...))
+# PROGS ?= $(notdir $(shell go list ./...))
+PROGS ?= $(filter-out bin Makefile,$(shell ls))
 
 .PHONY: $(PROGS)
 
@@ -12,9 +13,7 @@ BUILDDATE	?= $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 LDFLAGS		?= -ldflags="-w -X $(BUILDDATESYM)=$(BUILDDATE) -X $(GITSYM)=$(GITHEAD)"
 
-BUILDCMD ?= go
-
-all: prepare $(PROGS)
+all: $(PROGS)
 
 list:
 	$(Q) echo $(PROGS)
@@ -22,12 +21,14 @@ list:
 prepare:
 	$(Q) mkdir -p bin
 
-run-%:
-	sudo LOGXI=${LOGXI} go run $(patsubst run-%,%,$@)/*.go
+run-%: bin/%
+	$(Q) echo Running prebuilt bin/$@ ...
+	sudo LOGXI=${LOGXI} $<
 
 $(PROGS):
 	$(Q) echo Building bin/$@ ...
-	$(Q) GOGC=off GOOS=linux $(BUILDCMD) build  $(LDFLAGS) -o bin/$@ $@/*
+	$(Q) GOGC=off GOOS=linux go build  $(LDFLAGS) -o bin/$@ $@/*.go
+	sudo LOGXI=${LOGXI} bin/$@
 
 clean:
 	$(Q) rm -rf bin
