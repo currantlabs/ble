@@ -72,6 +72,10 @@ func newCCCD(c *char) *desc {
 
 		newCCC := binary.LittleEndian.Uint16(req.Data())
 		if newCCC&cccNotify != 0 && ccc&cccNotify == 0 {
+			if c.props&bt.CharNotify == 0 {
+				rsp.SetStatus(bt.ErrUnlikely)
+				return
+			}
 			send := func(b []byte) (int, error) { return rsp.Notify(false, c.attr.vh, b) }
 			nn = newNotifier(send)
 			go c.nh.ServeNotify(req, nn)
@@ -80,6 +84,10 @@ func newCCCD(c *char) *desc {
 			nn.cancel()
 		}
 		if newCCC&cccIndicate != 0 && ccc&cccIndicate == 0 {
+			if c.props&bt.CharIndicate == 0 {
+				rsp.SetStatus(bt.ErrUnlikely)
+				return
+			}
 			send := func(b []byte) (int, error) { return rsp.Notify(true, c.attr.vh, b) }
 			in = newNotifier(send)
 			go c.ih.ServeNotify(req, in)
