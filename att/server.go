@@ -24,6 +24,8 @@ type Server struct {
 	chNotBuf  chan []byte
 	chIndBuf  chan []byte
 	chConfirm chan bool
+
+	dummyRspWriter ResponseWriter
 }
 
 // NewServer returns an ATT (Attribute Protocol) server.
@@ -525,7 +527,7 @@ func (s *Server) handleWriteCommand(r WriteCommand) []byte {
 	if a == nil {
 		return nil
 	}
-	if e := a.HandleATT(s.l2c, r, nil); e != bt.ErrSuccess {
+	if e := a.HandleATT(s.l2c, r, &s.dummyRspWriter); e != bt.ErrSuccess {
 		return nil
 	}
 	return nil

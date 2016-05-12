@@ -15,7 +15,7 @@ type Attribute interface {
 	EndingHandle() uint16
 	Type() uuid.UUID
 
-	HandleATT(conn bt.Conn, req []byte, resp *ResponseWriter) bt.AttError
+	HandleATT(conn bt.Conn, req []byte, resp bt.ResponseWriter) bt.AttError
 	Value() []byte
 }
 
@@ -86,7 +86,7 @@ func DumpAttributes(Attributes []Attribute) {
 	}
 }
 
-// ResponseWriter ...
+// ResponseWriter implements bt.Response
 type ResponseWriter struct {
 	svr    *Server
 	buf    *bytes.Buffer
@@ -104,14 +104,30 @@ func (r *ResponseWriter) Notify(ind bool, h uint16, data []byte) (int, error) {
 	return r.svr.Notify(ind, h, data)
 }
 
-// Len ...
-func (r *ResponseWriter) Len() int { return r.buf.Len() }
+// Len returns length of the buffer.
+// Len returns 0 if it is a dummy write response for WriteCommand.
+func (r *ResponseWriter) Len() int {
+	if r.buf == nil {
+		return 0
+	}
+	return r.buf.Len()
+}
 
-// Cap ...
-func (r *ResponseWriter) Cap() int { return r.buf.Cap() }
+// Cap returns capacity of the buffer.
+// Cap returns 0 if it is a dummy write response for WriteCommand.
+func (r *ResponseWriter) Cap() int {
+	if r.buf == nil {
+		return 0
+	}
+	return r.buf.Cap()
+}
 
 // Write writes data to return as the characteristic value.
+// Cap returns 0 with error set to bt.ErrReqNotSupp if it is a dummy write response for WriteCommand.
 func (r *ResponseWriter) Write(b []byte) (int, error) {
+	if r.buf == nil {
+		return 0, bt.ErrReqNotSupp
+	}
 	if len(b) > r.buf.Cap()-r.buf.Len() {
 		return 0, io.ErrShortWrite
 	}
