@@ -56,8 +56,11 @@ type HCI struct {
 
 	states states
 
-	advFilter  bt.AdvFilter
-	advHandler bt.AdvHandler
+	chEvt       chan []byte
+	chStartScan chan bool
+	chAdvEvt    chan []byte
+	advFilter   bt.AdvFilter
+	advHandler  bt.AdvHandler
 
 	// Host to Controller Data Flow Control Packet-based Data flow control for LE-U [Vol 2, Part E, 4.1.1]
 	// Minimum 27 bytes. 4 bytes of L2CAP Header, and 23 bytes Payload from upper layer (ATT)
@@ -86,10 +89,14 @@ func (h *HCI) Init(id int) error {
 
 	h.chCmdPkt = make(chan *pkt)
 	h.chCmdBufs = make(chan []byte, 8)
+	h.chCmdBufs <- make([]byte, 64)
 	h.sent = make(map[int]*pkt)
 
 	h.evth = map[int]handlerFn{}
 	h.subh = map[int]handlerFn{}
+
+	h.chEvt = make(chan []byte, 64)
+	h.chStartScan = make(chan bool)
 
 	h.done = make(chan bool)
 
@@ -116,8 +123,8 @@ func (h *HCI) Init(id int) error {
 	// evt.AuthenticatedPayloadTimeoutExpiredCode:   bt.todo),
 	// evt.LEReadRemoteUsedFeaturesCompleteSubCode:   bt.todo),
 	// evt.LERemoteConnectionParameterRequestSubCode: bt.todo),
-	go h.cmdLoop()
-	go h.mainLoop()
+	go h.asyncLoop()
+	go h.sktLoop()
 	h.init()
 	h.states.init(h)
 
@@ -175,10 +182,7 @@ func (h *HCI) init() error {
 	WriteLEHostSupportRP := cmd.WriteLEHostSupportRP{}
 	h.Send(&cmd.WriteLEHostSupport{LESupportedHost: 1, SimultaneousLEHost: 0}, &WriteLEHostSupportRP)
 
-	if h.err != nil {
-		return h.err
-	}
-	return nil
+	return h.err
 }
 
 // Send ...
@@ -198,10 +202,20 @@ func (h *HCI) send(c Command) ([]byte, error) {
 		return nil, h.err
 	}
 	p := &pkt{c, make(chan []byte)}
-	select {
-	case <-h.done:
-		return nil, h.err
-	case h.chCmdPkt <- p:
+	b := <-h.chCmdBufs
+	b[0] = byte(pktTypeCommand) // HCI header
+	b[1] = byte(c.OpCode())
+	b[2] = byte(c.OpCode() >> 8)
+	b[3] = byte(c.Len())
+	if err := c.Marshal(b[4:]); err != nil {
+		h.stop(fmt.Errorf("hci: failed to marshal cmd"))
+	}
+
+	h.sent[c.OpCode()] = p // TODO: lock
+	if n, err := h.skt.Write(b[:4+c.Len()]); err != nil {
+		h.stop(fmt.Errorf("hci: failed to send cmd"))
+	} else if n != 4+c.Len() {
+		h.stop(fmt.Errorf("hci: failed to send whole cmd pkt to hci socket"))
 	}
 
 	select {
@@ -212,35 +226,35 @@ func (h *HCI) send(c Command) ([]byte, error) {
 	}
 }
 
-func (h *HCI) cmdLoop() {
-	h.chCmdBufs <- make([]byte, 64)
+func (h *HCI) asyncLoop() {
 	for {
 		select {
 		case <-h.done:
 			return
-		case p := <-h.chCmdPkt:
-			b := <-h.chCmdBufs
-			c := p.cmd
-			b[0] = byte(pktTypeCommand) // HCI header
-			b[1] = byte(c.OpCode())
-			b[2] = byte(c.OpCode() >> 8)
-			b[3] = byte(c.Len())
-			if err := c.Marshal(b[4:]); err != nil {
-				h.stop(fmt.Errorf("hci: failed to marshal cmd"))
-				return
+		case b := <-h.chEvt:
+			code, plen := int(b[0]), int(b[1])
+			if plen != len(b[2:]) {
+				h.err = fmt.Errorf("hci: corrupt event packet: [ % X ]", b)
 			}
-
-			h.sent[c.OpCode()] = p // TODO: lock
-			if n, err := h.skt.Write(b[:4+c.Len()]); err != nil {
-				h.stop(fmt.Errorf("hci: failed to send cmd"))
-			} else if n != 4+c.Len() {
-				h.stop(fmt.Errorf("hci: failed to send whole cmd pkt to hci socket"))
+			if f := h.evth[code]; f != nil {
+				h.err = f(b[2:])
+			}
+			// err = fmt.Errorf("hci: unsupported event packet: [ % X ]", b)
+		case <-h.chStartScan:
+			h.chAdvEvt = make(chan []byte, 16)
+		case b := <-h.chAdvEvt:
+			e := evt.LEAdvertisingReport(b)
+			for i := 0; i < int(e.NumReports()); i++ {
+				a := bt.NewAdvertisement(e, i)
+				if h.advFilter != nil && h.advFilter.Filter(*a) {
+					h.advHandler.Handle(*a)
+				}
 			}
 		}
 	}
 }
 
-func (h *HCI) mainLoop() {
+func (h *HCI) sktLoop() {
 	b := make([]byte, 4096)
 	defer close(h.done)
 	for {
@@ -300,10 +314,13 @@ func (h *HCI) handleEvt(b []byte) error {
 	if plen != len(b[2:]) {
 		return fmt.Errorf("hci: corrupt event packet: [ % X ]", b)
 	}
-	if f := h.evth[code]; f != nil {
-		return f(b[2:])
+	if code == evt.CommandCompleteCode || code == evt.CommandStatusCode {
+		if f := h.evth[code]; f != nil {
+			return f(b[2:])
+		}
 	}
-	return fmt.Errorf("hci: unsupported event packet: [ % X ]", b)
+	h.chEvt <- b
+	return nil
 }
 
 func (h *HCI) handleLEMeta(b []byte) error {
@@ -318,12 +335,10 @@ func (h *HCI) handleLEAdvertisingReport(b []byte) error {
 	if h.advHandler == nil {
 		return nil
 	}
-	e := evt.LEAdvertisingReport(b)
-	for i := 0; i < int(e.NumReports()); i++ {
-		a := bt.NewAdvertisement(e, i)
-		if h.advFilter != nil && h.advFilter.Filter(*a) {
-			go h.advHandler.Handle(*a)
-		}
+	select {
+	case h.chAdvEvt <- evt.LEAdvertisingReport(b):
+	default:
+		// discard the advertisement.
 	}
 	return nil
 }
@@ -336,6 +351,7 @@ func (h *HCI) handleCommandComplete(b []byte) error {
 
 	// NOP command, used for flow control purpose [Vol 2, Part E, 4.4]
 	if e.CommandOpcode() == 0x0000 {
+		h.chCmdBufs = make(chan []byte, 8)
 		return nil
 	}
 	p, found := h.sent[int(e.CommandOpcode())]
@@ -396,9 +412,9 @@ func (h *HCI) handleDisconnectionComplete(b []byte) error {
 	}
 	close(c.chInPkt)
 	if c.param.Role() == roleSlave {
-		go h.states.set(CentralDisconnected)
+		h.states.set(CentralDisconnected)
 	} else {
-		go h.states.set(PeripheralDisconnected)
+		h.states.set(PeripheralDisconnected)
 	}
 	// When a connection disconnects, all the sent packets and weren't acked yet
 	// will be recylecd. [Vol2, Part E 4.1.1]

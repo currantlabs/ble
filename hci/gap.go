@@ -337,6 +337,7 @@ func (s *states) handle(n nextState) {
 		if s.isDialing {
 			s.err = errors.Wrapf(ErrBusyScanning, "scan")
 		}
+		s.hci.chStartScan <- true
 		if s.send(&s.scanEnable) == nil {
 			s.isScanning = true
 		}
