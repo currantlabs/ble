@@ -1,9 +1,17 @@
 # PROGS ?= $(notdir $(shell go list ./...))
 PROGS ?= $(filter-out bin Makefile,$(shell ls))
 
-BUILD_CMD	?= GOGC=off GOOS=linux go build $(LDFLAGS) -i -o bin/$@ $@/*.go
+GOOS		?= linux
+BUILD_CMD	?= GOGC=off GOOS=$(GOOS) go build $(LDFLAGS) -i -o bin/$@ $@/*.go
 DEPLOY_CMD	?= scp bin/$< gentoo:/tmp
 RUN_CMD		?= ssh -t gentoo sudo LOGXI=${LOGXI} /tmp/$<
+DEPLOY_CMD	=
+
+ifeq ($(shell uname),Linux)
+RUN_CMD		= sudo LOGXI=${LOGXI} bin/$<
+else
+RUN_CMD		= LOGXI=${LOGXI} bin/$<
+endif
 
 .PHONY: $(PROGS)
 

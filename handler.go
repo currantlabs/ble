@@ -1,6 +1,10 @@
 package bt
 
-import "golang.org/x/net/context"
+import (
+	"bytes"
+	"context"
+	"io"
+)
 
 // A ReadHandler handles GATT requests.
 type ReadHandler interface {
@@ -54,19 +58,68 @@ type ResponseWriter interface {
 	Write(b []byte) (int, error)
 
 	// Status reports the result of the request.
-	Status() AttError
+	Status() ATTError
 
 	// SetStatus reports the result of the request.
-	SetStatus(status AttError)
-
-	// Notify ...
-	Notify(ind bool, h uint16, data []byte) (int, error)
+	SetStatus(status ATTError)
 
 	// Len ...
 	Len() int
 
 	// Cap ...
 	Cap() int
+}
+
+// NewResponseWriter ...
+func NewResponseWriter(buf *bytes.Buffer) ResponseWriter {
+	return &responseWriter{buf: buf}
+}
+
+// responseWriter implements Response
+type responseWriter struct {
+	buf    *bytes.Buffer
+	status ATTError
+}
+
+// Status reports the result of the request.
+func (r *responseWriter) Status() ATTError {
+	return r.status
+}
+
+// SetStatus reports the result of the request.
+func (r *responseWriter) SetStatus(status ATTError) {
+	r.status = status
+}
+
+// Len returns length of the buffer.
+// Len returns 0 if it is a dummy write response for WriteCommand.
+func (r *responseWriter) Len() int {
+	if r.buf == nil {
+		return 0
+	}
+	return r.buf.Len()
+}
+
+// Cap returns capacity of the buffer.
+// Cap returns 0 if it is a dummy write response for WriteCommand.
+func (r *responseWriter) Cap() int {
+	if r.buf == nil {
+		return 0
+	}
+	return r.buf.Cap()
+}
+
+// Write writes data to return as the characteristic value.
+// Cap returns 0 with error set to ErrReqNotSupp if it is a dummy write response for WriteCommand.
+func (r *responseWriter) Write(b []byte) (int, error) {
+	if r.buf == nil {
+		return 0, ErrReqNotSupp
+	}
+	if len(b) > r.buf.Cap()-r.buf.Len() {
+		return 0, io.ErrShortWrite
+	}
+
+	return r.buf.Write(b)
 }
 
 // Notifier ...
@@ -77,6 +130,42 @@ type Notifier interface {
 	// Write sends data to the central.
 	Write(b []byte) (int, error)
 
+	// Close ...
+	Close() error
+
 	// Cap returns the maximum number of bytes that may be sent in a single notification.
 	Cap() int
+}
+
+type notifier struct {
+	ctx    context.Context
+	maxlen int
+	cancel func()
+	send   func([]byte) (int, error)
+}
+
+// NewNotifier ...
+func NewNotifier(send func([]byte) (int, error)) Notifier {
+	n := &notifier{}
+	n.ctx, n.cancel = context.WithCancel(context.Background())
+	n.send = send
+	// n.maxlen = cap
+	return n
+}
+
+func (n *notifier) Context() context.Context {
+	return n.ctx
+}
+
+func (n *notifier) Write(b []byte) (int, error) {
+	return n.send(b)
+}
+
+func (n *notifier) Close() error {
+	n.cancel()
+	return nil
+}
+
+func (n *notifier) Cap() int {
+	return n.maxlen
 }

@@ -6,13 +6,12 @@ import (
 	"time"
 
 	"github.com/currantlabs/bt"
-	"github.com/currantlabs/bt/gatt"
 )
 
 // NewCountChar ...
-func NewCountChar() bt.Characteristic {
+func NewCountChar() *bt.Characteristic {
 	n := 0
-	c := gatt.NewCharacteristic(CountCharUUID)
+	c := bt.NewCharacteristic(CountCharUUID)
 	c.HandleRead(bt.ReadHandlerFunc(func(req bt.Request, rsp bt.ResponseWriter) {
 		fmt.Fprintf(rsp, "count: Read %d", n)
 		log.Printf("count: Read %d", n)
@@ -43,7 +42,7 @@ func NewCountChar() bt.Characteristic {
 		}
 	}
 
-	c.HandleNotify(false, bt.NotifyHandlerFunc(f))
-	c.HandleNotify(true, bt.NotifyHandlerFunc(f))
+	c.HandleNotify(bt.NotifyHandlerFunc(f))
+	c.HandleIndicate(bt.NotifyHandlerFunc(f))
 	return c
 }

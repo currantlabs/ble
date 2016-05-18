@@ -9,7 +9,6 @@ import (
 
 	"github.com/currantlabs/bt"
 	"github.com/currantlabs/bt/examples/lib"
-	"github.com/currantlabs/bt/gatt"
 )
 
 const echoDataSize = 1024 * 16
@@ -26,10 +25,9 @@ func echo(a bt.Advertisement, cln bt.Client) {
 	// Synchronous transfer (write with response, echoed by indicattion)
 	ec.test(l, c, false, true)
 
-	time.Sleep(time.Second)
 	// Asynchronous transfer (write without response, echoed by notification)
 	ec.test(l, c, true, false)
-	time.Sleep(time.Second)
+	// ec.ClearSubscriptions()
 }
 
 type echoClient struct {
@@ -55,7 +53,7 @@ func (ec *echoClient) rxHandler(b []byte) {
 	ec.rx <- b
 }
 
-func (ec *echoClient) test(l *log.Logger, c bt.Characteristic, noRsp bool, ind bool) {
+func (ec *echoClient) test(l *log.Logger, c *bt.Characteristic, noRsp bool, ind bool) {
 	if err := ec.Subscribe(c, ind, ec.rxHandler); err != nil {
 		l.Printf("can't subscribe: %s", err)
 	}
@@ -71,8 +69,8 @@ func (ec *echoClient) test(l *log.Logger, c bt.Characteristic, noRsp bool, ind b
 					return
 				}
 				rx = rx[len(b):]
-				l.Printf("%d/%d\n", echoDataSize-len(rx), echoDataSize)
-			case <-time.After(time.Second * 3):
+				// l.Printf("%d/%d\n", echoDataSize-len(rx), echoDataSize)
+			case <-time.After(time.Second * 10):
 				ec.result <- false
 				l.Printf("timeout")
 				return
@@ -83,15 +81,16 @@ func (ec *echoClient) test(l *log.Logger, c bt.Characteristic, noRsp bool, ind b
 
 	tx := ec.data
 	for len(tx) > 0 {
-		n, err := ec.ExchangeMTU(gatt.MaxMTU)
+		n, err := ec.ExchangeMTU(bt.MaxMTU)
 		if err != nil {
 			return
 		}
+		n -= 3 // deduct 3 bytes of ATT header
 		if n > len(tx) {
 			n = len(tx)
 		}
 		if err := ec.WriteCharacteristic(c, tx[:n], noRsp); err != nil {
-			l.Printf("can'ec wtite char: %s", err)
+			l.Printf("can't wtite char: %s", err)
 		}
 		tx = tx[n:]
 	}

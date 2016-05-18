@@ -6,9 +6,7 @@ import (
 	"sync"
 
 	"github.com/currantlabs/bt"
-	"github.com/currantlabs/bt/adv"
-	"github.com/currantlabs/bt/gatt"
-	"github.com/currantlabs/bt/uuid"
+	"github.com/currantlabs/bt/dev"
 )
 
 // ClientHandler is invoked when a connection is established.
@@ -57,7 +55,7 @@ func (m *centralManager) HandleClient(h ClientHandler) {
 
 // Start starts the centralManager.
 func (m *centralManager) Start() error {
-	m.SetAdvHandler(bt.AdvFilterFunc(m.advFilter), bt.AdvHandlerFunc(m.advHandle))
+	m.SetAdvHandler(bt.AdvHandlerFunc(m.advHandle))
 	m.Scan(false)
 	go func() {
 		for {
@@ -107,12 +105,11 @@ func (m *centralManager) Stop() {
 }
 
 func newClient(l2c bt.Conn) (bt.Client, error) {
-	cln := gatt.NewClient(l2c)
-
-	txMTU, err := cln.ExchangeMTU(gatt.MaxMTU)
+	cln := dev.NewGATTClient(l2c)
+	txMTU, err := cln.ExchangeMTU(bt.MaxMTU)
 	if err != nil {
 		log.Printf("can't set MTU: %s\n", err)
-		return nil, err
+		// return nil, err
 	}
 
 	// Perform services/characteristics/descriptors discovery.
@@ -133,17 +130,13 @@ func (c centralManagerCilent) ExchangeMTU(rxMTU int) (int, error) {
 	return c.txMTU, nil
 }
 
-func (m *centralManager) advFilter(a bt.Advertisement) bool {
-	p := adv.Packet(append(a.Data(), a.ScanResponse()...))
-	if p.LocalName() != "Gopher" {
-		return false
-	}
-	m.visitedLock.RLock()
-	defer m.visitedLock.RUnlock()
-	return !m.visited[a.Address().String()]
-}
-
 func (m *centralManager) advHandle(a bt.Advertisement) {
+	if a.LocalName() != "Gopher" {
+		return
+	}
+	// m.visitedLock.RLock()
+	// defer m.visitedLock.RUnlock()
+	// return !m.visited[a.Address().String()]
 	select {
 	case m.chAdv <- a:
 	default:
@@ -161,7 +154,8 @@ func discover(cln bt.Client) error {
 			return fmt.Errorf("can't discover characteristics: %s\n", err)
 		}
 		for _, c := range cs {
-			if _, err := cln.DiscoverDescriptors(nil, c); err != nil {
+			_, err := cln.DiscoverDescriptors(nil, c)
+			if err != nil {
 				return fmt.Errorf("can't discover descriptors: %s\n", err)
 			}
 		}
@@ -169,10 +163,10 @@ func discover(cln bt.Client) error {
 	return nil
 }
 
-func findChar(cln bt.Client, u uuid.UUID) bt.Characteristic {
+func findChar(cln bt.Client, u bt.UUID) *bt.Characteristic {
 	for _, s := range cln.Services() {
-		for _, c := range s.Characteristics() {
-			if c.UUID().Equal(u) {
+		for _, c := range s.Characteristics {
+			if c.UUID.Equal(u) {
 				return c
 			}
 		}

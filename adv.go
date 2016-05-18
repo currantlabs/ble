@@ -1,20 +1,5 @@
 package bt
 
-import "net"
-
-// AdvFilter ...
-type AdvFilter interface {
-	Filter(a Advertisement) bool
-}
-
-// AdvFilterFunc ...
-type AdvFilterFunc func(a Advertisement) bool
-
-// Filter ...
-func (f AdvFilterFunc) Filter(a Advertisement) bool {
-	return f(a)
-}
-
 // AdvHandler ...
 type AdvHandler interface {
 	Handle(a Advertisement)
@@ -31,21 +16,21 @@ func (f AdvHandlerFunc) Handle(a Advertisement) {
 
 // Advertisement ...
 type Advertisement interface {
-	// EventType ...
-	EventType() uint8
+	LocalName() string
+	ManufacturerData() []byte
+	ServiceData() []ServiceData
+	Services() []UUID
+	OverflowService() []UUID
+	TxPowerLevel() int
+	Connectable() bool
+	SolicitedService() []UUID
 
-	// AddressType ...
-	AddressType() uint8
+	RSSI() int
+	Address() Addr
+}
 
-	// RSSI ...
-	RSSI() int8
-
-	// Address ...
-	Address() net.HardwareAddr
-
-	// Data ...
-	Data() []byte
-
-	// ScanResponse ...
-	ScanResponse() []byte
+// ServiceData ...
+type ServiceData struct {
+	UUID UUID
+	Data []byte
 }

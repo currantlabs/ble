@@ -1,6 +1,19 @@
 package bt
 
-import "github.com/currantlabs/bt/uuid"
+// NewService creates and initialize a new Service using u as it's UUID.
+func NewService(u UUID) *Service {
+	return &Service{UUID: u}
+}
+
+// NewDescriptor creates and returns a Descriptor.
+func NewDescriptor(u UUID) *Descriptor {
+	return &Descriptor{UUID: u}
+}
+
+// NewCharacteristic creates and returns a Characteristic.
+func NewCharacteristic(u UUID) *Characteristic {
+	return &Characteristic{UUID: u}
+}
 
 // Property ...
 type Property int
@@ -17,79 +30,155 @@ const (
 	CharExtended    Property = 0x80 // supports extended properties
 )
 
-// A Service is a GATT service.
-type Service interface {
-	// UUID returns the UUID of the service.
-	UUID() uuid.UUID
+// A Service is a BLE service.
+type Service struct {
+	UUID            UUID
+	Characteristics []*Characteristic
 
-	// Characteristics returns the contained characteristic of this service.
-	Characteristics() []Characteristic
-
-	// AddCharacteristic adds a characteristic to a service.
-	// AddCharacteristic panics if the service already contains another characteristic with the same UUID.
-	AddCharacteristic(c Characteristic) Characteristic
-
-	// NewCharacteristic adds a characteristic to a service.
-	// NewCharacteristic panics if the service already contains another characteristic with the same UUID.
-	NewCharacteristic(u uuid.UUID) Characteristic
+	Handle       uint16
+	EndHandle uint16
 }
 
-// A Characteristic is a GATT characteristic.
-type Characteristic interface {
-	// UUID returns the UUID of the characteristic.
-	UUID() uuid.UUID
-
-	// Properties returns the properties of this characteristic.
-	Properties() Property
-
-	// Descriptors returns the contained descriptors of this characteristic.
-	Descriptors() []Descriptor
-
-	// SetValue makes the characteristic support read requests, and returns a static value.
-	// SetValue panics if the characteristic has been configured with a ReadHandler.
-	// SetValue must be called before the containing service is added to a server.
-	SetValue(b []byte) Characteristic
-
-	// HandleRead makes the characteristic support read requests, and routes the requests to h.
-	// HandleRead panics if the characteristic has been configured with a static attr.
-	// HandleRead must be called before the containing service is added to a server.
-	HandleRead(h ReadHandler) Characteristic
-
-	// HandleWrite makes the characteristic support write and write-no-response requests, and routes the requests to h.
-	// The WriteHandler does not differentiate between write and write-no-response requests; it is handled automatically.
-	// HandleWrite must be called before the containing service is added to a server.
-	HandleWrite(h WriteHandler) Characteristic
-
-	// HandleNotify makes the characteristic support notify requests, and routes the requests to h.
-	// HandleNotify must be called before the containing service is added to a server.
-	HandleNotify(ind bool, h NotifyHandler) Characteristic
-
-	// AddDescriptor adds a descriptor to a characteristic.
-	// AddDescriptor panics if the characteristic already contains another descriptor with the same UUID.
-	AddDescriptor(d Descriptor) Descriptor
-
-	// NewDescriptor adds a descriptor to a characteristic.
-	// NewDescriptor panics if the characteristic already contains another descriptor with the same UUID.
-	NewDescriptor(u uuid.UUID) Descriptor
+// AddCharacteristic adds a characteristic to a service.
+// AddCharacteristic panics if the service already contains another characteristic with the same UUID.
+func (s *Service) AddCharacteristic(c *Characteristic) *Characteristic {
+	for _, x := range s.Characteristics {
+		if x.UUID.Equal(c.UUID) {
+			panic("service already contains a characteristic with UUID " + c.UUID.String())
+		}
+	}
+	s.Characteristics = append(s.Characteristics, c)
+	return c
 }
 
-// Descriptor is a GATT descriptor
-type Descriptor interface {
-	// UUID returns the UUID of the descriptor.
-	UUID() uuid.UUID
+// NewCharacteristic adds a characteristic to a service.
+// NewCharacteristic panics if the service already contains another characteristic with the same UUID.
+func (s *Service) NewCharacteristic(u UUID) *Characteristic {
+	return s.AddCharacteristic(&Characteristic{UUID: u})
+}
 
-	// SetValue makes the descriptor support read requests, and returns a static attr.
-	// SetValue must be called before the containing service is added to a server.
-	// SetValue panics if the descriptor has already configured with a ReadHandler.
-	SetValue(b []byte) Descriptor
+// A Characteristic is a BLE characteristic.
+type Characteristic struct {
+	UUID        UUID
+	Property    Property
+	Secure      Property // FIXME
+	Descriptors []*Descriptor
+	CCCD        *Descriptor
 
-	// HandleRead makes the descriptor support write requests, and routes the requests to h.
-	// HandleRead must be called before the containing service is added to a server.
-	// HandleRead panics if the descriptor has been configured with a static attr.
-	HandleRead(h ReadHandler) Descriptor
+	Value []byte
 
-	// HandleWrite makes the descriptor support write and write-no-response requests, and routes the requests to h.
-	// The WriteHandler does not differentiate between write and write-no-response requests; it is handled automatically.
-	// HandleWrite must be called before the containing service is added to a server.
-	HandleWrite(h WriteHandler) Descriptor
+	ReadHandler     ReadHandler
+	WriteHandler    WriteHandler
+	NotifyHandler   NotifyHandler
+	IndicateHandler NotifyHandler
+
+	Handle       uint16
+	ValueHandle  uint16
+	EndHandle uint16
+}
+
+// AddDescriptor adds a descriptor to a characteristic.
+// AddDescriptor panics if the characteristic already contains another descriptor with the same UUID.
+func (c *Characteristic) AddDescriptor(d *Descriptor) *Descriptor {
+	for _, x := range c.Descriptors {
+		if x.UUID.Equal(d.UUID) {
+			panic("service already contains a characteristic with UUID " + d.UUID.String())
+		}
+	}
+	c.Descriptors = append(c.Descriptors, d)
+	return d
+}
+
+// NewDescriptor adds a descriptor to a characteristic.
+// NewDescriptor panics if the characteristic already contains another descriptor with the same UUID.
+func (c *Characteristic) NewDescriptor(u UUID) *Descriptor {
+	return c.AddDescriptor(&Descriptor{UUID: u})
+}
+
+// SetValue makes the characteristic support read requests, and returns a static value.
+// SetValue must be called before the containing service is added to a server.
+// SetValue panics if the characteristic has been configured with a ReadHandler.
+func (c *Characteristic) SetValue(b []byte) {
+	if c.ReadHandler != nil {
+		panic("charactristic has been configured with a read handler")
+	}
+	c.Property |= CharRead
+	c.Value = make([]byte, len(b))
+	copy(c.Value, b)
+}
+
+// HandleRead makes the characteristic support read requests, and routes read requests to h.
+// HandleRead must be called before the containing service is added to a server.
+// HandleRead panics if the characteristic has been configured with a static value.
+func (c *Characteristic) HandleRead(h ReadHandler) {
+	if c.Value != nil {
+		panic("charactristic has been configured with a static value")
+	}
+	c.Property |= CharRead
+	c.ReadHandler = h
+}
+
+// HandleWrite makes the characteristic support write and write-no-response requests, and routes write requests to h.
+// The WriteHandler does not differentiate between write and write-no-response requests; it is handled automatically.
+// HandleWrite must be called before the containing service is added to a server.
+func (c *Characteristic) HandleWrite(h WriteHandler) {
+	c.Property |= CharWrite | CharWriteNR
+	c.WriteHandler = h
+}
+
+// HandleNotify makes the characteristic support notify requests, and routes notification requests to h.
+// HandleNotify must be called before the containing service is added to a server.
+func (c *Characteristic) HandleNotify(h NotifyHandler) {
+	c.Property |= CharNotify
+	c.NotifyHandler = h
+}
+
+// HandleIndicate makes the characteristic support indicate requests, and routes notification requests to h.
+// HandleIndicate must be called before the containing service is added to a server.
+func (c *Characteristic) HandleIndicate(h NotifyHandler) {
+	c.Property |= CharIndicate
+	c.IndicateHandler = h
+}
+
+// Descriptor is a BLE descriptor
+type Descriptor struct {
+	UUID     UUID
+	Property Property
+
+	Handle uint16
+	Value  []byte
+
+	ReadHandler  ReadHandler
+	WriteHandler WriteHandler
+}
+
+// SetValue makes the descriptor support read requests, and returns a static value.
+// SetValue must be called before the containing service is added to a server.
+// SetValue panics if the descriptor has already configured with a ReadHandler.
+func (d *Descriptor) SetValue(b []byte) {
+	if d.ReadHandler != nil {
+		panic("descriptor has been configured with a read handler")
+	}
+	d.Property |= CharRead
+	d.Value = make([]byte, len(b))
+	copy(d.Value, b)
+}
+
+// HandleRead makes the descriptor support read requests, and routes read requests to h.
+// HandleRead must be called before the containing service is added to a server.
+// HandleRead panics if the descriptor has been configured with a static value.
+func (d *Descriptor) HandleRead(h ReadHandler) {
+	if d.Value != nil {
+		panic("descriptor has been configured with a static value")
+	}
+	d.Property |= CharRead
+	d.ReadHandler = h
+}
+
+// HandleWrite makes the descriptor support write and write-no-response requests, and routes write requests to h.
+// The WriteHandler does not differentiate between write and write-no-response requests; it is handled automatically.
+// HandleWrite must be called before the containing service is added to a server.
+func (d *Descriptor) HandleWrite(h WriteHandler) {
+	d.Property |= CharWrite | CharWriteNR
+	d.WriteHandler = h
 }

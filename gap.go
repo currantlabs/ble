@@ -1,18 +1,22 @@
 package bt
 
 import (
+	"context"
 	"io"
-
-	"golang.org/x/net/context"
 )
 
 // A Broadcaster is a device that sends advertising events.
 type Broadcaster interface {
-	// SetAdvertisement sets advertising data and scan response.
-	SetAdvertisement(ad []byte, sr []byte) error
+	// AdvertiseNameAndServices advertises device name, and specified service UUIDs.
+	// It tres to fit the UUIDs in the advertising packet as much as possible.
+	// If name doesn't fit in the advertising packet, it will be put in scan response.
+	AdvertiseNameAndServices(name string, uuids ...UUID) error
 
-	// Advertise starts advertising.
-	Advertise() error
+	// AdvertiseIBeaconData advertise iBeacon with given manufacturer data.
+	AdvertiseIBeaconData(b []byte) error
+
+	// AdvertisingIbeacon advertises iBeacon with specified parameters.
+	AdvertiseIBeacon(u UUID, major, minor uint16, pwr int8) error
 
 	// StopAdvertising stops advertising.
 	StopAdvertising() error
@@ -26,8 +30,8 @@ type Peripheral interface {
 
 // An Observer is a device that receives advertising events.
 type Observer interface {
-	// SetAdvHandler sets filter, handler.
-	SetAdvHandler(af AdvFilter, ah AdvHandler) error
+	// SetHandler sets filter, handler.
+	SetAdvHandler(h AdvHandler) error
 
 	// Scan starts scanning. Duplicated advertisements will be filtered out if allowDup is set to false.
 	Scan(allowDup bool) error

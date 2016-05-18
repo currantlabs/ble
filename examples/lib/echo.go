@@ -6,16 +6,15 @@ import (
 	"time"
 
 	"github.com/currantlabs/bt"
-	"github.com/currantlabs/bt/gatt"
 )
 
 // NewEchoChar ...
-func NewEchoChar() bt.Characteristic {
+func NewEchoChar() *bt.Characteristic {
 	e := &echoChar{m: make(map[string]chan []byte)}
-	c := gatt.NewCharacteristic(EchoCharUUID)
+	c := bt.NewCharacteristic(EchoCharUUID)
 	c.HandleWrite(bt.WriteHandlerFunc(e.written))
-	c.HandleNotify(true, bt.NotifyHandlerFunc(e.echo))
-	c.HandleNotify(false, bt.NotifyHandlerFunc(e.echo))
+	c.HandleNotify(bt.NotifyHandlerFunc(e.echo))
+	c.HandleIndicate(bt.NotifyHandlerFunc(e.echo))
 	return c
 }
 
