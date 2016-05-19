@@ -2,6 +2,7 @@ package gatt
 
 import (
 	"encoding/binary"
+	"log"
 	"net"
 	"sync"
 
@@ -277,7 +278,12 @@ func newNHandler() *nHandlers {
 func (n *nHandlers) HandleNotification(req []byte) {
 	n.RLock()
 	valueh := att.HandleValueIndication(req).AttributeHandle()
-	stub := n.stubs[valueh]
+	stub, ok := n.stubs[valueh]
+	if !ok {
+		// FIXME: disconnects and propagate an error to the user.
+		log.Printf("Got an unregistered notification")
+		return
+	}
 	h := stub.nHandler
 	if req[0] == att.HandleValueIndicationCode {
 		h = stub.iHandler
