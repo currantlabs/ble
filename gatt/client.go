@@ -208,6 +208,8 @@ func (p *Client) Subscribe(c bt.Characteristic, ind bool, h bt.NotificationHandl
 }
 
 func (p *Client) setHandlers(cccdh, vh, flag uint16, h bt.NotificationHandler) error {
+	p.handler.Lock()
+	defer p.handler.Unlock()
 	s, ok := p.handler.stubs[vh]
 	if !ok {
 		s = &stub{cccdh, 0x0000, nil, nil}
@@ -236,10 +238,13 @@ func (p *Client) setHandlers(cccdh, vh, flag uint16, h bt.NotificationHandler) e
 
 // ClearSubscriptions ...
 func (p *Client) ClearSubscriptions() error {
-	for _, s := range p.handler.stubs {
+	p.handler.Lock()
+	defer p.handler.Unlock()
+	for vh, s := range p.handler.stubs {
 		if err := p.c.Write(s.cccdh, make([]byte, 2)); err != nil {
 			return err
 		}
+		delete(p.handler.stubs, vh)
 	}
 	return nil
 }
