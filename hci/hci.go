@@ -123,7 +123,7 @@ func (h *HCI) Init(id int) error {
 
 	// Pre-allocate buffers with additional head room for lower layer headers.
 	// HCI header (1 Byte) + ACL Data Header (4 bytes) + L2CAP PDU (or fragment)
-	h.pool = NewPool(1+4+h.bufSize, h.bufCnt)
+	h.pool = NewPool(1+4+h.bufSize, h.bufCnt-1)
 
 	return nil
 }
