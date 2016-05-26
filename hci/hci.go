@@ -227,6 +227,8 @@ func (h *HCI) send(c Command) ([]byte, error) {
 }
 
 func (h *HCI) asyncLoop() {
+	var ad []*advertisement
+	var last int
 	for {
 		select {
 		case <-h.done:
@@ -242,10 +244,40 @@ func (h *HCI) asyncLoop() {
 			// err = fmt.Errorf("hci: unsupported event packet: [ % X ]", b)
 		case <-h.chStartScan:
 			h.chAdvEvt = make(chan []byte, 16)
+			ad = make([]*advertisement, 16)
+			last = 0
 		case b := <-h.chAdvEvt:
 			e := evt.LEAdvertisingReport(b)
 			for i := 0; i < int(e.NumReports()); i++ {
-				a := bt.NewAdvertisement(e, i)
+				var a *advertisement
+				switch e.EventType(i) {
+				case evtTypAdvInd:
+					fallthrough
+				case evtTypAdvScanInd:
+					a = newAdvertisement(e, i)
+					ad[last] = a
+					last++
+					if last == len(ad) {
+						last = 0
+					}
+				case evtTypScanRsp:
+					sr := newAdvertisement(e, i)
+					for idx := last - 1; idx != last; idx-- {
+						if idx == -1 {
+							idx = len(ad) - 1
+						}
+						if ad[idx] == nil {
+							break
+						}
+						if ad[idx].Address().String() == sr.Address().String() {
+							ad[idx].sr = sr
+							a = ad[idx]
+							break
+						}
+					}
+				default:
+					a = newAdvertisement(e, i)
+				}
 				if h.advFilter != nil && h.advFilter.Filter(*a) {
 					h.advHandler.Handle(*a)
 				}

@@ -134,7 +134,8 @@ func (c centralManagerCilent) ExchangeMTU(rxMTU int) (int, error) {
 }
 
 func (m *centralManager) advFilter(a bt.Advertisement) bool {
-	if adv.Packet(a.Data()).LocalName() != "Gopher" {
+	p := adv.Packet(append(a.Data(), a.ScanResponse()...))
+	if p.LocalName() != "Gopher" {
 		return false
 	}
 	m.visitedLock.RLock()

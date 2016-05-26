@@ -1,10 +1,6 @@
 package bt
 
-import (
-	"net"
-
-	"github.com/currantlabs/bt/hci/evt"
-)
+import "net"
 
 // AdvFilter ...
 type AdvFilter interface {
@@ -34,30 +30,22 @@ func (f AdvHandlerFunc) Handle(a Advertisement) {
 }
 
 // Advertisement ...
-type Advertisement struct {
-	e evt.LEAdvertisingReport
-	i int
+type Advertisement interface {
+	// EventType ...
+	EventType() uint8
+
+	// AddressType ...
+	AddressType() uint8
+
+	// RSSI ...
+	RSSI() int8
+
+	// Address ...
+	Address() net.HardwareAddr
+
+	// Data ...
+	Data() []byte
+
+	// ScanResponse ...
+	ScanResponse() []byte
 }
-
-// NewAdvertisement ...
-func NewAdvertisement(e evt.LEAdvertisingReport, i int) *Advertisement {
-	return &Advertisement{e: e, i: i}
-}
-
-// EventType ...
-func (a Advertisement) EventType() uint8 { return a.e.EventType(a.i) }
-
-// AddressType ...
-func (a Advertisement) AddressType() uint8 { return a.e.AddressType(a.i) }
-
-// RSSI ...
-func (a Advertisement) RSSI() int8 { return a.e.RSSI(a.i) }
-
-// Address ...
-func (a Advertisement) Address() net.HardwareAddr {
-	b := a.e.Address(a.i)
-	return []byte{b[5], b[4], b[3], b[2], b[1], b[0]}
-}
-
-// Data ...
-func (a Advertisement) Data() []byte { return a.e.Data(a.i) }

@@ -28,3 +28,12 @@ const (
 	roleMaster = 0x00
 	roleSlave  = 0x01
 )
+
+// [Vol 6, Part B, 4.4.2] [Vol 3, Part C, 11]
+const (
+	evtTypAdvInd        = 0x00 // Connectable undirected advertising (ADV_IND).
+	evtTypAdvDirectInd  = 0x01 // Connectable directed advertising (ADV_DIRECT_IND).
+	evtTypAdvScanInd    = 0x02 // Scannable undirected advertising (ADV_SCAN_IND).
+	evtTypAdvNonconnInd = 0x03 // Non connectable undirected advertising (ADV_NONCONN_IND).
+	evtTypScanRsp       = 0x04 // Scan Response (SCAN_RSP).
+)
