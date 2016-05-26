@@ -1,6 +1,10 @@
 # PROGS ?= $(notdir $(shell go list ./...))
 PROGS ?= $(filter-out bin Makefile,$(shell ls))
 
+BUILD_CMD	?= GOGC=off GOOS=linux go build $(LDFLAGS) -i -o bin/$@ $@/*.go
+DEPLOY_CMD	?= scp bin/$< gentoo:/tmp
+RUN_CMD		?= ssh -t gentoo sudo LOGXI=${LOGXI} /tmp/$<
+
 .PHONY: $(PROGS)
 
 Q ?= @
@@ -15,20 +19,11 @@ LDFLAGS		?= -ldflags="-w -X $(BUILDDATESYM)=$(BUILDDATE) -X $(GITSYM)=$(GITHEAD)
 
 all: $(PROGS)
 
-list:
-	$(Q) echo $(PROGS)
-
-prepare:
-	$(Q) mkdir -p bin
-
-run-%: bin/%
-	$(Q) echo Running prebuilt bin/$@ ...
-	sudo LOGXI=${LOGXI} $<
-
 $(PROGS):
-	$(Q) echo Building bin/$@ ...
-	$(Q) GOGC=off GOOS=linux go build  $(LDFLAGS) -o bin/$@ $@/*.go
-	sudo LOGXI=${LOGXI} bin/$@
+	$(Q) $(BUILD_CMD)
 
+run-%: %
+	$(Q) $(DEPLOY_CMD)
+	$(Q) $(RUN_CMD)
 clean:
 	$(Q) rm -rf bin
