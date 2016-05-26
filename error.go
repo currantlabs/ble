@@ -35,11 +35,9 @@ func (a AttError) Error() string {
 	switch i := int(a); {
 	case i < 0x11:
 		return errName[a]
-	case i >= 0x12 && i <= 0x7F: // Reserved for future use
-		return "reserved error code"
-	case i >= 0x80 && i <= 0x9F: // Application AttError, defined by higher level
-		return "reserved error code"
-	case i >= 0xA0 && i <= 0xDF: // Reserved for future use
+	case (i >= 0x12 && i <= 0x7F) || // Reserved for future use
+		(i >= 0x80 && i <= 0x9F) || // Application AttError, defined by higher level
+		(i >= 0xA0 && i <= 0xDF): // Reserved for future use
 		return "reserved error code"
 	case i >= 0xE0 && i <= 0xFF: // Common profile and service error codes
 		return "profile or service error"
