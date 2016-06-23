@@ -389,12 +389,12 @@ func (d *Device) HandleXpcEvent(event xpc.Dict, err error) {
 		// Notification
 		c := d.conn(args.deviceUUID())
 		if args.isNotification() != 0 {
-			fn := c.subs[uint16(args.characteristicHandle())]
-			if fn == nil {
+			sub := c.subs[uint16(args.characteristicHandle())]
+			if sub == nil {
 				log.Printf("notified by unsubscribed handle")
 				// FIXME: should terminate the connection?
 			} else {
-				go fn(args.data())
+				go sub.fn(args.data())
 			}
 			break
 		}

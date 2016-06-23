@@ -203,7 +203,7 @@ func (cln *Client) ExchangeMTU(mtu int) (int, error) {
 func (cln *Client) Subscribe(c *bt.Characteristic, ind bool, fn bt.NotificationHandler) error {
 	cln.conn.Lock()
 	defer cln.conn.Unlock()
-	cln.conn.subs[c.Handle] = fn
+	cln.conn.subs[c.Handle] = &sub{fn: fn, char: c}
 	rsp := cln.conn.sendReq(68, xpc.Dict{
 		"kCBMsgArgDeviceUUID":                cln.id,
 		"kCBMsgArgCharacteristicHandle":      c.Handle,
@@ -237,6 +237,9 @@ func (cln *Client) Unsubscribe(c *bt.Characteristic, ind bool) error {
 
 // ClearSubscriptions clears all subscriptions to notifications and indications.
 func (cln *Client) ClearSubscriptions() error {
+	for _, s := range cln.conn.subs {
+		cln.Unsubscribe(s.char, false)
+	}
 	return nil
 }
 
@@ -247,4 +250,9 @@ func (cln *Client) CancelConnection() error {
 		return bt.ATTError(res)
 	}
 	return nil
+}
+
+type sub struct {
+	fn   bt.NotificationHandler
+	char *bt.Characteristic
 }

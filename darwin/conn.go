@@ -4,8 +4,8 @@ import (
 	"context"
 	"sync"
 
-	"github.com/currantlabs/x/io/bt"
 	"github.com/currantlabs/ble/darwin/xpc"
+	"github.com/currantlabs/x/io/bt"
 )
 
 func newConn(d *Device, a bt.Addr) *conn {
@@ -16,7 +16,7 @@ func newConn(d *Device, a bt.Addr) *conn {
 		addr:  a,
 
 		notifiers: make(map[uint16]bt.Notifier),
-		subs:      make(map[uint16]bt.NotificationHandler),
+		subs:      make(map[uint16]*sub),
 
 		rspc: make(chan msg),
 	}
@@ -40,7 +40,7 @@ type conn struct {
 
 	notifiers map[uint16]bt.Notifier // central connection only
 
-	subs map[uint16]bt.NotificationHandler
+	subs map[uint16]*sub
 }
 
 func (c *conn) Context() context.Context {
