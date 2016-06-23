@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/currantlabs/ble/gatt"
 	"github.com/currantlabs/x/io/bt"
@@ -13,7 +14,8 @@ import (
 
 var (
 	name = flag.String("name", "Gopher", "name of remote peripheral")
-	addr = flag.String("addr", "", "addr (MAC on Linux, UUID on OS X) of remote peripheral")
+	addr = flag.String("addr", "", "address of remote peripheral (MAC on Linux, UUID on OS X)")
+	sub  = flag.Duration("sub", 0, "subscribe to notification and indication for a specified period")
 )
 
 // matcher returns true if the advertisement matches our search criteria.
@@ -74,12 +76,21 @@ func explorer(cln bt.Client) error {
 					l.Printf("    Value         %x | %q\n", b, b)
 				}
 			}
-			// if (c.Property & bt.CharNotify) != 0 {
-			// 	h := func(req []byte) { l.Printf("Notified: %q [ % X ]", string(req), req) }
-			// 	cln.Subscribe(c, false, h)
-			// 	time.Sleep(3 * time.Second)
-			// 	cln.Unsubscribe(c, false)
-			// }
+
+			if *sub != 0 {
+				if (c.Property & bt.CharNotify) != 0 {
+					h := func(req []byte) { l.Printf("Notified: %q [ % X ]", string(req), req) }
+					cln.Subscribe(c, false, h)
+					time.Sleep(*sub)
+					cln.Unsubscribe(c, false)
+				}
+				if (c.Property & bt.CharIndicate) != 0 {
+					h := func(req []byte) { l.Printf("Indicated: %q [ % X ]", string(req), req) }
+					cln.Subscribe(c, true, h)
+					time.Sleep(*sub)
+					cln.Unsubscribe(c, true)
+				}
+			}
 		}
 		l.Printf("\n")
 	}
@@ -127,12 +138,10 @@ func main() {
 
 	// Create and attach a GATT client to the connection.
 	cln := gatt.NewClient(c)
-	defer cln.CancelConnection()
-
-	if _, err := cln.ExchangeMTU(bt.MaxMTU); err != nil {
-		log.Printf("can't set MTU: %s\n", err)
-	}
 
 	// Start the exploration.
 	explorer(cln)
+
+	// Disconnect the connection. (On OS X, this might take a while.)
+	cln.CancelConnection()
 }
