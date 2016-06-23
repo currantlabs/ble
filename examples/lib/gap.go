@@ -1,6 +1,6 @@
 package lib
 
-import "github.com/currantlabs/bt"
+import "github.com/currantlabs/x/io/bt"
 
 // https://developer.bluetooth.org/gatt/characteristics/Pages/CharacteristicViewer.aspx?u=org.bluetooth.characteristic.bt.appearance.xml
 var gapCharAppearanceGenericComputer = []byte{0x00, 0x80}

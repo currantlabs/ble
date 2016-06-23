@@ -5,8 +5,8 @@ import (
 	"log"
 	"sync"
 
-	"github.com/currantlabs/bt"
-	"github.com/currantlabs/bt/dev"
+	"github.com/currantlabs/ble/dev"
+	"github.com/currantlabs/x/io/bt"
 )
 
 // ClientHandler is invoked when a connection is established.

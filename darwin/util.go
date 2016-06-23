@@ -1,6 +1,6 @@
 package darwin
 
-import "github.com/currantlabs/bt"
+import "github.com/currantlabs/x/io/bt"
 
 func uuidSlice(uu []bt.UUID) [][]byte {
 	us := [][]byte{}

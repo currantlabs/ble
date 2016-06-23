@@ -6,8 +6,8 @@ import (
 	"log"
 	"sync"
 
-	"github.com/currantlabs/bt"
-	"github.com/currantlabs/bt/linux/att"
+	"github.com/currantlabs/x/io/bt"
+	"github.com/currantlabs/ble/linux/att"
 )
 
 // NewServer ...

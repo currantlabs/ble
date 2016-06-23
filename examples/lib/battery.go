@@ -1,6 +1,6 @@
 package lib
 
-import "github.com/currantlabs/bt"
+import "github.com/currantlabs/x/io/bt"
 
 // NewBatteryService ...
 func NewBatteryService() *bt.Service {

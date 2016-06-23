@@ -7,8 +7,8 @@ import (
 	"log"
 	"time"
 
-	"github.com/currantlabs/bt"
-	"github.com/currantlabs/bt/darwin/xpc"
+	"github.com/currantlabs/x/io/bt"
+	"github.com/currantlabs/ble/darwin/xpc"
 )
 
 const (

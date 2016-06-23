@@ -7,10 +7,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/currantlabs/bt"
-	"github.com/currantlabs/bt/linux/hci/cmd"
-	"github.com/currantlabs/bt/linux/hci/evt"
-	"github.com/currantlabs/bt/linux/hci/skt"
+	"github.com/currantlabs/x/io/bt"
+	"github.com/currantlabs/ble/linux/hci/cmd"
+	"github.com/currantlabs/ble/linux/hci/evt"
+	"github.com/currantlabs/ble/linux/hci/skt"
 )
 
 // Command ...

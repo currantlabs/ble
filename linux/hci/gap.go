@@ -6,9 +6,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/currantlabs/bt"
-	"github.com/currantlabs/bt/linux/adv"
-	"github.com/currantlabs/bt/linux/hci/cmd"
+	"github.com/currantlabs/x/io/bt"
+	"github.com/currantlabs/ble/linux/adv"
+	"github.com/currantlabs/ble/linux/hci/cmd"
 	"github.com/mgutz/logxi/v1"
 
 	"github.com/pkg/errors"

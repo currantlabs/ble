@@ -6,7 +6,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/currantlabs/bt/linux/hci/cmd"
+	"github.com/currantlabs/ble/linux/hci/cmd"
 )
 
 // Signal ...

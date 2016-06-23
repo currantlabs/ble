@@ -5,7 +5,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/currantlabs/bt"
+	"github.com/currantlabs/x/io/bt"
 )
 
 // NewCountChar ...

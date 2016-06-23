@@ -3,8 +3,8 @@ package dev
 import (
 	"log"
 
-	"github.com/currantlabs/bt"
-	"github.com/currantlabs/bt/darwin"
+	"github.com/currantlabs/ble/darwin"
+	"github.com/currantlabs/x/io/bt"
 )
 
 // NewBroadcaster ...

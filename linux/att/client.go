@@ -4,7 +4,7 @@ import (
 	"encoding/binary"
 	"time"
 
-	"github.com/currantlabs/bt"
+	"github.com/currantlabs/x/io/bt"
 )
 
 // NotificationHandler handles notification or indication.

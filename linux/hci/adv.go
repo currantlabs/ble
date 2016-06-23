@@ -3,9 +3,9 @@ package hci
 import (
 	"net"
 
-	"github.com/currantlabs/bt"
-	"github.com/currantlabs/bt/linux/adv"
-	"github.com/currantlabs/bt/linux/hci/evt"
+	"github.com/currantlabs/x/io/bt"
+	"github.com/currantlabs/ble/linux/adv"
+	"github.com/currantlabs/ble/linux/hci/evt"
 )
 
 // [Vol 6, Part B, 4.4.2] [Vol 3, Part C, 11]

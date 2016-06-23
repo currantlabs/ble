@@ -3,7 +3,7 @@ package adv
 import (
 	"encoding/binary"
 
-	"github.com/currantlabs/bt"
+	"github.com/currantlabs/x/io/bt"
 )
 
 // Packet is an implemntation of bt.AdvPacket for crafting or parsing an advertising packet or scan response.

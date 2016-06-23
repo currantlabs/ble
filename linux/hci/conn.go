@@ -9,9 +9,9 @@ import (
 	"log"
 	"net"
 
-	"github.com/currantlabs/bt"
-	"github.com/currantlabs/bt/linux/hci/cmd"
-	"github.com/currantlabs/bt/linux/hci/evt"
+	"github.com/currantlabs/x/io/bt"
+	"github.com/currantlabs/ble/linux/hci/cmd"
+	"github.com/currantlabs/ble/linux/hci/evt"
 )
 
 // Conn ...

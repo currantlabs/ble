@@ -1,6 +1,6 @@
 package darwin
 
-import "github.com/currantlabs/bt/darwin/xpc"
+import "github.com/currantlabs/ble/darwin/xpc"
 
 type msg xpc.Dict
 

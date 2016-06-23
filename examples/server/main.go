@@ -3,9 +3,9 @@ package main
 import (
 	"log"
 
-	"github.com/currantlabs/bt"
-	"github.com/currantlabs/bt/dev"
-	"github.com/currantlabs/bt/examples/lib"
+	"github.com/currantlabs/ble/dev"
+	"github.com/currantlabs/ble/examples/lib"
+	"github.com/currantlabs/x/io/bt"
 )
 
 func main() {

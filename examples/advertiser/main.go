@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/currantlabs/bt/dev"
+	"github.com/currantlabs/ble/dev"
 )
 
 func main() {

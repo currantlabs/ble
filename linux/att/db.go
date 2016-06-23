@@ -4,7 +4,7 @@ import (
 	"encoding/binary"
 	"log"
 
-	"github.com/currantlabs/bt"
+	"github.com/currantlabs/x/io/bt"
 )
 
 // A DB is a contiguous range of attributes.

@@ -7,8 +7,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/currantlabs/bt"
-	"github.com/currantlabs/bt/examples/lib"
+	"github.com/currantlabs/x/io/bt"
+	"github.com/currantlabs/ble/examples/lib"
 )
 
 const echoDataSize = 1024 * 16

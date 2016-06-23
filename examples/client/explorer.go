@@ -4,7 +4,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/currantlabs/bt"
+	"github.com/currantlabs/x/io/bt"
 )
 
 func explorer(a bt.Advertisement, cln bt.Client) {

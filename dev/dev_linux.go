@@ -3,9 +3,9 @@ package dev
 import (
 	"log"
 
-	"github.com/currantlabs/bt"
-	"github.com/currantlabs/bt/linux/gatt"
-	"github.com/currantlabs/bt/linux/hci"
+	"github.com/currantlabs/x/io/bt"
+	"github.com/currantlabs/ble/linux/gatt"
+	"github.com/currantlabs/ble/linux/hci"
 )
 
 // NewPeripheral ...

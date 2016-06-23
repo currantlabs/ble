@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/currantlabs/bt"
+	"github.com/currantlabs/x/io/bt"
 )
 
 // NewEchoChar ...
