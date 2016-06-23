@@ -7,22 +7,12 @@ import (
 	"github.com/currantlabs/x/io/bt"
 )
 
-type request struct {
-	conn   bt.Conn
-	data   []byte
-	offset int
-}
-
-func (r *request) Conn() bt.Conn { return r.conn }
-func (r *request) Data() []byte  { return r.data }
-func (r *request) Offset() int   { return r.offset }
-
-// NewServer ...
+// NewServer returns a GATT server.
 func NewServer() *Server {
 	return &Server{}
 }
 
-// Server ...
+// A Server is a GATT server.
 type Server struct {
 	sync.Mutex
 
@@ -30,43 +20,44 @@ type Server struct {
 	dev  *Device
 }
 
-// AddService ...
-func (s *Server) AddService(svc *bt.Service) *bt.Service {
-	s.Lock()
-	defer s.Unlock()
-	s.svcs = append(s.svcs, svc)
+// AddService adds a service to database.
+func (svr *Server) AddService(svc *bt.Service) *bt.Service {
+	svr.Lock()
+	defer svr.Unlock()
+	svr.svcs = append(svr.svcs, svc)
 	return svc
 }
 
-// RemoveAllServices ...
-func (s *Server) RemoveAllServices() error {
-	s.Lock()
-	defer s.Unlock()
-	s.svcs = nil
+// RemoveAllServices removes all services that are currently in the database.
+func (svr *Server) RemoveAllServices() error {
+	svr.Lock()
+	defer svr.Unlock()
+	svr.svcs = nil
 	return nil
 }
 
-// SetServices ...
-func (s *Server) SetServices(svcs []*bt.Service) error {
-	s.Lock()
-	defer s.Unlock()
-	s.RemoveAllServices()
-	s.svcs = append(s.svcs, svcs...)
+// SetServices set the specified service to the database.
+// It removes all currently added services, if any.
+func (svr *Server) SetServices(svcs []*bt.Service) error {
+	svr.Lock()
+	defer svr.Unlock()
+	svr.RemoveAllServices()
+	svr.svcs = append(svr.svcs, svcs...)
 	return nil
 }
 
-// Start ...
-func (s *Server) Start(p bt.Peripheral) error {
+// Start attach the GATT server to a peripheral device.
+func (svr *Server) Start(p bt.Peripheral) error {
 	d, ok := p.(*Device)
 	if !ok {
 		return fmt.Errorf("can't convert peripheral to os x device")
 	}
-	return d.SetServices(s.svcs)
+	return d.SetServices(svr.svcs)
 }
 
-// Stop ...
-func (s *Server) Stop() error {
-	s.Lock()
-	defer s.Unlock()
+// Stop detatch the GATT server from a peripheral device.
+func (svr *Server) Stop() error {
+	svr.Lock()
+	defer svr.Unlock()
 	return nil
 }

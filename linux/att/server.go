@@ -537,48 +537,32 @@ func newErrorResponse(op byte, h uint16, s bt.ATTError) []byte {
 	return r
 }
 
-type request struct {
-	conn   bt.Conn
-	data   []byte
-	offset int
-}
-
-func (r *request) Conn() bt.Conn { return r.conn }
-func (r *request) Data() []byte  { return r.data }
-func (r *request) Offset() int   { return r.offset }
-
 func handleATT(a *attr, conn bt.Conn, req []byte, rsp bt.ResponseWriter) bt.ATTError {
-	r := &request{conn: conn}
 	rsp.SetStatus(bt.ErrSuccess)
+	var offset int
+	var data []byte
 	switch req[0] {
 	case ReadByTypeRequestCode:
-		if a.rh == nil {
-			return bt.ErrReadNotPerm
-		}
-		a.rh.ServeRead(r, rsp)
+		fallthrough
 	case ReadRequestCode:
 		if a.rh == nil {
 			return bt.ErrReadNotPerm
 		}
-		a.rh.ServeRead(r, rsp)
+		a.rh.ServeRead(bt.NewRequest(conn, data, offset), rsp)
 	case ReadBlobRequestCode:
 		if a.rh == nil {
 			return bt.ErrReadNotPerm
 		}
-		r.offset = int(ReadBlobRequest(req).ValueOffset())
-		a.rh.ServeRead(r, rsp)
+		offset = int(ReadBlobRequest(req).ValueOffset())
+		a.rh.ServeRead(bt.NewRequest(conn, data, offset), rsp)
 	case WriteRequestCode:
-		if a.wh == nil {
-			return bt.ErrWriteNotPerm
-		}
-		r.data = WriteRequest(req).AttributeValue()
-		a.wh.ServeWrite(r, rsp)
+		fallthrough
 	case WriteCommandCode:
 		if a.wh == nil {
 			return bt.ErrWriteNotPerm
 		}
-		r.data = WriteRequest(req).AttributeValue()
-		a.wh.ServeWrite(r, rsp)
+		data = WriteRequest(req).AttributeValue()
+		a.wh.ServeWrite(bt.NewRequest(conn, data, offset), rsp)
 	// case PrepareWriteRequestCode:
 	// case ExecuteWriteRequestCode:
 	// case SignedWriteCommandCode:

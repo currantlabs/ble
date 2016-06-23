@@ -333,10 +333,7 @@ func (d *Device) HandleXpcEvent(event xpc.Dict, err error) {
 		v := char.Value
 		if v == nil {
 			c := d.conn(args.deviceUUID())
-			req := &request{
-				conn:   c,
-				offset: args.offset(),
-			}
+			req := bt.NewRequest(c, nil, args.offset())
 			buf := bytes.NewBuffer(make([]byte, 0, c.txMTU-1))
 			rsp := bt.NewResponseWriter(buf)
 			char.ReadHandler.ServeRead(req, rsp)
@@ -355,12 +352,8 @@ func (d *Device) HandleXpcEvent(event xpc.Dict, err error) {
 			xw := msg(xxw.(xpc.Dict))
 			aid := xw.attributeID()
 			char := d.chars[aid]
-			r := &request{
-				conn:   d.conn(args.deviceUUID()),
-				data:   xw.data(),
-				offset: xw.offset(),
-			}
-			char.WriteHandler.ServeWrite(r, nil)
+			req := bt.NewRequest(d.conn(args.deviceUUID()), xw.data(), xw.offset())
+			char.WriteHandler.ServeWrite(req, nil)
 			if xw.ignoreResponse() == 1 {
 				continue
 			}
