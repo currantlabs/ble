@@ -9,19 +9,29 @@ import (
 )
 
 func handle(a bt.Advertisement) {
-	fmt.Printf("%s (%s): Services: %v [ %x ]\n", a.Address(), a.LocalName(), a.Services(), a.ManufacturerData())
-	// aa := a.(*hci.Advertisement)
-	// log.Printf("% X ", aa.Data())
+	fmt.Printf("[%s]", a.Address())
+	comma := ""
+	if len(a.LocalName()) > 0 {
+		fmt.Printf(" Name: %s", a.LocalName())
+		comma = ","
+	}
+	if len(a.Services()) > 0 {
+		fmt.Printf("%s Svcs: %v", comma, a.Services())
+		comma = ","
+	}
+	if len(a.ManufacturerData()) > 0 {
+		fmt.Printf("%s MD: %X", comma, a.ManufacturerData())
+	}
+	fmt.Printf("\n")
 }
 
 func main() {
 	dev := gatt.NewObserver()
-	if err := dev.Scan(true); err != nil {
-		log.Fatalf("can't scan: %s", err)
-	}
-
 	if err := dev.SetAdvHandler(bt.AdvHandlerFunc(handle)); err != nil {
 		log.Fatalf("can't set adv handler: %s", err)
+	}
+	if err := dev.Scan(true); err != nil {
+		log.Fatalf("can't scan: %s", err)
 	}
 	select {}
 }
