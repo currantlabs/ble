@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/currantlabs/ble/dev"
+	"github.com/currantlabs/ble/gatt"
 )
 
 func main() {
-	dev := dev.NewBroadcaster()
+	dev := gatt.NewBroadcaster()
 	if err := dev.AdvertiseNameAndServices("Hello"); err != nil {
 		log.Fatalf("can't advertise: %s", err)
 	}

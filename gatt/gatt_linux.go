@@ -1,11 +1,11 @@
-package dev
+package gatt
 
 import (
 	"log"
 
-	"github.com/currantlabs/x/io/bt"
 	"github.com/currantlabs/ble/linux/gatt"
 	"github.com/currantlabs/ble/linux/hci"
+	"github.com/currantlabs/x/io/bt"
 )
 
 // NewPeripheral ...

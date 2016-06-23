@@ -3,13 +3,13 @@ package main
 import (
 	"log"
 
-	"github.com/currantlabs/ble/dev"
 	"github.com/currantlabs/ble/examples/lib"
+	"github.com/currantlabs/ble/gatt"
 	"github.com/currantlabs/x/io/bt"
 )
 
 func main() {
-	svr := dev.NewGATTServer()
+	svr := gatt.NewGATTServer()
 	svr.AddService(lib.NewGAPService("Gopher"))
 	svr.AddService(lib.NewGATTService())
 
@@ -19,7 +19,7 @@ func main() {
 
 	// batSvc := svr.AddService(lib.NewBatteryService())
 
-	dev := dev.NewPeripheral()
+	dev := gatt.NewPeripheral()
 	// dev.AdvertiseNameAndServices("Gopher", testSvc.UUID, batSvc.UUID)
 	dev.AdvertiseNameAndServices("Gopher", testSvc.UUID)
 

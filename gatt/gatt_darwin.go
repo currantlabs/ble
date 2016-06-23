@@ -1,4 +1,4 @@
-package dev
+package gatt
 
 import (
 	"log"

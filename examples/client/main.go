@@ -3,11 +3,11 @@ package main
 import (
 	"log"
 
-	"github.com/currantlabs/ble/dev"
+	"github.com/currantlabs/ble/gatt"
 )
 
 func main() {
-	dev := dev.NewCentral()
+	dev := gatt.NewCentral()
 
 	// Create a centralManager to handle concurrent connections.
 	m := newCentralManager(dev)

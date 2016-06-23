@@ -5,7 +5,7 @@ import (
 	"log"
 	"sync"
 
-	"github.com/currantlabs/ble/dev"
+	"github.com/currantlabs/ble/gatt"
 	"github.com/currantlabs/x/io/bt"
 )
 
@@ -105,7 +105,7 @@ func (m *centralManager) Stop() {
 }
 
 func newClient(l2c bt.Conn) (bt.Client, error) {
-	cln := dev.NewGATTClient(l2c)
+	cln := gatt.NewGATTClient(l2c)
 	txMTU, err := cln.ExchangeMTU(bt.MaxMTU)
 	if err != nil {
 		log.Printf("can't set MTU: %s\n", err)
