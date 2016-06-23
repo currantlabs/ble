@@ -55,12 +55,12 @@ func NewCentral() bt.Central {
 	return dev
 }
 
-// NewGATTServer ...
-func NewGATTServer() bt.Server {
+// NewServer ...
+func NewServer() bt.Server {
 	return darwin.NewServer()
 }
 
-// NewGATTClient ...
-func NewGATTClient(l2c bt.Conn) bt.Client {
-	return darwin.NewClient(l2c)
+// NewClient ...
+func NewClient(c bt.Conn) bt.Client {
+	return darwin.NewClient(c)
 }

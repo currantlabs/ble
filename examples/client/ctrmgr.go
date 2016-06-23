@@ -105,7 +105,7 @@ func (m *centralManager) Stop() {
 }
 
 func newClient(l2c bt.Conn) (bt.Client, error) {
-	cln := gatt.NewGATTClient(l2c)
+	cln := gatt.NewClient(l2c)
 	txMTU, err := cln.ExchangeMTU(bt.MaxMTU)
 	if err != nil {
 		log.Printf("can't set MTU: %s\n", err)

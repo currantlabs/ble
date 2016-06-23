@@ -93,10 +93,10 @@ func NewObserver() bt.Observer {
 	return dev
 }
 
-func NewGATTServer() bt.Server {
+func NewServer() bt.Server {
 	return gatt.NewServer()
 }
 
-func NewGATTClient(l2c bt.Conn) bt.Client {
+func NewClient(l2c bt.Conn) bt.Client {
 	return gatt.NewClient(l2c)
 }

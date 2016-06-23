@@ -9,7 +9,7 @@ import (
 )
 
 func main() {
-	svr := gatt.NewGATTServer()
+	svr := gatt.NewServer()
 	svr.AddService(lib.NewGAPService("Gopher"))
 	svr.AddService(lib.NewGATTService())
 
