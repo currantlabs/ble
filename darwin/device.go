@@ -7,8 +7,8 @@ import (
 	"log"
 	"time"
 
-	"github.com/currantlabs/x/io/bt"
 	"github.com/currantlabs/ble/darwin/xpc"
+	"github.com/currantlabs/x/io/bt"
 )
 
 const (
@@ -382,6 +382,7 @@ func (d *Device) HandleXpcEvent(event xpc.Dict, err error) {
 		d.chConn <- d.conn(args.deviceUUID())
 
 	case evtPeripheralDisconnected:
+		d.conn(args.deviceUUID()).rspc <- m
 		delete(d.conns, args.deviceUUID().String())
 
 	case evtCharacteristicRead:

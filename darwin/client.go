@@ -1,11 +1,11 @@
 package darwin
 
 import (
-	"github.com/currantlabs/x/io/bt"
 	"github.com/currantlabs/ble/darwin/xpc"
+	"github.com/currantlabs/x/io/bt"
 )
 
-// Client ...
+// A Client is a GATT client.
 type Client struct {
 	svcs []*bt.Service
 	name string
@@ -22,25 +22,27 @@ func NewClient(c bt.Conn) *Client {
 	}
 }
 
-// Address ...
-func (p *Client) Address() bt.Addr {
-	return p.conn.RemoteAddr()
+// Address returns UUID of the remote peripheral.
+func (cln *Client) Address() bt.Addr {
+	return cln.conn.RemoteAddr()
 }
 
-// Name ...
-func (p *Client) Name() string {
-	return p.name
+// Name returns the name of the remote peripheral.
+// This can be the advertised name, if exists, or the GAP device name, which takes priority.
+func (cln *Client) Name() string {
+	return cln.name
 }
 
-// Services ...
-func (p *Client) Services() []*bt.Service {
-	return p.svcs
+// Services returns discovered services.
+func (cln *Client) Services() []*bt.Service {
+	return cln.svcs
 }
 
-// DiscoverServices ...
-func (p *Client) DiscoverServices(ss []bt.UUID) ([]*bt.Service, error) {
-	rsp := p.conn.sendReq(45, xpc.Dict{
-		"kCBMsgArgDeviceUUID": p.id,
+// DiscoverServices finds all the primary services on a server. [Vol 3, Part G, 4.4.1]
+// If filter is specified, only filtered services are returned.
+func (cln *Client) DiscoverServices(ss []bt.UUID) ([]*bt.Service, error) {
+	rsp := cln.conn.sendReq(45, xpc.Dict{
+		"kCBMsgArgDeviceUUID": cln.id,
 		"kCBMsgArgUUIDs":      uuidSlice(ss),
 	})
 	if res := rsp.result(); res != 0 {
@@ -55,14 +57,15 @@ func (p *Client) DiscoverServices(ss []bt.UUID) ([]*bt.Service, error) {
 			EndHandle: uint16(xs.serviceEndHandle()),
 		})
 	}
-	p.svcs = svcs
+	cln.svcs = svcs
 	return svcs, nil
 }
 
-// DiscoverIncludedServices ...
-func (p *Client) DiscoverIncludedServices(ss []bt.UUID, s *bt.Service) ([]*bt.Service, error) {
-	rsp := p.conn.sendReq(60, xpc.Dict{
-		"kCBMsgArgDeviceUUID":         p.id,
+// DiscoverIncludedServices finds the included services of a service. [Vol 3, Part G, 4.5.1]
+// If filter is specified, only filtered services are returned.
+func (cln *Client) DiscoverIncludedServices(ss []bt.UUID, s *bt.Service) ([]*bt.Service, error) {
+	rsp := cln.conn.sendReq(60, xpc.Dict{
+		"kCBMsgArgDeviceUUID":         cln.id,
 		"kCBMsgArgServiceStartHandle": s.Handle,
 		"kCBMsgArgServiceEndHandle":   s.EndHandle,
 		"kCBMsgArgUUIDs":              uuidSlice(ss),
@@ -73,10 +76,11 @@ func (p *Client) DiscoverIncludedServices(ss []bt.UUID, s *bt.Service) ([]*bt.Se
 	return nil, bt.ErrNotImplemented
 }
 
-// DiscoverCharacteristics ...
-func (p *Client) DiscoverCharacteristics(cs []bt.UUID, s *bt.Service) ([]*bt.Characteristic, error) {
-	rsp := p.conn.sendReq(62, xpc.Dict{
-		"kCBMsgArgDeviceUUID":         p.id,
+// DiscoverCharacteristics finds all the characteristics within a service. [Vol 3, Part G, 4.6.1]
+// If filter is specified, only filtered characteristics are returned.
+func (cln *Client) DiscoverCharacteristics(cs []bt.UUID, s *bt.Service) ([]*bt.Characteristic, error) {
+	rsp := cln.conn.sendReq(62, xpc.Dict{
+		"kCBMsgArgDeviceUUID":         cln.id,
 		"kCBMsgArgServiceStartHandle": s.Handle,
 		"kCBMsgArgServiceEndHandle":   s.EndHandle,
 		"kCBMsgArgUUIDs":              uuidSlice(cs),
@@ -96,10 +100,11 @@ func (p *Client) DiscoverCharacteristics(cs []bt.UUID, s *bt.Service) ([]*bt.Cha
 	return s.Characteristics, nil
 }
 
-// DiscoverDescriptors ...
-func (p *Client) DiscoverDescriptors(ds []bt.UUID, c *bt.Characteristic) ([]*bt.Descriptor, error) {
-	rsp := p.conn.sendReq(70, xpc.Dict{
-		"kCBMsgArgDeviceUUID":                p.id,
+// DiscoverDescriptors finds all the descriptors within a characteristic. [Vol 3, Part G, 4.7.1]
+// If filter is specified, only filtered descriptors are returned.
+func (cln *Client) DiscoverDescriptors(ds []bt.UUID, c *bt.Characteristic) ([]*bt.Descriptor, error) {
+	rsp := cln.conn.sendReq(70, xpc.Dict{
+		"kCBMsgArgDeviceUUID":                cln.id,
 		"kCBMsgArgCharacteristicHandle":      c.Handle,
 		"kCBMsgArgCharacteristicValueHandle": c.ValueHandle,
 		"kCBMsgArgUUIDs":                     uuidSlice(ds),
@@ -114,10 +119,10 @@ func (p *Client) DiscoverDescriptors(ds []bt.UUID, c *bt.Characteristic) ([]*bt.
 	return c.Descriptors, nil
 }
 
-// ReadCharacteristic ...
-func (p *Client) ReadCharacteristic(c *bt.Characteristic) ([]byte, error) {
-	rsp := p.conn.sendReq(65, xpc.Dict{
-		"kCBMsgArgDeviceUUID":                p.id,
+// ReadCharacteristic reads a characteristic value from a server. [Vol 3, Part G, 4.8.1]
+func (cln *Client) ReadCharacteristic(c *bt.Characteristic) ([]byte, error) {
+	rsp := cln.conn.sendReq(65, xpc.Dict{
+		"kCBMsgArgDeviceUUID":                cln.id,
 		"kCBMsgArgCharacteristicHandle":      c.Handle,
 		"kCBMsgArgCharacteristicValueHandle": c.ValueHandle,
 	})
@@ -127,35 +132,35 @@ func (p *Client) ReadCharacteristic(c *bt.Characteristic) ([]byte, error) {
 	return rsp.data(), nil
 }
 
-// ReadLongCharacteristic ...
-func (p *Client) ReadLongCharacteristic(c *bt.Characteristic) ([]byte, error) {
+// ReadLongCharacteristic reads a characteristic value which is longer than the MTU. [Vol 3, Part G, 4.8.3]
+func (cln *Client) ReadLongCharacteristic(c *bt.Characteristic) ([]byte, error) {
 	return nil, bt.ErrNotImplemented
 }
 
-// WriteCharacteristic ...
-func (p *Client) WriteCharacteristic(c *bt.Characteristic, b []byte, noRsp bool) error {
+// WriteCharacteristic writes a characteristic value to a server. [Vol 3, Part G, 4.9.3]
+func (cln *Client) WriteCharacteristic(c *bt.Characteristic, b []byte, noRsp bool) error {
 	args := xpc.Dict{
-		"kCBMsgArgDeviceUUID":                p.id,
+		"kCBMsgArgDeviceUUID":                cln.id,
 		"kCBMsgArgCharacteristicHandle":      c.Handle,
 		"kCBMsgArgCharacteristicValueHandle": c.ValueHandle,
 		"kCBMsgArgData":                      b,
 		"kCBMsgArgType":                      map[bool]int{false: 0, true: 1}[noRsp],
 	}
 	if noRsp {
-		p.conn.sendCmd(66, args)
+		cln.conn.sendCmd(66, args)
 		return nil
 	}
-	rsp := p.conn.sendReq(65, args)
+	rsp := cln.conn.sendReq(65, args)
 	if res := rsp.result(); res != 0 {
 		return bt.ATTError(res)
 	}
 	return nil
 }
 
-// ReadDescriptor ...
-func (p *Client) ReadDescriptor(d *bt.Descriptor) ([]byte, error) {
-	rsp := p.conn.sendReq(77, xpc.Dict{
-		"kCBMsgArgDeviceUUID":       p.id,
+// ReadDescriptor reads a characteristic descriptor from a server. [Vol 3, Part G, 4.12.1]
+func (cln *Client) ReadDescriptor(d *bt.Descriptor) ([]byte, error) {
+	rsp := cln.conn.sendReq(77, xpc.Dict{
+		"kCBMsgArgDeviceUUID":       cln.id,
 		"kCBMsgArgDescriptorHandle": d.Handle,
 	})
 	if res := rsp.result(); res != 0 {
@@ -164,10 +169,10 @@ func (p *Client) ReadDescriptor(d *bt.Descriptor) ([]byte, error) {
 	return rsp.data(), nil
 }
 
-// WriteDescriptor ...
-func (p *Client) WriteDescriptor(d *bt.Descriptor, b []byte) error {
-	rsp := p.conn.sendReq(78, xpc.Dict{
-		"kCBMsgArgDeviceUUID":       p.id,
+// WriteDescriptor writes a characteristic descriptor to a server. [Vol 3, Part G, 4.12.3]
+func (cln *Client) WriteDescriptor(d *bt.Descriptor, b []byte) error {
+	rsp := cln.conn.sendReq(78, xpc.Dict{
+		"kCBMsgArgDeviceUUID":       cln.id,
 		"kCBMsgArgDescriptorHandle": d.Handle,
 		"kCBMsgArgData":             b,
 	})
@@ -177,42 +182,46 @@ func (p *Client) WriteDescriptor(d *bt.Descriptor, b []byte) error {
 	return nil
 }
 
-// ReadRSSI ...
-func (p *Client) ReadRSSI() int {
-	rsp := p.conn.sendReq(44, xpc.Dict{"kCBMsgArgDeviceUUID": p.id})
+// ReadRSSI retrieves the current RSSI value of remote peripheral. [Vol 2, Part E, 7.5.4]
+func (cln *Client) ReadRSSI() int {
+	rsp := cln.conn.sendReq(44, xpc.Dict{"kCBMsgArgDeviceUUID": cln.id})
 	if res := rsp.result(); res != 0 {
 		return 0
 	}
 	return rsp.rssi()
 }
 
-// ExchangeMTU ...
-func (p *Client) ExchangeMTU(mtu int) (int, error) {
-	return 23, bt.ErrNotImplemented
+// ExchangeMTU set the ATT_MTU to the maximum possible value that can be
+// supported by both devices [Vol 3, Part G, 4.3.1]
+func (cln *Client) ExchangeMTU(mtu int) (int, error) {
+	// TODO: find the xpc command to tell OS X the rxMTU we can handle.
+	return cln.conn.TxMTU(), nil
 }
 
-// Subscribe ...
-func (p *Client) Subscribe(c *bt.Characteristic, ind bool, fn bt.NotificationHandler) error {
-	p.conn.Lock()
-	defer p.conn.Unlock()
-	p.conn.subs[c.Handle] = fn
-	rsp := p.conn.sendReq(68, xpc.Dict{
-		"kCBMsgArgDeviceUUID":                p.id,
+// Subscribe subscribes to indication (if ind is set true), or notification of a
+// characteristic value. [Vol 3, Part G, 4.10 & 4.11]
+func (cln *Client) Subscribe(c *bt.Characteristic, ind bool, fn bt.NotificationHandler) error {
+	cln.conn.Lock()
+	defer cln.conn.Unlock()
+	cln.conn.subs[c.Handle] = fn
+	rsp := cln.conn.sendReq(68, xpc.Dict{
+		"kCBMsgArgDeviceUUID":                cln.id,
 		"kCBMsgArgCharacteristicHandle":      c.Handle,
 		"kCBMsgArgCharacteristicValueHandle": c.ValueHandle,
 		"kCBMsgArgState":                     1,
 	})
 	if res := rsp.result(); res != 0 {
-		delete(p.conn.subs, c.Handle)
+		delete(cln.conn.subs, c.Handle)
 		return bt.ATTError(res)
 	}
 	return nil
 }
 
-// Unsubscribe ...
-func (p *Client) Unsubscribe(c *bt.Characteristic, ind bool) error {
-	rsp := p.conn.sendReq(68, xpc.Dict{
-		"kCBMsgArgDeviceUUID":                p.id,
+// Unsubscribe unsubscribes to indication (if ind is set true), or notification
+// of a specified characteristic value. [Vol 3, Part G, 4.10 & 4.11]
+func (cln *Client) Unsubscribe(c *bt.Characteristic, ind bool) error {
+	rsp := cln.conn.sendReq(68, xpc.Dict{
+		"kCBMsgArgDeviceUUID":                cln.id,
 		"kCBMsgArgCharacteristicHandle":      c.Handle,
 		"kCBMsgArgCharacteristicValueHandle": c.ValueHandle,
 		"kCBMsgArgState":                     0,
@@ -220,20 +229,20 @@ func (p *Client) Unsubscribe(c *bt.Characteristic, ind bool) error {
 	if res := rsp.result(); res != 0 {
 		return bt.ATTError(res)
 	}
-	p.conn.Lock()
-	defer p.conn.Unlock()
-	delete(p.conn.subs, c.Handle)
+	cln.conn.Lock()
+	defer cln.conn.Unlock()
+	delete(cln.conn.subs, c.Handle)
 	return nil
 }
 
-// ClearSubscriptions ...
-func (p *Client) ClearSubscriptions() error {
+// ClearSubscriptions clears all subscriptions to notifications and indications.
+func (cln *Client) ClearSubscriptions() error {
 	return nil
 }
 
-// CancelConnection ...
-func (p *Client) CancelConnection() error {
-	rsp := p.conn.sendReq(32, xpc.Dict{"kCBMsgArgDeviceUUID": p.id})
+// CancelConnection disconnects the connection.
+func (cln *Client) CancelConnection() error {
+	rsp := cln.conn.sendReq(32, xpc.Dict{"kCBMsgArgDeviceUUID": cln.id})
 	if res := rsp.result(); res != 0 {
 		return bt.ATTError(res)
 	}
