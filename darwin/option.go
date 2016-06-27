@@ -6,7 +6,7 @@ type Option func(*Device) error
 // OptPeripheralRole configures the device to perform Peripheral tasks.
 func OptPeripheralRole() Option {
 	return func(d *Device) error {
-		d.role = 0
+		d.role = 1
 		return nil
 	}
 }
@@ -14,7 +14,7 @@ func OptPeripheralRole() Option {
 // OptCentralRole configures the device to perform Central tasks.
 func OptCentralRole() Option {
 	return func(d *Device) error {
-		d.role = 1
+		d.role = 0
 		return nil
 	}
 }
