@@ -75,22 +75,22 @@ func explorer(cln bt.Client) error {
 					}
 					l.Printf("    Value         %x | %q\n", b, b)
 				}
+				if *sub != 0 {
+					if (c.Property & bt.CharNotify) != 0 {
+						h := func(req []byte) { l.Printf("Notified: %q [ % X ]", string(req), req) }
+						cln.Subscribe(c, false, h)
+						time.Sleep(*sub)
+						cln.Unsubscribe(c, false)
+					}
+					if (c.Property & bt.CharIndicate) != 0 {
+						h := func(req []byte) { l.Printf("Indicated: %q [ % X ]", string(req), req) }
+						cln.Subscribe(c, true, h)
+						time.Sleep(*sub)
+						cln.Unsubscribe(c, true)
+					}
+				}
 			}
 
-			if *sub != 0 {
-				if (c.Property & bt.CharNotify) != 0 {
-					h := func(req []byte) { l.Printf("Notified: %q [ % X ]", string(req), req) }
-					cln.Subscribe(c, false, h)
-					time.Sleep(*sub)
-					cln.Unsubscribe(c, false)
-				}
-				if (c.Property & bt.CharIndicate) != 0 {
-					h := func(req []byte) { l.Printf("Indicated: %q [ % X ]", string(req), req) }
-					cln.Subscribe(c, true, h)
-					time.Sleep(*sub)
-					cln.Unsubscribe(c, true)
-				}
-			}
 		}
 		l.Printf("\n")
 	}
@@ -112,18 +112,21 @@ func main() {
 		}
 	}
 
-	dev := gatt.NewCentral()
+	dev, err := gatt.NewCentral()
+	if err != nil {
+		log.Fatalf("can't create central: %s", err)
+	}
 	exp := &explorerer{
 		Central: dev,
 		ch:      make(chan bt.Advertisement),
 		match:   match,
 	}
 
-	if err := dev.SetAdvHandler(exp); err != nil {
+	if err = dev.SetAdvHandler(exp); err != nil {
 		log.Fatalf("can't set adv handler: %s", err)
 	}
 
-	if err := dev.Scan(false); err != nil {
+	if err = dev.Scan(false); err != nil {
 		log.Fatalf("can't scan: %s", err)
 	}
 
@@ -137,11 +140,15 @@ func main() {
 	}
 
 	// Create and attach a GATT client to the connection.
-	cln := gatt.NewClient(c)
+	cln, err := gatt.NewClient(c)
+	if err != nil {
+		log.Fatalf("can't create client: %s", err)
+	}
 
 	// Start the exploration.
 	explorer(cln)
 
 	// Disconnect the connection. (On OS X, this might take a while.)
+	log.Printf("Disconnecting... ")
 	cln.CancelConnection()
 }

@@ -105,7 +105,10 @@ func (m *centralManager) Stop() {
 }
 
 func newClient(l2c bt.Conn) (bt.Client, error) {
-	cln := gatt.NewClient(l2c)
+	cln, err := gatt.NewClient(l2c)
+	if err != nil {
+		log.Fatalf("can't create client: %s\n", err)
+	}
 	txMTU, err := cln.ExchangeMTU(bt.MaxMTU)
 	if err != nil {
 		log.Printf("can't set MTU: %s\n", err)

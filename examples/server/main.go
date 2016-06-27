@@ -9,17 +9,24 @@ import (
 )
 
 func main() {
-	svr := gatt.NewServer()
+	svr, err := gatt.NewServer()
+	if err != nil {
+		log.Fatalf("can't create server: %s", err)
+	}
+
 	svr.AddService(lib.NewGAPService("Gopher"))
 	svr.AddService(lib.NewGATTService())
 
 	testSvc := svr.AddService(bt.NewService(lib.TestSvcUUID))
 	testSvc.AddCharacteristic(lib.NewCountChar())
-	testSvc.AddCharacteristic(lib.NewEchoChar())
+	// testSvc.AddCharacteristic(lib.NewEchoChar())
 
 	// batSvc := svr.AddService(lib.NewBatteryService())
 
-	dev := gatt.NewPeripheral()
+	dev, err := gatt.NewPeripheral()
+	if err != nil {
+		log.Fatalf("can't create device: %s", err)
+	}
 	// dev.AdvertiseNameAndServices("Gopher", testSvc.UUID, batSvc.UUID)
 	dev.AdvertiseNameAndServices("Gopher", testSvc.UUID)
 

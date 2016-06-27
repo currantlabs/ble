@@ -8,7 +8,11 @@ import (
 )
 
 func main() {
-	dev := gatt.NewBroadcaster()
+	dev, err := gatt.NewBroadcaster()
+	if err != nil {
+		log.Fatalf("can't create broadcaster: %s", err)
+	}
+
 	if err := dev.AdvertiseNameAndServices("Hello"); err != nil {
 		log.Fatalf("can't advertise: %s", err)
 	}

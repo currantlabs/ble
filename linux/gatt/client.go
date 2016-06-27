@@ -5,8 +5,8 @@ import (
 	"log"
 	"sync"
 
-	"github.com/currantlabs/x/io/bt"
 	"github.com/currantlabs/ble/linux/att"
+	"github.com/currantlabs/x/io/bt"
 )
 
 const (
@@ -15,14 +15,14 @@ const (
 )
 
 // NewClient ...
-func NewClient(conn bt.Conn) *Client {
+func NewClient(conn bt.Conn) (*Client, error) {
 	p := &Client{
 		subs: make(map[uint16]*sub),
 		conn: conn,
 	}
 	p.ac = att.NewClient(conn, p)
 	go p.ac.Loop()
-	return p
+	return p, nil
 }
 
 // Client ...

@@ -7,7 +7,10 @@ import (
 )
 
 func main() {
-	dev := gatt.NewCentral()
+	dev, err := gatt.NewCentral()
+	if err != nil {
+		log.Fatalf("can't create central: %s", err)
+	}
 
 	// Create a centralManager to handle concurrent connections.
 	m := newCentralManager(dev)

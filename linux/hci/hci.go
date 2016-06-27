@@ -7,10 +7,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/currantlabs/x/io/bt"
 	"github.com/currantlabs/ble/linux/hci/cmd"
 	"github.com/currantlabs/ble/linux/hci/evt"
 	"github.com/currantlabs/ble/linux/hci/skt"
+	"github.com/currantlabs/x/io/bt"
 )
 
 // Command ...
@@ -30,6 +30,15 @@ type handlerFn func(b []byte) error
 type pkt struct {
 	cmd  Command
 	done chan []byte
+}
+
+// NewHCI returns a hci device.
+func NewHCI(opts ...Option) (*HCI, error) {
+	h := &HCI{}
+	if err := h.Option(opts...); err != nil {
+		return nil, err
+	}
+	return h, nil
 }
 
 // HCI ...

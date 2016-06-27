@@ -6,13 +6,13 @@ import (
 	"log"
 	"sync"
 
-	"github.com/currantlabs/x/io/bt"
 	"github.com/currantlabs/ble/linux/att"
+	"github.com/currantlabs/x/io/bt"
 )
 
 // NewServer ...
-func NewServer() *Server {
-	return &Server{}
+func NewServer() (*Server, error) {
+	return &Server{}, nil
 }
 
 // Server ...

@@ -8,8 +8,8 @@ import (
 )
 
 // NewServer returns a GATT server.
-func NewServer() *Server {
-	return &Server{}
+func NewServer() (*Server, error) {
+	return &Server{}, nil
 }
 
 // A Server is a GATT server.

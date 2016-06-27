@@ -65,15 +65,18 @@ type Device struct {
 }
 
 // NewDevice ...
-func NewDevice(role int) (*Device, error) {
+func NewDevice(opts ...Option) (*Device, error) {
 	d := &Device{
-		role:   role,
 		rspc:   make(chan msg),
 		conns:  make(map[string]*conn),
 		chConn: make(chan *conn),
 		chars:  make(map[int]*bt.Characteristic),
 		base:   1,
 	}
+	if err := d.Option(opts...); err != nil {
+		return nil, err
+	}
+
 	d.xpc = xpc.XpcConnect("com.apple.blued", d)
 	return d, nil
 }

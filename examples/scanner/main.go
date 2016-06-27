@@ -26,11 +26,14 @@ func handle(a bt.Advertisement) {
 }
 
 func main() {
-	dev := gatt.NewObserver()
-	if err := dev.SetAdvHandler(bt.AdvHandlerFunc(handle)); err != nil {
+	dev, err := gatt.NewObserver()
+	if err != nil {
+		log.Fatalf("can't create observer: %s", err)
+	}
+	if err = dev.SetAdvHandler(bt.AdvHandlerFunc(handle)); err != nil {
 		log.Fatalf("can't set adv handler: %s", err)
 	}
-	if err := dev.Scan(true); err != nil {
+	if err = dev.Scan(true); err != nil {
 		log.Fatalf("can't scan: %s", err)
 	}
 	select {}

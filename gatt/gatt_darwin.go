@@ -1,66 +1,49 @@
 package gatt
 
 import (
-	"log"
-
 	"github.com/currantlabs/ble/darwin"
+
 	"github.com/currantlabs/x/io/bt"
+	"github.com/pkg/errors"
 )
 
 // NewBroadcaster ...
-func NewBroadcaster() bt.Broadcaster {
-	dev, err := darwin.NewDevice(1)
-	if err != nil {
-		log.Fatalf("can't create Broadcaster: %s", err)
-	}
-	if err := dev.Init(nil); err != nil {
-		log.Fatalf("can't init Broadcaster: %s", err)
-	}
-	return dev
+func NewBroadcaster() (bt.Broadcaster, error) {
+	return newDev("broadcaster", darwin.OptPeripheralRole())
 }
 
 // NewObserver ...
-func NewObserver() bt.Observer {
-	dev, err := darwin.NewDevice(0)
-	if err != nil {
-		log.Fatalf("can't create Observer: %s", err)
-	}
-	if err := dev.Init(nil); err != nil {
-		log.Fatalf("can't init Observer: %s", err)
-	}
-	return dev
+func NewObserver() (bt.Observer, error) {
+	return newDev("observer", darwin.OptCentralRole())
 }
 
 // NewPeripheral ...
-func NewPeripheral() bt.Peripheral {
-	dev, err := darwin.NewDevice(1)
-	if err != nil {
-		log.Fatalf("can't create Peripheral: %s", err)
-	}
-	if err := dev.Init(nil); err != nil {
-		log.Fatalf("can't init Peripheral: %s", err)
-	}
-	return dev
+func NewPeripheral() (bt.Peripheral, error) {
+	return newDev("peripheral", darwin.OptPeripheralRole())
 }
 
 // NewCentral ...
-func NewCentral() bt.Central {
-	dev, err := darwin.NewDevice(0)
+func NewCentral() (bt.Central, error) {
+	return newDev("central", darwin.OptCentralRole())
+}
+
+func newDev(role string, opts ...darwin.Option) (*darwin.Device, error) {
+	dev, err := darwin.NewDevice(opts...)
 	if err != nil {
-		log.Fatalf("can't create Central: %s", err)
+		return nil, errors.Wrapf(err, "create %s failed", role)
 	}
 	if err := dev.Init(nil); err != nil {
-		log.Fatalf("can't init Central: %s", err)
+		return nil, errors.Wrapf(err, "init %s failed", role)
 	}
-	return dev
+	return dev, nil
 }
 
 // NewServer ...
-func NewServer() bt.Server {
+func NewServer() (bt.Server, error) {
 	return darwin.NewServer()
 }
 
 // NewClient ...
-func NewClient(c bt.Conn) bt.Client {
+func NewClient(c bt.Conn) (bt.Client, error) {
 	return darwin.NewClient(c)
 }

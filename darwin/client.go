@@ -15,11 +15,11 @@ type Client struct {
 }
 
 // NewClient ...
-func NewClient(c bt.Conn) *Client {
+func NewClient(c bt.Conn) (*Client, error) {
 	return &Client{
 		conn: c.(*conn),
 		id:   xpc.MakeUUID(c.RemoteAddr().String()),
-	}
+	}, nil
 }
 
 // Address returns UUID of the remote peripheral.
