@@ -78,6 +78,15 @@ type HCI struct {
 	done chan bool
 }
 
+// Option sets the options specified.
+func (h *HCI) Option(opts ...Option) error {
+	var err error
+	for _, opt := range opts {
+		err = opt(h)
+	}
+	return err
+}
+
 // Init ...
 func (h *HCI) Init(id int) error {
 	skt, err := skt.NewSocket(id)

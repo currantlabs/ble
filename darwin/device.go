@@ -78,6 +78,15 @@ func NewDevice(role int) (*Device, error) {
 	return d, nil
 }
 
+// Option sets the options specified.
+func (d *Device) Option(opts ...Option) error {
+	var err error
+	for _, opt := range opts {
+		err = opt(d)
+	}
+	return err
+}
+
 // Init ...
 func (d *Device) Init(f func(Device, State)) error {
 	rsp := d.sendReq(1, xpc.Dict{
