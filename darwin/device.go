@@ -267,9 +267,13 @@ func (d *Device) AddService(s *bt.Service) error {
 
 // SetServices ...
 func (d *Device) SetServices(ss []*bt.Service) error {
-	d.RemoveAllServices()
+	if err := d.RemoveAllServices(); err != nil {
+		return nil
+	}
 	for _, s := range ss {
-		d.AddService(s)
+		if err := d.AddService(s); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -435,17 +439,14 @@ func (d *Device) conn(a bt.Addr) *conn {
 	return c
 }
 
+// sendReq sends a message and waits for its reply.
 func (d *Device) sendReq(id int, args xpc.Dict) msg {
-	d.sendCBMsg(id, args)
+	d.sendCmd(id, args)
 	return <-d.rspc
 }
 
 func (d *Device) sendCmd(id int, args xpc.Dict) error {
-	d.sendCBMsg(id, args)
-	return nil
-}
-
-func (d *Device) sendCBMsg(id int, args xpc.Dict) {
 	// log.Printf("<< %d, %v", id, args)
 	d.xpc.Send(xpc.Dict{"kCBMsgId": id, "kCBMsgArgs": args}, false)
+	return nil
 }

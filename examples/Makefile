@@ -17,10 +17,9 @@ endif
 
 Q ?= @
 
-GITSYM ?= github.com/currantlabs/$@/config.GitCommit
-GITHEAD	?= $(shell git rev-parse --quiet HEAD)
-
-BUILDDATESYM ?= github.com/currantlabs/$@/config.BuildDate
+GITSYM		?= github.com/currantlabs/$@/config.GitCommit
+GITHEAD		?= $(shell git rev-parse --quiet HEAD)
+BUILDDATESYM	?= github.com/currantlabs/$@/config.BuildDate
 BUILDDATE	?= $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 LDFLAGS		?= -ldflags="-w -X $(BUILDDATESYM)=$(BUILDDATE) -X $(GITSYM)=$(GITHEAD)"

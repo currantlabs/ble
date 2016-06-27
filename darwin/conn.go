@@ -115,11 +115,11 @@ func (c *conn) unsubscribed(char *bt.Characteristic) {
 }
 
 func (c *conn) sendReq(id int, args xpc.Dict) msg {
-	c.dev.sendCBMsg(id, args)
+	c.dev.sendCmd(id, args)
 	m := <-c.rspc
 	return msg(m.args())
 }
 
 func (c *conn) sendCmd(id int, args xpc.Dict) {
-	c.dev.sendCBMsg(id, args)
+	c.dev.sendCmd(id, args)
 }
