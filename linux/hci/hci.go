@@ -286,7 +286,8 @@ func (h *HCI) asyncLoop() {
 				default:
 					a = newAdvertisement(e, i)
 				}
-				h.advHandler.Handle(a)
+				// FIXME:
+				go h.advHandler.Handle(a)
 			}
 		}
 	}
