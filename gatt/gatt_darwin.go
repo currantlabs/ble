@@ -32,7 +32,7 @@ func newDev(role string, opts ...darwin.Option) (*darwin.Device, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "create %s failed", role)
 	}
-	if err := dev.Init(nil); err != nil {
+	if err := dev.Init(); err != nil {
 		return nil, errors.Wrapf(err, "init %s failed", role)
 	}
 	return dev, nil

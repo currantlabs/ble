@@ -45,8 +45,8 @@ func (cln *Client) DiscoverServices(ss []bt.UUID) ([]*bt.Service, error) {
 		"kCBMsgArgDeviceUUID": cln.id,
 		"kCBMsgArgUUIDs":      uuidSlice(ss),
 	})
-	if res := rsp.result(); res != 0 {
-		return nil, bt.ATTError(res)
+	if rsp.err() != nil {
+		return nil, rsp.err()
 	}
 	svcs := []*bt.Service{}
 	for _, xss := range rsp.services() {
@@ -70,8 +70,8 @@ func (cln *Client) DiscoverIncludedServices(ss []bt.UUID, s *bt.Service) ([]*bt.
 		"kCBMsgArgServiceEndHandle":   s.EndHandle,
 		"kCBMsgArgUUIDs":              uuidSlice(ss),
 	})
-	if res := rsp.result(); res != 0 {
-		return nil, bt.ATTError(res)
+	if rsp.err() != nil {
+		return nil, rsp.err()
 	}
 	return nil, bt.ErrNotImplemented
 }
@@ -85,8 +85,8 @@ func (cln *Client) DiscoverCharacteristics(cs []bt.UUID, s *bt.Service) ([]*bt.C
 		"kCBMsgArgServiceEndHandle":   s.EndHandle,
 		"kCBMsgArgUUIDs":              uuidSlice(cs),
 	})
-	if res := rsp.result(); res != 0 {
-		return nil, bt.ATTError(res)
+	if rsp.err() != nil {
+		return nil, rsp.err()
 	}
 	for _, xcs := range rsp.characteristics() {
 		xc := msg(xcs.(xpc.Dict))
@@ -126,8 +126,8 @@ func (cln *Client) ReadCharacteristic(c *bt.Characteristic) ([]byte, error) {
 		"kCBMsgArgCharacteristicHandle":      c.Handle,
 		"kCBMsgArgCharacteristicValueHandle": c.ValueHandle,
 	})
-	if res := rsp.result(); res != 0 {
-		return nil, bt.ATTError(res)
+	if rsp.err() != nil {
+		return nil, rsp.err()
 	}
 	return rsp.data(), nil
 }
@@ -150,11 +150,7 @@ func (cln *Client) WriteCharacteristic(c *bt.Characteristic, b []byte, noRsp boo
 		cln.conn.sendCmd(66, args)
 		return nil
 	}
-	rsp := cln.conn.sendReq(65, args)
-	if res := rsp.result(); res != 0 {
-		return bt.ATTError(res)
-	}
-	return nil
+	return cln.conn.sendReq(65, args).err()
 }
 
 // ReadDescriptor reads a characteristic descriptor from a server. [Vol 3, Part G, 4.12.1]
@@ -163,8 +159,8 @@ func (cln *Client) ReadDescriptor(d *bt.Descriptor) ([]byte, error) {
 		"kCBMsgArgDeviceUUID":       cln.id,
 		"kCBMsgArgDescriptorHandle": d.Handle,
 	})
-	if res := rsp.result(); res != 0 {
-		return nil, bt.ATTError(res)
+	if rsp.err() != nil {
+		return nil, rsp.err()
 	}
 	return rsp.data(), nil
 }
@@ -176,16 +172,13 @@ func (cln *Client) WriteDescriptor(d *bt.Descriptor, b []byte) error {
 		"kCBMsgArgDescriptorHandle": d.Handle,
 		"kCBMsgArgData":             b,
 	})
-	if res := rsp.result(); res != 0 {
-		return bt.ATTError(res)
-	}
-	return nil
+	return rsp.err()
 }
 
 // ReadRSSI retrieves the current RSSI value of remote peripheral. [Vol 2, Part E, 7.5.4]
 func (cln *Client) ReadRSSI() int {
 	rsp := cln.conn.sendReq(44, xpc.Dict{"kCBMsgArgDeviceUUID": cln.id})
-	if res := rsp.result(); res != 0 {
+	if rsp.err() != nil {
 		return 0
 	}
 	return rsp.rssi()
@@ -210,9 +203,9 @@ func (cln *Client) Subscribe(c *bt.Characteristic, ind bool, fn bt.NotificationH
 		"kCBMsgArgCharacteristicValueHandle": c.ValueHandle,
 		"kCBMsgArgState":                     1,
 	})
-	if res := rsp.result(); res != 0 {
+	if rsp.err() != nil {
 		delete(cln.conn.subs, c.Handle)
-		return bt.ATTError(res)
+		return rsp.err()
 	}
 	return nil
 }
@@ -226,8 +219,8 @@ func (cln *Client) Unsubscribe(c *bt.Characteristic, ind bool) error {
 		"kCBMsgArgCharacteristicValueHandle": c.ValueHandle,
 		"kCBMsgArgState":                     0,
 	})
-	if res := rsp.result(); res != 0 {
-		return bt.ATTError(res)
+	if rsp.err() != nil {
+		return rsp.err()
 	}
 	cln.conn.Lock()
 	defer cln.conn.Unlock()
@@ -246,10 +239,7 @@ func (cln *Client) ClearSubscriptions() error {
 // CancelConnection disconnects the connection.
 func (cln *Client) CancelConnection() error {
 	rsp := cln.conn.sendReq(32, xpc.Dict{"kCBMsgArgDeviceUUID": cln.id})
-	if res := rsp.result(); res != 0 {
-		return bt.ATTError(res)
-	}
-	return nil
+	return rsp.err()
 }
 
 type sub struct {

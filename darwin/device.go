@@ -39,15 +39,8 @@ const (
 	evtMasterConnectionComplete   = 82
 )
 
-type message struct {
-	id   int
-	args xpc.Dict
-	rspc chan msg
-}
-
-// Device ...
+// Device is either a Peripheral or Central device.
 type Device struct {
-	init chan bool
 	xpc  xpc.XPC
 	role int // 1: peripheralManager (server), 0: centralManager (client)
 
@@ -64,7 +57,7 @@ type Device struct {
 	base  int
 }
 
-// NewDevice ...
+// NewDevice returns a BLE device.
 func NewDevice(opts ...Option) (*Device, error) {
 	d := &Device{
 		rspc:   make(chan msg),
@@ -91,7 +84,7 @@ func (d *Device) Option(opts ...Option) error {
 }
 
 // Init ...
-func (d *Device) Init(f func(Device, State)) error {
+func (d *Device) Init() error {
 	rsp := d.sendReq(1, xpc.Dict{
 		"kCBMsgArgName": fmt.Sprintf("gopher-%v", time.Now().Unix()),
 		"kCBMsgArgOptions": xpc.Dict{
@@ -99,32 +92,28 @@ func (d *Device) Init(f func(Device, State)) error {
 		},
 		"kCBMsgArgType": d.role,
 	})
-	s := State(rsp.state())
-	if s != StatePoweredOn {
+	if s := State(rsp.state()); s != StatePoweredOn {
 		return fmt.Errorf("state: %s", s)
 	}
-	log.Printf("state: %s", s)
 	return nil
 }
 
 // AdvertiseMfgData ...
 func (d *Device) AdvertiseMfgData(b []byte) error {
-	rsp := d.sendReq(8, xpc.Dict{
+	return d.sendReq(8, xpc.Dict{
 		"kCBAdvDataAppleMfgData": b,
-	})
-	return result("Advertise", rsp)
+	}).err()
 }
 
-// AdvertiseNameAndServices ...
+// AdvertiseNameAndServices advertises name and specifid service UUIDs.
 func (d *Device) AdvertiseNameAndServices(name string, ss ...bt.UUID) error {
-	rsp := d.sendReq(8, xpc.Dict{
+	return d.sendReq(8, xpc.Dict{
 		"kCBAdvDataLocalName":    name,
 		"kCBAdvDataServiceUUIDs": uuidSlice(ss)},
-	)
-	return result("AdvertiseNameandService", rsp)
+	).err()
 }
 
-// AdvertiseIBeaconData ...
+// AdvertiseIBeaconData advertises iBeacon packet with specified manufacturer data.
 func (d *Device) AdvertiseIBeaconData(md []byte) error {
 	var utsname xpc.Utsname
 	xpc.Uname(&utsname)
@@ -134,11 +123,10 @@ func (d *Device) AdvertiseIBeaconData(md []byte) error {
 		b := []byte{byte(l + 5), 0xFF, 0x4C, 0x00, 0x02, byte(l)}
 		return d.AdvertiseMfgData(append(b, md...))
 	}
-	rsp := d.sendReq(8, xpc.Dict{"kCBAdvDataAppleBeaconKey": md})
-	return result("AdvertisingIbeaconData", rsp)
+	return d.sendReq(8, xpc.Dict{"kCBAdvDataAppleBeaconKey": md}).err()
 }
 
-// AdvertiseIBeacon ...
+// AdvertiseIBeacon advertises iBeacon packet.
 func (d *Device) AdvertiseIBeacon(u bt.UUID, major, minor uint16, pwr int8) error {
 	b := make([]byte, 21)
 	copy(b, bt.Reverse(u))                    // Big endian
@@ -148,9 +136,9 @@ func (d *Device) AdvertiseIBeacon(u bt.UUID, major, minor uint16, pwr int8) erro
 	return d.AdvertiseIBeaconData(b)
 }
 
-// StopAdvertising ...
+// StopAdvertising stops advertising.
 func (d *Device) StopAdvertising() error {
-	return result("StopAdvertising", d.sendReq(9, nil))
+	return d.sendReq(9, nil).err()
 }
 
 // SetAdvHandler ...
@@ -169,19 +157,12 @@ func (d *Device) Scan(allowDup bool) error {
 	})
 }
 
-// StopScanning ...
+// StopScanning stops scanning
 func (d *Device) StopScanning() error {
 	return d.sendCmd(30, nil)
 }
 
-func result(msg string, rsp msg) error {
-	if res := rsp.result(); res != 0 {
-		return fmt.Errorf("%s: %d", msg, res)
-	}
-	return nil
-}
-
-// RemoveAllServices ...
+// RemoveAllServices removes all services of device's
 func (d *Device) RemoveAllServices() error {
 	return d.sendCmd(12, nil)
 }
@@ -204,7 +185,6 @@ func (d *Device) AddService(s *bt.Service) error {
 		s.UUID.Equal(bt.HIDUUID) {
 		return nil
 	}
-
 	xs := xpc.Dict{
 		"kCBMsgArgAttributeID":     d.base,
 		"kCBMsgArgAttributeIDs":    []int{},
@@ -285,8 +265,7 @@ func (d *Device) AddService(s *bt.Service) error {
 	}
 	xs["kCBMsgArgCharacteristics"] = xcs
 
-	rsp := d.sendReq(10, xs)
-	return result("AddServices", rsp)
+	return d.sendReq(10, xs).err()
 }
 
 // SetServices ...

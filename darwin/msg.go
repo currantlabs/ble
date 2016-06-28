@@ -1,6 +1,9 @@
 package darwin
 
-import "github.com/currantlabs/ble/darwin/xpc"
+import (
+	"github.com/currantlabs/ble/darwin/xpc"
+	"github.com/currantlabs/x/io/bt"
+)
 
 type msg xpc.Dict
 
@@ -40,3 +43,10 @@ func (m msg) descriptorHandle() int   { return xpc.Dict(m).MustGetInt("kCBMsgArg
 func (m msg) connectionInterval() int { return xpc.Dict(m).MustGetInt("kCBMsgArgConnectionInterval") }
 func (m msg) connectionLatency() int  { return xpc.Dict(m).MustGetInt("kCBMsgArgConnectionLatency") }
 func (m msg) supervisionTimeout() int { return xpc.Dict(m).MustGetInt("kCBMsgArgSupervisionTimeout") }
+
+func (m msg) err() error {
+	if code := m.result(); code != 0 {
+		return bt.ATTError(code)
+	}
+	return nil
+}
