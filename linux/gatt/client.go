@@ -143,7 +143,7 @@ func (p *Client) DiscoverDescriptors(filter []bt.UUID, c *bt.Characteristic) ([]
 	p.Lock()
 	defer p.Unlock()
 	start := c.ValueHandle + 1
-	for start < c.EndHandle {
+	for start <= c.EndHandle {
 		fmt, b, err := p.ac.FindInformation(start, c.EndHandle)
 		if err == bt.ErrAttrNotFound {
 			break
