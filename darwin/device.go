@@ -186,10 +186,22 @@ func (d *Device) RemoveAllServices() error {
 	return d.sendCmd(12, nil)
 }
 
-// AddService ...
+// AddService adds a service to device's database.
+// The following services are ignored as they are provided by OS X.
+//
+// 0x1800 (Generic Access)
+// 0x1801 (Generic Attribute)
+// 0x1805 (Current Time Service)
+// 0x180A (Device Information)
+// 0x180F (Battery Service)
+// 0x1812 (Human Interface Device)
 func (d *Device) AddService(s *bt.Service) error {
-	// skip GATT and GAP services
-	if s.UUID.Equal(bt.GAPUUID) || s.UUID.Equal(bt.GATTUUID) {
+	if s.UUID.Equal(bt.GAPUUID) ||
+		s.UUID.Equal(bt.GATTUUID) ||
+		s.UUID.Equal(bt.CurrentTimeUUID) ||
+		s.UUID.Equal(bt.DeviceInfoUUID) ||
+		s.UUID.Equal(bt.BatteryUUID) ||
+		s.UUID.Equal(bt.HIDUUID) {
 		return nil
 	}
 
