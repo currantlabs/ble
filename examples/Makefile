@@ -5,12 +5,13 @@ GOOS		?= linux
 BUILD_CMD	?= GOGC=off GOOS=$(GOOS) go build $(LDFLAGS) -i -o bin/$@ $@/*.go
 DEPLOY_CMD	?= scp bin/$< gentoo:/tmp
 RUN_CMD		?= ssh -t gentoo sudo LOGXI=${LOGXI} /tmp/$<
+ARGS		?=
 DEPLOY_CMD	=
 
 ifeq ($(shell uname),Linux)
-RUN_CMD		= sudo LOGXI=${LOGXI} bin/$<
+RUN_CMD		= sudo LOGXI=${LOGXI} bin/$< ${ARGS}
 else
-RUN_CMD		= LOGXI=${LOGXI} bin/$<
+RUN_CMD		= LOGXI=${LOGXI} bin/$< ${ARGS}
 endif
 
 .PHONY: $(PROGS)

@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"os"
 	"strings"
 	"time"
 
@@ -37,62 +36,64 @@ func (e *explorerer) Handle(a bt.Advertisement) {
 }
 
 func explorer(cln bt.Client) error {
-	l := log.New(os.Stdout, "["+cln.Address().String()+"] ", log.Lmicroseconds)
+	fmt.Printf("Exploring Peripheral [ %s ] ...\n", cln.Address())
 
 	ss, err := cln.DiscoverServices(nil)
 	if err != nil {
 		return fmt.Errorf("can't discover services: %s\n", err)
 	}
 	for _, s := range ss {
-		l.Printf("Service: %s %s\n", s.UUID.String(), bt.Name(s.UUID))
+		fmt.Printf("Service: %s %s\n", s.UUID.String(), bt.Name(s.UUID))
 
 		cs, err := cln.DiscoverCharacteristics(nil, s)
 		if err != nil {
 			return fmt.Errorf("can't discover characteristics: %s\n", err)
 		}
 		for _, c := range cs {
-			l.Printf("  Characteristic: %s, Property: 0x%02X, %s\n", c.UUID, c.Property, bt.Name(c.UUID))
+			fmt.Printf("  Characteristic: %s, Property: 0x%02X, %s\n", c.UUID, c.Property, bt.Name(c.UUID))
 			if (c.Property & bt.CharRead) != 0 {
 				b, err := cln.ReadCharacteristic(c)
 				if err != nil {
-					l.Printf("Failed to read characteristic: %s\n", err)
+					fmt.Printf("Failed to read characteristic: %s\n", err)
 					continue
 				}
-				l.Printf("    Value         %x | %q\n", b, b)
+				fmt.Printf("    Value         %x | %q\n", b, b)
 			}
 
-			for _, c := range cs {
-				ds, err := cln.DiscoverDescriptors(nil, c)
+			ds, err := cln.DiscoverDescriptors(nil, c)
+			if err != nil {
+				return fmt.Errorf("can't discover descriptors: %s\n", err)
+			}
+			for _, d := range ds {
+				fmt.Printf("    Descriptor: %s, %s\n", d.UUID, bt.Name(d.UUID))
+				b, err := cln.ReadDescriptor(d)
 				if err != nil {
-					return fmt.Errorf("can't discover descriptors: %s\n", err)
+					fmt.Printf("Failed to read descriptor: %s\n", err)
+					continue
 				}
-				for _, d := range ds {
-					l.Printf("    Descriptor: %s, %s\n", d.UUID, bt.Name(d.UUID))
-					b, err := cln.ReadDescriptor(d)
-					if err != nil {
-						l.Printf("Failed to read descriptor: %s\n", err)
-						continue
-					}
-					l.Printf("    Value         %x | %q\n", b, b)
+				fmt.Printf("    Value         %x | %q\n", b, b)
+			}
+			if *sub != 0 {
+				if (c.Property & bt.CharNotify) != 0 {
+					fmt.Printf("\n-- Subscribe to notification for %s --\n", *sub)
+					h := func(req []byte) { fmt.Printf("Notified: %q [ % X ]\n", string(req), req) }
+					cln.Subscribe(c, false, h)
+					time.Sleep(*sub)
+					cln.Unsubscribe(c, false)
+					fmt.Printf("-- Unsubscribe to notification --\n")
 				}
-				if *sub != 0 {
-					if (c.Property & bt.CharNotify) != 0 {
-						h := func(req []byte) { l.Printf("Notified: %q [ % X ]", string(req), req) }
-						cln.Subscribe(c, false, h)
-						time.Sleep(*sub)
-						cln.Unsubscribe(c, false)
-					}
-					if (c.Property & bt.CharIndicate) != 0 {
-						h := func(req []byte) { l.Printf("Indicated: %q [ % X ]", string(req), req) }
-						cln.Subscribe(c, true, h)
-						time.Sleep(*sub)
-						cln.Unsubscribe(c, true)
-					}
+				if (c.Property & bt.CharIndicate) != 0 {
+					fmt.Printf("\n-- Subscribe to indication of %s --\n", *sub)
+					h := func(req []byte) { fmt.Printf("Indicated: %q [ % X ]\n", string(req), req) }
+					cln.Subscribe(c, true, h)
+					time.Sleep(*sub)
+					cln.Unsubscribe(c, true)
+					fmt.Printf("-- Unsubscribe to indication --\n")
 				}
 			}
 
 		}
-		l.Printf("\n")
+		fmt.Printf("\n")
 	}
 	return nil
 }
@@ -149,6 +150,6 @@ func main() {
 	explorer(cln)
 
 	// Disconnect the connection. (On OS X, this might take a while.)
-	log.Printf("Disconnecting... ")
+	fmt.Printf("Disconnecting [ %s ]... (this might take up to few seconds on OS X)\n", cln.Address())
 	cln.CancelConnection()
 }
