@@ -77,17 +77,25 @@ func explorer(cln bt.Client) error {
 				if (c.Property & bt.CharNotify) != 0 {
 					fmt.Printf("\n-- Subscribe to notification for %s --\n", *sub)
 					h := func(req []byte) { fmt.Printf("Notified: %q [ % X ]\n", string(req), req) }
-					cln.Subscribe(c, false, h)
+					if err := cln.Subscribe(c, false, h); err != nil {
+						log.Fatalf("subscribe failed: %s", err)
+					}
 					time.Sleep(*sub)
-					cln.Unsubscribe(c, false)
+					if err := cln.Unsubscribe(c, false); err != nil {
+						log.Fatalf("unsubscribe failed: %s", err)
+					}
 					fmt.Printf("-- Unsubscribe to notification --\n")
 				}
 				if (c.Property & bt.CharIndicate) != 0 {
 					fmt.Printf("\n-- Subscribe to indication of %s --\n", *sub)
 					h := func(req []byte) { fmt.Printf("Indicated: %q [ % X ]\n", string(req), req) }
-					cln.Subscribe(c, true, h)
+					if err := cln.Subscribe(c, true, h); err != nil {
+						log.Fatalf("subscribe failed: %s", err)
+					}
 					time.Sleep(*sub)
-					cln.Unsubscribe(c, true)
+					if err := cln.Unsubscribe(c, true); err != nil {
+						log.Fatalf("unsubscribe failed: %s", err)
+					}
 					fmt.Printf("-- Unsubscribe to indication --\n")
 				}
 			}
