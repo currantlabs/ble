@@ -13,3 +13,18 @@ var (
 	// [Vol 3, Part F, 3.3.3]
 	ErrSeqProtoTimeout = errors.New("req timeout")
 )
+
+var rspOfReq = map[byte]byte{
+	ExchangeMTURequestCode:     ExchangeMTUResponseCode,
+	FindInformationRequestCode: FindInformationResponseCode,
+	FindByTypeValueRequestCode: FindByTypeValueResponseCode,
+	ReadByTypeRequestCode:      ReadByTypeResponseCode,
+	ReadRequestCode:            ReadResponseCode,
+	ReadBlobRequestCode:        ReadBlobResponseCode,
+	ReadMultipleRequestCode:    ReadMultipleResponseCode,
+	ReadByGroupTypeRequestCode: ReadByGroupTypeResponseCode,
+	WriteRequestCode:           WriteResponseCode,
+	PrepareWriteRequestCode:    PrepareWriteResponseCode,
+	ExecuteWriteRequestCode:    ExecuteWriteResponseCode,
+	HandleValueIndicationCode:  HandleValueConfirmationCode,
+}

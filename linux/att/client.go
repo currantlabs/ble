@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/currantlabs/x/io/bt"
+	"github.com/pkg/errors"
 )
 
 // NotificationHandler handles notification or indication.
@@ -479,15 +480,28 @@ func (c *Client) sendCmd(b []byte) error {
 
 func (c *Client) sendReq(b []byte) (rsp []byte, err error) {
 	if _, err := c.l2c.Write(b); err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "send ATT request failed")
 	}
-	select {
-	case rsp := <-c.rspc:
-		return rsp, nil
-	case err := <-c.chErr:
-		return nil, err
-	case <-time.After(30 * time.Second):
-		return nil, ErrSeqProtoTimeout
+	for {
+		select {
+		case rsp := <-c.rspc:
+			if rsp[0] == ErrorResponseCode || rsp[0] == rspOfReq[b[0]] {
+				return rsp, nil
+			}
+			// Sometimes when we connect to an Apple device, it sends
+			// ATT requests asynchronously to us. // In this case, we
+			// returns an ErrReqNotSupp response, and continue to wait
+			// the response to our request.
+			errRsp := newErrorResponse(rsp[0], 0x0000, bt.ErrReqNotSupp)
+			_, err := c.l2c.Write(errRsp)
+			if err != nil {
+				return nil, errors.Wrap(err, "unexpected ATT response recieved")
+			}
+		case err := <-c.chErr:
+			return nil, err
+		case <-time.After(30 * time.Second):
+			return nil, ErrSeqProtoTimeout
+		}
 	}
 }
 
