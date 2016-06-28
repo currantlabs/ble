@@ -103,7 +103,8 @@ func (c *conn) subscribed(char *bt.Characteristic) {
 	}
 	n := bt.NewNotifier(send)
 	c.notifiers[h] = n
-	go char.NotifyHandler.ServeNotify(nil, n)
+	req := bt.NewRequest(c, nil, 0) // convey *conn to user handler.
+	go char.NotifyHandler.ServeNotify(req, n)
 }
 
 // server (peripheral)
