@@ -314,22 +314,23 @@ func (d *Device) HandleXpcEvent(event xpc.Dict, err error) {
 		if d.advHandler == nil {
 			break
 		}
-		a := &adv{
-			args: m.args(),
-			ad:   args.advertisementData(),
-		}
+		a := &adv{args: m.args(), ad: args.advertisementData()}
 		go d.advHandler.Handle(a)
 
 	case evtConfirmation:
 		// log.Printf("confirmed: %d", args.attributeID())
 
 	case evtATTMTU:
-		d.conn(args.deviceUUID()).SetTxMTU(args.attMTU())
+		d.conn(args).SetTxMTU(args.attMTU())
 
 	case evtSleveConnectionComplete:
+		// remote peripheral is connected.
 		fallthrough
 	case evtMasterConnectionComplete:
-		c := d.conn(args.deviceUUID())
+		// remote central is connected.
+
+		// Could be LEConnectionComplete or LEConnectionUpdateComplete.
+		c := d.conn(args)
 		c.connInterval = args.connectionInterval()
 		c.connLatency = args.connectionLatency()
 		c.supervisionTimeout = args.supervisionTimeout()
@@ -339,7 +340,7 @@ func (d *Device) HandleXpcEvent(event xpc.Dict, err error) {
 		char := d.chars[aid]
 		v := char.Value
 		if v == nil {
-			c := d.conn(args.deviceUUID())
+			c := d.conn(args)
 			req := bt.NewRequest(c, nil, args.offset())
 			buf := bytes.NewBuffer(make([]byte, 0, c.txMTU-1))
 			rsp := bt.NewResponseWriter(buf)
@@ -359,7 +360,7 @@ func (d *Device) HandleXpcEvent(event xpc.Dict, err error) {
 			xw := msg(xxw.(xpc.Dict))
 			aid := xw.attributeID()
 			char := d.chars[aid]
-			req := bt.NewRequest(d.conn(args.deviceUUID()), xw.data(), xw.offset())
+			req := bt.NewRequest(d.conn(args), xw.data(), xw.offset())
 			char.WriteHandler.ServeWrite(req, nil)
 			if xw.ignoreResponse() == 1 {
 				continue
@@ -373,21 +374,23 @@ func (d *Device) HandleXpcEvent(event xpc.Dict, err error) {
 		}
 
 	case evtSubscribe:
-		d.conn(args.deviceUUID()).subscribed(d.chars[args.attributeID()])
+		// characteristic is subscribed by remote central.
+		d.conn(args).subscribed(d.chars[args.attributeID()])
 
 	case evtUnubscribe:
-		d.conn(args.deviceUUID()).unsubscribed(d.chars[args.attributeID()])
+		// characteristic is unsubscribed by remote central.
+		d.conn(args).unsubscribed(d.chars[args.attributeID()])
 
 	case evtPeripheralConnected:
-		d.chConn <- d.conn(args.deviceUUID())
+		d.chConn <- d.conn(args)
 
 	case evtPeripheralDisconnected:
-		d.conn(args.deviceUUID()).rspc <- m
-		delete(d.conns, args.deviceUUID().String())
+		d.conn(args).rspc <- m
+		delete(d.conns, d.conn(args).RemoteAddr().String())
 
 	case evtCharacteristicRead:
 		// Notification
-		c := d.conn(args.deviceUUID())
+		c := d.conn(args)
 		if args.isNotification() != 0 {
 			sub := c.subs[uint16(args.characteristicHandle())]
 			if sub == nil {
@@ -411,7 +414,7 @@ func (d *Device) HandleXpcEvent(event xpc.Dict, err error) {
 		evtDescriptorRead,
 		evtDescriptorWritten:
 
-		d.conn(args.deviceUUID()).rspc <- m
+		d.conn(args).rspc <- m
 
 	default:
 		log.Printf("Unhandled event: %#v", event)
@@ -433,7 +436,9 @@ func (d *Device) Close() error {
 	return nil
 }
 
-func (d *Device) conn(a bt.Addr) *conn {
+func (d *Device) conn(m msg) *conn {
+	// Convert xpc.UUID to bt.UUID.
+	a := bt.MustParse(m.deviceUUID().String())
 	c, ok := d.conns[a.String()]
 	if !ok {
 		c = newConn(d, a)
