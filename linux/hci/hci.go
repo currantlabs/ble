@@ -34,22 +34,43 @@ type pkt struct {
 
 // NewHCI returns a hci device.
 func NewHCI(opts ...Option) (*HCI, error) {
-	h := &HCI{}
-	if err := h.Option(opts...); err != nil {
-		return nil, err
+	h := &HCI{
+		id: -1,
+
+		chCmdPkt:  make(chan *pkt),
+		chCmdBufs: make(chan []byte, 8),
+		sent:      make(map[int]*pkt),
+
+		evth: map[int]handlerFn{},
+		subh: map[int]handlerFn{},
+
+		states: newStates(),
+
+		chEvt:       make(chan []byte, 64),
+		chStartScan: make(chan bool),
+
+		muConns:      &sync.Mutex{},
+		conns:        make(map[uint16]*Conn),
+		chMasterConn: make(chan *Conn),
+		chSlaveConn:  make(chan *Conn),
+
+		done: make(chan bool),
 	}
+
 	return h, nil
 }
 
 // HCI ...
 type HCI struct {
 	sync.Mutex
+
 	skt io.ReadWriteCloser
+	id  int
 
 	// Host to Controller command flow control [Vol 2, Part E, 4.4]
-	sent      map[int]*pkt
 	chCmdPkt  chan *pkt
 	chCmdBufs chan []byte
+	sent      map[int]*pkt
 
 	// evtHub
 	evth map[int]handlerFn
@@ -63,7 +84,7 @@ type HCI struct {
 	addr    net.HardwareAddr
 	txPwrLv int
 
-	states states
+	states *states
 
 	chEvt       chan []byte
 	chStartScan chan bool
@@ -87,41 +108,8 @@ type HCI struct {
 	done chan bool
 }
 
-// Option sets the options specified.
-func (h *HCI) Option(opts ...Option) error {
-	var err error
-	for _, opt := range opts {
-		err = opt(h)
-	}
-	return err
-}
-
 // Init ...
-func (h *HCI) Init(id int) error {
-	skt, err := skt.NewSocket(id)
-	if err != nil {
-		return err
-	}
-	h.skt = skt
-
-	h.chCmdPkt = make(chan *pkt)
-	h.chCmdBufs = make(chan []byte, 8)
-	h.chCmdBufs <- make([]byte, 64)
-	h.sent = make(map[int]*pkt)
-
-	h.evth = map[int]handlerFn{}
-	h.subh = map[int]handlerFn{}
-
-	h.chEvt = make(chan []byte, 64)
-	h.chStartScan = make(chan bool)
-
-	h.done = make(chan bool)
-
-	h.muConns = &sync.Mutex{}
-	h.conns = make(map[uint16]*Conn)
-	h.chMasterConn = make(chan *Conn)
-	h.chSlaveConn = make(chan *Conn)
-
+func (h *HCI) Init(opts ...Option) error {
 	h.evth[0x3E] = h.handleLEMeta
 	h.evth[evt.CommandCompleteCode] = h.handleCommandComplete
 	h.evth[evt.CommandStatusCode] = h.handleCommandStatus
@@ -140,6 +128,19 @@ func (h *HCI) Init(id int) error {
 	// evt.AuthenticatedPayloadTimeoutExpiredCode:   bt.todo),
 	// evt.LEReadRemoteUsedFeaturesCompleteSubCode:   bt.todo),
 	// evt.LERemoteConnectionParameterRequestSubCode: bt.todo),
+
+	if err := h.Option(opts...); err != nil {
+		return err
+	}
+
+	skt, err := skt.NewSocket(h.id)
+	if err != nil {
+		return err
+	}
+	h.skt = skt
+
+	h.chCmdBufs <- make([]byte, 64)
+
 	go h.asyncLoop()
 	go h.sktLoop()
 	h.init()
@@ -160,6 +161,15 @@ func (h *HCI) Stop() error {
 // Error ...
 func (h *HCI) Error() error {
 	return h.err
+}
+
+// Option sets the options specified.
+func (h *HCI) Option(opts ...Option) error {
+	var err error
+	for _, opt := range opts {
+		err = opt(h)
+	}
+	return err
 }
 
 func (h *HCI) init() error {
