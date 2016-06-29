@@ -9,7 +9,7 @@ import (
 	"log"
 	"net"
 
-	"github.com/currantlabs/x/io/bt"
+	"github.com/currantlabs/ble"
 	"github.com/currantlabs/ble/linux/hci/cmd"
 	"github.com/currantlabs/ble/linux/hci/evt"
 )
@@ -71,13 +71,13 @@ func newConn(h *HCI, param evt.LEConnectionComplete) *Conn {
 		ctx:   context.Background(),
 		param: param,
 
-		rxMTU: bt.DefaultMTU,
-		txMTU: bt.DefaultMTU,
+		rxMTU: ble.DefaultMTU,
+		txMTU: ble.DefaultMTU,
 
-		rxMPS: bt.DefaultMTU,
+		rxMPS: ble.DefaultMTU,
 
-		sigRxMTU: bt.MaxMTU,
-		sigTxMTU: bt.DefaultMTU,
+		sigRxMTU: ble.MaxMTU,
+		sigTxMTU: ble.DefaultMTU,
 
 		chInPkt: make(chan packet, 16),
 		chInPDU: make(chan pdu, 16),
@@ -276,10 +276,10 @@ func (c *Conn) Close() error {
 }
 
 // LocalAddr returns local device's MAC address.
-func (c *Conn) LocalAddr() bt.Addr { return c.hci.Addr() }
+func (c *Conn) LocalAddr() ble.Addr { return c.hci.Addr() }
 
 // RemoteAddr returns remote device's MAC address.
-func (c *Conn) RemoteAddr() bt.Addr {
+func (c *Conn) RemoteAddr() ble.Addr {
 	a := c.param.PeerAddress()
 	return net.HardwareAddr([]byte{a[5], a[4], a[3], a[2], a[1], a[0]})
 }

@@ -27,6 +27,10 @@ LDFLAGS		?= -ldflags="-w -X $(BUILDDATESYM)=$(BUILDDATE) -X $(GITSYM)=$(GITHEAD)
 
 all: $(PROGS)
 
+build:
+	GOOS=linux make -j4
+	GOOS=darwin make -j4
+
 $(PROGS):
 	$(Q) $(BUILD_CMD)
 

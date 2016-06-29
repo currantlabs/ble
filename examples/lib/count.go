@@ -5,24 +5,24 @@ import (
 	"log"
 	"time"
 
-	"github.com/currantlabs/x/io/bt"
+	"github.com/currantlabs/ble"
 )
 
 // NewCountChar ...
-func NewCountChar() *bt.Characteristic {
+func NewCountChar() *ble.Characteristic {
 	n := 0
-	c := bt.NewCharacteristic(CountCharUUID)
-	c.HandleRead(bt.ReadHandlerFunc(func(req bt.Request, rsp bt.ResponseWriter) {
+	c := ble.NewCharacteristic(CountCharUUID)
+	c.HandleRead(ble.ReadHandlerFunc(func(req ble.Request, rsp ble.ResponseWriter) {
 		fmt.Fprintf(rsp, "count: Read %d", n)
 		log.Printf("count: Read %d", n)
 		n++
 	}))
 
-	c.HandleWrite(bt.WriteHandlerFunc(func(req bt.Request, rsp bt.ResponseWriter) {
+	c.HandleWrite(ble.WriteHandlerFunc(func(req ble.Request, rsp ble.ResponseWriter) {
 		log.Printf("count: Wrote %s", string(req.Data()))
 	}))
 
-	f := func(req bt.Request, n bt.Notifier) {
+	f := func(req ble.Request, n ble.Notifier) {
 		cnt := 0
 		log.Printf("count: Notification subscribed")
 		for {
@@ -42,7 +42,7 @@ func NewCountChar() *bt.Characteristic {
 		}
 	}
 
-	c.HandleNotify(bt.NotifyHandlerFunc(f))
-	c.HandleIndicate(bt.NotifyHandlerFunc(f))
+	c.HandleNotify(ble.NotifyHandlerFunc(f))
+	c.HandleIndicate(ble.NotifyHandlerFunc(f))
 	return c
 }

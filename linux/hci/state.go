@@ -191,12 +191,16 @@ func (s *states) handle(n nextState) {
 		if s.isAdvertising {
 			return
 		}
-		if s.isListening {
-			s.err = errors.Wrapf(ErrBusyListening, "advertise")
-			return
-		}
+		// if s.isListening {
+		// 	s.err = errors.Wrapf(ErrBusyListening, "advertise")
+		// 	return
+		// }
 		if s.send(&s.advEnable) == nil {
 			s.isAdvertising = true
+		}
+		if s.err == nil || s.err == ErrDisallowed {
+			s.err = nil
+			return
 		}
 	case StopAdvertising:
 		if !s.isAdvertising {

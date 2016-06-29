@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/currantlabs/ble/gatt"
-	"github.com/currantlabs/x/io/bt"
+	"github.com/currantlabs/ble"
+	"github.com/currantlabs/ble/examples/lib/gatt"
 )
 
 var (
@@ -18,24 +18,22 @@ var (
 )
 
 // matcher returns true if the advertisement matches our search criteria.
-type matcher func(a bt.Advertisement) bool
+type matcher func(a ble.Advertisement) bool
 
 // explorer connects to a remote peripheral and explores its GATT server.
 type explorerer struct {
-	bt.Central
-
 	match matcher
-	ch    chan bt.Advertisement
+	ch    chan ble.Advertisement
 }
 
-func (e *explorerer) Handle(a bt.Advertisement) {
+func (e *explorerer) Handle(a ble.Advertisement) {
 	if e.match(a) {
-		e.StopScanning()
+		gatt.StopScanning()
 		e.ch <- a
 	}
 }
 
-func explorer(cln bt.Client) error {
+func explorer(cln ble.Client) error {
 	fmt.Printf("Exploring Peripheral [ %s ] ...\n", cln.Address())
 
 	ss, err := cln.DiscoverServices(nil)
@@ -43,15 +41,15 @@ func explorer(cln bt.Client) error {
 		return fmt.Errorf("can't discover services: %s\n", err)
 	}
 	for _, s := range ss {
-		fmt.Printf("Service: %s %s\n", s.UUID.String(), bt.Name(s.UUID))
+		fmt.Printf("Service: %s %s\n", s.UUID.String(), ble.Name(s.UUID))
 
 		cs, err := cln.DiscoverCharacteristics(nil, s)
 		if err != nil {
 			return fmt.Errorf("can't discover characteristics: %s\n", err)
 		}
 		for _, c := range cs {
-			fmt.Printf("  Characteristic: %s, Property: 0x%02X, %s\n", c.UUID, c.Property, bt.Name(c.UUID))
-			if (c.Property & bt.CharRead) != 0 {
+			fmt.Printf("  Characteristic: %s, Property: 0x%02X, %s\n", c.UUID, c.Property, ble.Name(c.UUID))
+			if (c.Property & ble.CharRead) != 0 {
 				b, err := cln.ReadCharacteristic(c)
 				if err != nil {
 					fmt.Printf("Failed to read characteristic: %s\n", err)
@@ -65,7 +63,7 @@ func explorer(cln bt.Client) error {
 				return fmt.Errorf("can't discover descriptors: %s\n", err)
 			}
 			for _, d := range ds {
-				fmt.Printf("    Descriptor: %s, %s\n", d.UUID, bt.Name(d.UUID))
+				fmt.Printf("    Descriptor: %s, %s\n", d.UUID, ble.Name(d.UUID))
 				b, err := cln.ReadDescriptor(d)
 				if err != nil {
 					fmt.Printf("Failed to read descriptor: %s\n", err)
@@ -74,7 +72,7 @@ func explorer(cln bt.Client) error {
 				fmt.Printf("    Value         %x | %q\n", b, b)
 			}
 			if *sub != 0 {
-				if (c.Property & bt.CharNotify) != 0 {
+				if (c.Property & ble.CharNotify) != 0 {
 					fmt.Printf("\n-- Subscribe to notification for %s --\n", *sub)
 					h := func(req []byte) { fmt.Printf("Notified: %q [ % X ]\n", string(req), req) }
 					if err := cln.Subscribe(c, false, h); err != nil {
@@ -86,7 +84,7 @@ func explorer(cln bt.Client) error {
 					}
 					fmt.Printf("-- Unsubscribe to notification --\n")
 				}
-				if (c.Property & bt.CharIndicate) != 0 {
+				if (c.Property & ble.CharIndicate) != 0 {
 					fmt.Printf("\n-- Subscribe to indication of %s --\n", *sub)
 					h := func(req []byte) { fmt.Printf("Indicated: %q [ % X ]\n", string(req), req) }
 					if err := cln.Subscribe(c, true, h); err != nil {
@@ -110,32 +108,27 @@ func main() {
 	flag.Parse()
 
 	// Default to search device with name of Gopher (or specified by user).
-	match := func(a bt.Advertisement) bool {
+	match := func(a ble.Advertisement) bool {
 		return strings.ToUpper(a.LocalName()) == strings.ToUpper(*name)
 	}
 
 	// If addr is specified, search for addr instead.
 	if len(*addr) != 0 {
-		match = func(a bt.Advertisement) bool {
+		match = func(a ble.Advertisement) bool {
 			return strings.ToUpper(a.Address().String()) == strings.ToUpper(*addr)
 		}
 	}
 
-	dev, err := gatt.NewCentral()
-	if err != nil {
-		log.Fatalf("can't create central: %s", err)
-	}
 	exp := &explorerer{
-		Central: dev,
-		ch:      make(chan bt.Advertisement),
-		match:   match,
+		ch:    make(chan ble.Advertisement),
+		match: match,
 	}
 
-	if err = dev.SetAdvHandler(exp); err != nil {
+	if err := gatt.SetAdvHandler(exp); err != nil {
 		log.Fatalf("can't set adv handler: %s", err)
 	}
 
-	if err = dev.Scan(false); err != nil {
+	if err := gatt.Scan(false); err != nil {
 		log.Fatalf("can't scan: %s", err)
 	}
 
@@ -143,15 +136,9 @@ func main() {
 	a := <-exp.ch
 
 	// Dial connects to the remote device.
-	c, err := exp.Dial(a.Address())
+	cln, err := gatt.Dial(a.Address())
 	if err != nil {
 		log.Fatalf("can't dial: %s", err)
-	}
-
-	// Create and attach a GATT client to the connection.
-	cln, err := gatt.NewClient(c)
-	if err != nil {
-		log.Fatalf("can't create client: %s", err)
 	}
 
 	// Start the exploration.

@@ -3,7 +3,7 @@ package hci
 import (
 	"net"
 
-	"github.com/currantlabs/x/io/bt"
+	"github.com/currantlabs/ble"
 	"github.com/currantlabs/ble/linux/adv"
 	"github.com/currantlabs/ble/linux/hci/evt"
 )
@@ -21,7 +21,7 @@ func newAdvertisement(e evt.LEAdvertisingReport, i int) *Advertisement {
 	return &Advertisement{e: e, i: i}
 }
 
-// Advertisement implements bt.Advertisement and other functions that are only
+// Advertisement implements ble.Advertisement and other functions that are only
 // available on Linux.
 type Advertisement struct {
 	e  evt.LEAdvertisingReport
@@ -57,17 +57,17 @@ func (a *Advertisement) ManufacturerData() []byte {
 }
 
 // ServiceData returns the service data of the advertisement.
-func (a *Advertisement) ServiceData() []bt.ServiceData {
+func (a *Advertisement) ServiceData() []ble.ServiceData {
 	return a.packets().ServiceData()
 }
 
 // Services returns the service UUIDs of the advertisement.
-func (a *Advertisement) Services() []bt.UUID {
+func (a *Advertisement) Services() []ble.UUID {
 	return a.packets().UUIDs()
 }
 
 // OverflowService returns the UUIDs of overflowed service.
-func (a *Advertisement) OverflowService() []bt.UUID {
+func (a *Advertisement) OverflowService() []ble.UUID {
 	return a.packets().UUIDs()
 }
 
@@ -78,7 +78,7 @@ func (a *Advertisement) TxPowerLevel() int {
 }
 
 // SolicitedService returns UUIDs of solicited services.
-func (a *Advertisement) SolicitedService() []bt.UUID {
+func (a *Advertisement) SolicitedService() []ble.UUID {
 	return a.packets().ServiceSol()
 }
 
@@ -93,7 +93,7 @@ func (a *Advertisement) RSSI() int {
 }
 
 // Address returns the address of the remote peripheral.
-func (a *Advertisement) Address() bt.Addr {
+func (a *Advertisement) Address() ble.Addr {
 	b := a.e.Address(a.i)
 	return net.HardwareAddr([]byte{b[5], b[4], b[3], b[2], b[1], b[0]})
 }

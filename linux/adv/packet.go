@@ -3,10 +3,10 @@ package adv
 import (
 	"encoding/binary"
 
-	"github.com/currantlabs/x/io/bt"
+	"github.com/currantlabs/ble"
 )
 
-// Packet is an implemntation of bt.AdvPacket for crafting or parsing an advertising packet or scan response.
+// Packet is an implemntation of ble.AdvPacket for crafting or parsing an advertising packet or scan response.
 // Refer to Supplement to Bluetooth Core Specification | CSSv6, Part A.
 type Packet struct {
 	b []byte
@@ -83,7 +83,7 @@ func IBeaconData(md []byte) Field {
 }
 
 // IBeacon returns an iBeacon advertising packet with specified parameters.
-func IBeacon(u bt.UUID, major, minor uint16, pwr int8) Field {
+func IBeacon(u ble.UUID, major, minor uint16, pwr int8) Field {
 	return func(p *Packet) error {
 		if u.Len() != 16 {
 			return ErrInvalid
@@ -91,7 +91,7 @@ func IBeacon(u bt.UUID, major, minor uint16, pwr int8) Field {
 		md := make([]byte, 23)
 		md[0] = 0x02                               // Data type: iBeacon
 		md[1] = 0x15                               // Data length: 21 bytes
-		copy(md[2:], bt.Reverse(u))                // Big endian
+		copy(md[2:], ble.Reverse(u))                // Big endian
 		binary.BigEndian.PutUint16(md[18:], major) // Big endian
 		binary.BigEndian.PutUint16(md[20:], minor) // Big endian
 		md[22] = uint8(pwr)                        // Measured Tx Power
@@ -129,7 +129,7 @@ func ManufacturerData(id uint16, b []byte) Field {
 }
 
 // AllUUID is one of the complete service UUID list.
-func AllUUID(u bt.UUID) Field {
+func AllUUID(u ble.UUID) Field {
 	return func(p *Packet) error {
 		if u.Len() == 2 {
 			return p.append(allUUID16, u)
@@ -142,7 +142,7 @@ func AllUUID(u bt.UUID) Field {
 }
 
 // SomeUUID is one of the incomplete service UUID list.
-func SomeUUID(u bt.UUID) Field {
+func SomeUUID(u ble.UUID) Field {
 	return func(p *Packet) error {
 		if u.Len() == 2 {
 			return p.append(someUUID16, u)
@@ -201,8 +201,8 @@ func (p *Packet) TxPower() (power int, present bool) {
 }
 
 // UUIDs returns a list of service UUIDs.
-func (p *Packet) UUIDs() []bt.UUID {
-	var u []bt.UUID
+func (p *Packet) UUIDs() []ble.UUID {
+	var u []ble.UUID
 	if b := p.Field(someUUID16); b != nil {
 		u = uuidList(u, b, 2)
 	}
@@ -225,8 +225,8 @@ func (p *Packet) UUIDs() []bt.UUID {
 }
 
 // ServiceSol ...
-func (p *Packet) ServiceSol() []bt.UUID {
-	var u []bt.UUID
+func (p *Packet) ServiceSol() []ble.UUID {
+	var u []ble.UUID
 	if b := p.Field(serviceSol16); b != nil {
 		u = uuidList(u, b, 2)
 	}
@@ -240,8 +240,8 @@ func (p *Packet) ServiceSol() []bt.UUID {
 }
 
 // ServiceData ...
-func (p *Packet) ServiceData() []bt.ServiceData {
-	var s []bt.ServiceData
+func (p *Packet) ServiceData() []ble.ServiceData {
+	var s []ble.ServiceData
 	if b := p.Field(serviceData16); b != nil {
 		s = serviceDataList(s, b, 2)
 	}
@@ -260,17 +260,17 @@ func (p *Packet) ManufacturerData() []byte {
 }
 
 // Utility function for creating a list of uuids.
-func uuidList(u []bt.UUID, d []byte, w int) []bt.UUID {
+func uuidList(u []ble.UUID, d []byte, w int) []ble.UUID {
 	for len(d) > 0 {
-		u = append(u, bt.UUID(d[:w]))
+		u = append(u, ble.UUID(d[:w]))
 		d = d[w:]
 	}
 	return u
 }
 
-func serviceDataList(sd []bt.ServiceData, d []byte, w int) []bt.ServiceData {
-	serviceData := bt.ServiceData{
-		UUID: bt.UUID(d[:w]),
+func serviceDataList(sd []ble.ServiceData, d []byte, w int) []ble.ServiceData {
+	serviceData := ble.ServiceData{
+		UUID: ble.UUID(d[:w]),
 		Data: make([]byte, len(d)-w),
 	}
 	copy(serviceData.Data, d[2:])

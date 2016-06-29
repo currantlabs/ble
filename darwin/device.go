@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/currantlabs/ble/darwin/xpc"
-	"github.com/currantlabs/x/io/bt"
+	"github.com/currantlabs/ble"
 )
 
 const (
@@ -49,11 +49,11 @@ type Device struct {
 	conns map[string]*conn
 
 	// Only used in client/centralManager implementation
-	advHandler bt.AdvHandler
+	advHandler ble.AdvHandler
 	chConn     chan *conn
 
 	// Only used in server/peripheralManager implementation
-	chars map[int]*bt.Characteristic
+	chars map[int]*ble.Characteristic
 	base  int
 }
 
@@ -63,7 +63,7 @@ func NewDevice(opts ...Option) (*Device, error) {
 		rspc:   make(chan msg),
 		conns:  make(map[string]*conn),
 		chConn: make(chan *conn),
-		chars:  make(map[int]*bt.Characteristic),
+		chars:  make(map[int]*ble.Characteristic),
 		base:   1,
 	}
 	if err := d.Option(opts...); err != nil {
@@ -71,6 +71,7 @@ func NewDevice(opts ...Option) (*Device, error) {
 	}
 
 	d.xpc = xpc.XpcConnect("com.apple.blued", d)
+
 	return d, nil
 }
 
@@ -106,7 +107,7 @@ func (d *Device) AdvertiseMfgData(b []byte) error {
 }
 
 // AdvertiseNameAndServices advertises name and specifid service UUIDs.
-func (d *Device) AdvertiseNameAndServices(name string, ss ...bt.UUID) error {
+func (d *Device) AdvertiseNameAndServices(name string, ss ...ble.UUID) error {
 	return d.sendReq(8, xpc.Dict{
 		"kCBAdvDataLocalName":    name,
 		"kCBAdvDataServiceUUIDs": uuidSlice(ss)},
@@ -127,9 +128,9 @@ func (d *Device) AdvertiseIBeaconData(md []byte) error {
 }
 
 // AdvertiseIBeacon advertises iBeacon packet.
-func (d *Device) AdvertiseIBeacon(u bt.UUID, major, minor uint16, pwr int8) error {
+func (d *Device) AdvertiseIBeacon(u ble.UUID, major, minor uint16, pwr int8) error {
 	b := make([]byte, 21)
-	copy(b, bt.Reverse(u))                    // Big endian
+	copy(b, ble.Reverse(u))                    // Big endian
 	binary.BigEndian.PutUint16(b[16:], major) // Big endian
 	binary.BigEndian.PutUint16(b[18:], minor) // Big endian
 	b[20] = uint8(pwr)                        // Measured Tx Power
@@ -142,7 +143,7 @@ func (d *Device) StopAdvertising() error {
 }
 
 // SetAdvHandler ...
-func (d *Device) SetAdvHandler(ah bt.AdvHandler) error {
+func (d *Device) SetAdvHandler(ah ble.AdvHandler) error {
 	d.advHandler = ah
 	return nil
 }
@@ -176,13 +177,13 @@ func (d *Device) RemoveAllServices() error {
 // 0x180A (Device Information)
 // 0x180F (Battery Service)
 // 0x1812 (Human Interface Device)
-func (d *Device) AddService(s *bt.Service) error {
-	if s.UUID.Equal(bt.GAPUUID) ||
-		s.UUID.Equal(bt.GATTUUID) ||
-		s.UUID.Equal(bt.CurrentTimeUUID) ||
-		s.UUID.Equal(bt.DeviceInfoUUID) ||
-		s.UUID.Equal(bt.BatteryUUID) ||
-		s.UUID.Equal(bt.HIDUUID) {
+func (d *Device) AddService(s *ble.Service) error {
+	if s.UUID.Equal(ble.GAPUUID) ||
+		s.UUID.Equal(ble.GATTUUID) ||
+		s.UUID.Equal(ble.CurrentTimeUUID) ||
+		s.UUID.Equal(ble.DeviceInfoUUID) ||
+		s.UUID.Equal(ble.BatteryUUID) ||
+		s.UUID.Equal(ble.HIDUUID) {
 		return nil
 	}
 	xs := xpc.Dict{
@@ -190,7 +191,7 @@ func (d *Device) AddService(s *bt.Service) error {
 		"kCBMsgArgAttributeIDs":    []int{},
 		"kCBMsgArgCharacteristics": nil,
 		"kCBMsgArgType":            1, // 1 => primary, 0 => excluded
-		"kCBMsgArgUUID":            bt.Reverse(s.UUID),
+		"kCBMsgArgUUID":            ble.Reverse(s.UUID),
 	}
 	d.base++
 
@@ -198,39 +199,39 @@ func (d *Device) AddService(s *bt.Service) error {
 	for _, c := range s.Characteristics {
 		props := 0
 		perm := 0
-		if c.Property&bt.CharRead != 0 {
+		if c.Property&ble.CharRead != 0 {
 			props |= 0x02
-			if bt.CharRead&c.Secure != 0 {
+			if ble.CharRead&c.Secure != 0 {
 				perm |= 0x04
 			} else {
 				perm |= 0x01
 			}
 		}
-		if c.Property&bt.CharWriteNR != 0 {
+		if c.Property&ble.CharWriteNR != 0 {
 			props |= 0x04
-			if c.Secure&bt.CharWriteNR != 0 {
+			if c.Secure&ble.CharWriteNR != 0 {
 				perm |= 0x08
 			} else {
 				perm |= 0x02
 			}
 		}
-		if c.Property&bt.CharWrite != 0 {
+		if c.Property&ble.CharWrite != 0 {
 			props |= 0x08
-			if c.Secure&bt.CharWrite != 0 {
+			if c.Secure&ble.CharWrite != 0 {
 				perm |= 0x08
 			} else {
 				perm |= 0x02
 			}
 		}
-		if c.Property&bt.CharNotify != 0 {
-			if c.Secure&bt.CharNotify != 0 {
+		if c.Property&ble.CharNotify != 0 {
+			if c.Secure&ble.CharNotify != 0 {
 				props |= 0x100
 			} else {
 				props |= 0x10
 			}
 		}
-		if c.Property&bt.CharIndicate != 0 {
-			if c.Secure&bt.CharIndicate != 0 {
+		if c.Property&ble.CharIndicate != 0 {
+			if c.Secure&ble.CharIndicate != 0 {
 				props |= 0x200
 			} else {
 				props |= 0x20
@@ -239,7 +240,7 @@ func (d *Device) AddService(s *bt.Service) error {
 
 		xc := xpc.Dict{
 			"kCBMsgArgAttributeID":              d.base,
-			"kCBMsgArgUUID":                     bt.Reverse(c.UUID),
+			"kCBMsgArgUUID":                     ble.Reverse(c.UUID),
 			"kCBMsgArgAttributePermissions":     perm,
 			"kCBMsgArgCharacteristicProperties": props,
 			"kCBMsgArgData":                     c.Value,
@@ -250,13 +251,13 @@ func (d *Device) AddService(s *bt.Service) error {
 
 		xds := xpc.Array{}
 		for _, d := range c.Descriptors {
-			if d.UUID.Equal(bt.ClientCharacteristicConfigUUID) {
+			if d.UUID.Equal(ble.ClientCharacteristicConfigUUID) {
 				// skip CCCD
 				continue
 			}
 			xd := xpc.Dict{
 				"kCBMsgArgData": d.Value,
-				"kCBMsgArgUUID": bt.Reverse(d.UUID),
+				"kCBMsgArgUUID": ble.Reverse(d.UUID),
 			}
 			xds = append(xds, xd)
 		}
@@ -269,7 +270,7 @@ func (d *Device) AddService(s *bt.Service) error {
 }
 
 // SetServices ...
-func (d *Device) SetServices(ss []*bt.Service) error {
+func (d *Device) SetServices(ss []*ble.Service) error {
 	if err := d.RemoveAllServices(); err != nil {
 		return nil
 	}
@@ -282,14 +283,14 @@ func (d *Device) SetServices(ss []*bt.Service) error {
 }
 
 // Dial ...
-func (d *Device) Dial(a bt.Addr) (bt.Conn, error) {
+func (d *Device) Dial(a ble.Addr) (ble.Client, error) {
 	d.sendCmd(31, xpc.Dict{
 		"kCBMsgArgDeviceUUID": xpc.MakeUUID(a.String()),
 		"kCBMsgArgOptions": xpc.Dict{
 			"kCBConnectOptionNotifyOnDisconnection": 1,
 		},
 	})
-	return <-d.chConn, nil
+	return NewClient(<-d.chConn)
 }
 
 // HandleXpcEvent process Device events and asynchronous errors.
@@ -341,9 +342,9 @@ func (d *Device) HandleXpcEvent(event xpc.Dict, err error) {
 		v := char.Value
 		if v == nil {
 			c := d.conn(args)
-			req := bt.NewRequest(c, nil, args.offset())
+			req := ble.NewRequest(c, nil, args.offset())
 			buf := bytes.NewBuffer(make([]byte, 0, c.txMTU-1))
-			rsp := bt.NewResponseWriter(buf)
+			rsp := ble.NewResponseWriter(buf)
 			char.ReadHandler.ServeRead(req, rsp)
 			v = buf.Bytes()
 		}
@@ -360,7 +361,7 @@ func (d *Device) HandleXpcEvent(event xpc.Dict, err error) {
 			xw := msg(xxw.(xpc.Dict))
 			aid := xw.attributeID()
 			char := d.chars[aid]
-			req := bt.NewRequest(d.conn(args), xw.data(), xw.offset())
+			req := ble.NewRequest(d.conn(args), xw.data(), xw.offset())
 			char.WriteHandler.ServeWrite(req, nil)
 			if xw.ignoreResponse() == 1 {
 				continue
@@ -421,24 +422,19 @@ func (d *Device) HandleXpcEvent(event xpc.Dict, err error) {
 	}
 }
 
-// Accept ...
-func (d *Device) Accept() (bt.Conn, error) {
-	return nil, nil
-}
-
 // Addr ...
-func (d *Device) Addr() bt.Addr {
+func (d *Device) Addr() ble.Addr {
 	return nil
 }
 
-// Close ...
-func (d *Device) Close() error {
+// Stop ...
+func (d *Device) Stop() error {
 	return nil
 }
 
 func (d *Device) conn(m msg) *conn {
-	// Convert xpc.UUID to bt.UUID.
-	a := bt.MustParse(m.deviceUUID().String())
+	// Convert xpc.UUID to ble.UUID.
+	a := ble.MustParse(m.deviceUUID().String())
 	c, ok := d.conns[a.String()]
 	if !ok {
 		c = newConn(d, a)

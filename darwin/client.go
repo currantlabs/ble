@@ -2,12 +2,12 @@ package darwin
 
 import (
 	"github.com/currantlabs/ble/darwin/xpc"
-	"github.com/currantlabs/x/io/bt"
+	"github.com/currantlabs/ble"
 )
 
 // A Client is a GATT client.
 type Client struct {
-	svcs []*bt.Service
+	svcs []*ble.Service
 	name string
 
 	id   xpc.UUID
@@ -15,7 +15,7 @@ type Client struct {
 }
 
 // NewClient ...
-func NewClient(c bt.Conn) (*Client, error) {
+func NewClient(c ble.Conn) (*Client, error) {
 	return &Client{
 		conn: c.(*conn),
 		id:   xpc.MakeUUID(c.RemoteAddr().String()),
@@ -23,7 +23,7 @@ func NewClient(c bt.Conn) (*Client, error) {
 }
 
 // Address returns UUID of the remote peripheral.
-func (cln *Client) Address() bt.Addr {
+func (cln *Client) Address() ble.Addr {
 	return cln.conn.RemoteAddr()
 }
 
@@ -34,13 +34,13 @@ func (cln *Client) Name() string {
 }
 
 // Services returns discovered services.
-func (cln *Client) Services() []*bt.Service {
+func (cln *Client) Services() []*ble.Service {
 	return cln.svcs
 }
 
 // DiscoverServices finds all the primary services on a server. [Vol 3, Part G, 4.4.1]
 // If filter is specified, only filtered services are returned.
-func (cln *Client) DiscoverServices(ss []bt.UUID) ([]*bt.Service, error) {
+func (cln *Client) DiscoverServices(ss []ble.UUID) ([]*ble.Service, error) {
 	rsp := cln.conn.sendReq(45, xpc.Dict{
 		"kCBMsgArgDeviceUUID": cln.id,
 		"kCBMsgArgUUIDs":      uuidSlice(ss),
@@ -48,11 +48,11 @@ func (cln *Client) DiscoverServices(ss []bt.UUID) ([]*bt.Service, error) {
 	if rsp.err() != nil {
 		return nil, rsp.err()
 	}
-	svcs := []*bt.Service{}
+	svcs := []*ble.Service{}
 	for _, xss := range rsp.services() {
 		xs := msg(xss.(xpc.Dict))
-		svcs = append(svcs, &bt.Service{
-			UUID:      bt.MustParse(xs.uuid()),
+		svcs = append(svcs, &ble.Service{
+			UUID:      ble.MustParse(xs.uuid()),
 			Handle:    uint16(xs.serviceStartHandle()),
 			EndHandle: uint16(xs.serviceEndHandle()),
 		})
@@ -63,7 +63,7 @@ func (cln *Client) DiscoverServices(ss []bt.UUID) ([]*bt.Service, error) {
 
 // DiscoverIncludedServices finds the included services of a service. [Vol 3, Part G, 4.5.1]
 // If filter is specified, only filtered services are returned.
-func (cln *Client) DiscoverIncludedServices(ss []bt.UUID, s *bt.Service) ([]*bt.Service, error) {
+func (cln *Client) DiscoverIncludedServices(ss []ble.UUID, s *ble.Service) ([]*ble.Service, error) {
 	rsp := cln.conn.sendReq(60, xpc.Dict{
 		"kCBMsgArgDeviceUUID":         cln.id,
 		"kCBMsgArgServiceStartHandle": s.Handle,
@@ -73,12 +73,12 @@ func (cln *Client) DiscoverIncludedServices(ss []bt.UUID, s *bt.Service) ([]*bt.
 	if rsp.err() != nil {
 		return nil, rsp.err()
 	}
-	return nil, bt.ErrNotImplemented
+	return nil, ble.ErrNotImplemented
 }
 
 // DiscoverCharacteristics finds all the characteristics within a service. [Vol 3, Part G, 4.6.1]
 // If filter is specified, only filtered characteristics are returned.
-func (cln *Client) DiscoverCharacteristics(cs []bt.UUID, s *bt.Service) ([]*bt.Characteristic, error) {
+func (cln *Client) DiscoverCharacteristics(cs []ble.UUID, s *ble.Service) ([]*ble.Characteristic, error) {
 	rsp := cln.conn.sendReq(62, xpc.Dict{
 		"kCBMsgArgDeviceUUID":         cln.id,
 		"kCBMsgArgServiceStartHandle": s.Handle,
@@ -90,9 +90,9 @@ func (cln *Client) DiscoverCharacteristics(cs []bt.UUID, s *bt.Service) ([]*bt.C
 	}
 	for _, xcs := range rsp.characteristics() {
 		xc := msg(xcs.(xpc.Dict))
-		s.Characteristics = append(s.Characteristics, &bt.Characteristic{
-			UUID:        bt.MustParse(xc.uuid()),
-			Property:    bt.Property(xc.characteristicProperties()),
+		s.Characteristics = append(s.Characteristics, &ble.Characteristic{
+			UUID:        ble.MustParse(xc.uuid()),
+			Property:    ble.Property(xc.characteristicProperties()),
 			Handle:      uint16(xc.characteristicHandle()),
 			ValueHandle: uint16(xc.characteristicValueHandle()),
 		})
@@ -102,7 +102,7 @@ func (cln *Client) DiscoverCharacteristics(cs []bt.UUID, s *bt.Service) ([]*bt.C
 
 // DiscoverDescriptors finds all the descriptors within a characteristic. [Vol 3, Part G, 4.7.1]
 // If filter is specified, only filtered descriptors are returned.
-func (cln *Client) DiscoverDescriptors(ds []bt.UUID, c *bt.Characteristic) ([]*bt.Descriptor, error) {
+func (cln *Client) DiscoverDescriptors(ds []ble.UUID, c *ble.Characteristic) ([]*ble.Descriptor, error) {
 	rsp := cln.conn.sendReq(70, xpc.Dict{
 		"kCBMsgArgDeviceUUID":                cln.id,
 		"kCBMsgArgCharacteristicHandle":      c.Handle,
@@ -111,8 +111,8 @@ func (cln *Client) DiscoverDescriptors(ds []bt.UUID, c *bt.Characteristic) ([]*b
 	})
 	for _, xds := range rsp.descriptors() {
 		xd := msg(xds.(xpc.Dict))
-		c.Descriptors = append(c.Descriptors, &bt.Descriptor{
-			UUID:   bt.MustParse(xd.uuid()),
+		c.Descriptors = append(c.Descriptors, &ble.Descriptor{
+			UUID:   ble.MustParse(xd.uuid()),
 			Handle: uint16(xd.descriptorHandle()),
 		})
 	}
@@ -120,7 +120,7 @@ func (cln *Client) DiscoverDescriptors(ds []bt.UUID, c *bt.Characteristic) ([]*b
 }
 
 // ReadCharacteristic reads a characteristic value from a server. [Vol 3, Part G, 4.8.1]
-func (cln *Client) ReadCharacteristic(c *bt.Characteristic) ([]byte, error) {
+func (cln *Client) ReadCharacteristic(c *ble.Characteristic) ([]byte, error) {
 	rsp := cln.conn.sendReq(65, xpc.Dict{
 		"kCBMsgArgDeviceUUID":                cln.id,
 		"kCBMsgArgCharacteristicHandle":      c.Handle,
@@ -133,12 +133,12 @@ func (cln *Client) ReadCharacteristic(c *bt.Characteristic) ([]byte, error) {
 }
 
 // ReadLongCharacteristic reads a characteristic value which is longer than the MTU. [Vol 3, Part G, 4.8.3]
-func (cln *Client) ReadLongCharacteristic(c *bt.Characteristic) ([]byte, error) {
-	return nil, bt.ErrNotImplemented
+func (cln *Client) ReadLongCharacteristic(c *ble.Characteristic) ([]byte, error) {
+	return nil, ble.ErrNotImplemented
 }
 
 // WriteCharacteristic writes a characteristic value to a server. [Vol 3, Part G, 4.9.3]
-func (cln *Client) WriteCharacteristic(c *bt.Characteristic, b []byte, noRsp bool) error {
+func (cln *Client) WriteCharacteristic(c *ble.Characteristic, b []byte, noRsp bool) error {
 	args := xpc.Dict{
 		"kCBMsgArgDeviceUUID":                cln.id,
 		"kCBMsgArgCharacteristicHandle":      c.Handle,
@@ -154,7 +154,7 @@ func (cln *Client) WriteCharacteristic(c *bt.Characteristic, b []byte, noRsp boo
 }
 
 // ReadDescriptor reads a characteristic descriptor from a server. [Vol 3, Part G, 4.12.1]
-func (cln *Client) ReadDescriptor(d *bt.Descriptor) ([]byte, error) {
+func (cln *Client) ReadDescriptor(d *ble.Descriptor) ([]byte, error) {
 	rsp := cln.conn.sendReq(77, xpc.Dict{
 		"kCBMsgArgDeviceUUID":       cln.id,
 		"kCBMsgArgDescriptorHandle": d.Handle,
@@ -166,7 +166,7 @@ func (cln *Client) ReadDescriptor(d *bt.Descriptor) ([]byte, error) {
 }
 
 // WriteDescriptor writes a characteristic descriptor to a server. [Vol 3, Part G, 4.12.3]
-func (cln *Client) WriteDescriptor(d *bt.Descriptor, b []byte) error {
+func (cln *Client) WriteDescriptor(d *ble.Descriptor, b []byte) error {
 	rsp := cln.conn.sendReq(78, xpc.Dict{
 		"kCBMsgArgDeviceUUID":       cln.id,
 		"kCBMsgArgDescriptorHandle": d.Handle,
@@ -193,7 +193,7 @@ func (cln *Client) ExchangeMTU(mtu int) (int, error) {
 
 // Subscribe subscribes to indication (if ind is set true), or notification of a
 // characteristic value. [Vol 3, Part G, 4.10 & 4.11]
-func (cln *Client) Subscribe(c *bt.Characteristic, ind bool, fn bt.NotificationHandler) error {
+func (cln *Client) Subscribe(c *ble.Characteristic, ind bool, fn ble.NotificationHandler) error {
 	cln.conn.Lock()
 	defer cln.conn.Unlock()
 	cln.conn.subs[c.Handle] = &sub{fn: fn, char: c}
@@ -212,7 +212,7 @@ func (cln *Client) Subscribe(c *bt.Characteristic, ind bool, fn bt.NotificationH
 
 // Unsubscribe unsubscribes to indication (if ind is set true), or notification
 // of a specified characteristic value. [Vol 3, Part G, 4.10 & 4.11]
-func (cln *Client) Unsubscribe(c *bt.Characteristic, ind bool) error {
+func (cln *Client) Unsubscribe(c *ble.Characteristic, ind bool) error {
 	rsp := cln.conn.sendReq(68, xpc.Dict{
 		"kCBMsgArgDeviceUUID":                cln.id,
 		"kCBMsgArgCharacteristicHandle":      c.Handle,
@@ -243,6 +243,6 @@ func (cln *Client) CancelConnection() error {
 }
 
 type sub struct {
-	fn   bt.NotificationHandler
-	char *bt.Characteristic
+	fn   ble.NotificationHandler
+	char *ble.Characteristic
 }

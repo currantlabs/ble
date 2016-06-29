@@ -2,7 +2,7 @@ package darwin
 
 import (
 	"github.com/currantlabs/ble/darwin/xpc"
-	"github.com/currantlabs/x/io/bt"
+	"github.com/currantlabs/ble"
 )
 
 type adv struct {
@@ -18,37 +18,37 @@ func (a *adv) ManufacturerData() []byte {
 	return a.ad.GetBytes("kCBAdvDataManufacturerData", nil)
 }
 
-func (a *adv) ServiceData() []bt.ServiceData {
+func (a *adv) ServiceData() []ble.ServiceData {
 	xSDs, ok := a.ad["kCBAdvDataServiceData"]
 	if !ok {
 		return nil
 	}
 
 	xSD := xSDs.(xpc.Array)
-	var sd []bt.ServiceData
+	var sd []ble.ServiceData
 	for i := 0; i < len(xSD); i += 2 {
 		sd = append(
-			sd, bt.ServiceData{
-				UUID: bt.UUID(xSD[i].([]byte)),
+			sd, ble.ServiceData{
+				UUID: ble.UUID(xSD[i].([]byte)),
 				Data: xSD[i+1].([]byte),
 			})
 	}
 	return sd
 }
 
-func (a *adv) Services() []bt.UUID {
+func (a *adv) Services() []ble.UUID {
 	xUUIDs, ok := a.ad["kCBAdvDataServiceUUIDs"]
 	if !ok {
 		return nil
 	}
-	var uuids []bt.UUID
+	var uuids []ble.UUID
 	for _, xUUID := range xUUIDs.(xpc.Array) {
-		uuids = append(uuids, bt.UUID(bt.Reverse(xUUID.([]byte))))
+		uuids = append(uuids, ble.UUID(ble.Reverse(xUUID.([]byte))))
 	}
 	return uuids
 }
 
-func (a *adv) OverflowService() []bt.UUID {
+func (a *adv) OverflowService() []ble.UUID {
 	return nil // TODO
 }
 
@@ -56,7 +56,7 @@ func (a *adv) TxPowerLevel() int {
 	return a.ad.GetInt("kCBAdvDataTxPowerLevel", 0)
 }
 
-func (a *adv) SolicitedService() []bt.UUID {
+func (a *adv) SolicitedService() []ble.UUID {
 	return nil // TODO
 }
 
@@ -68,6 +68,6 @@ func (a *adv) RSSI() int {
 	return a.args.GetInt("kCBMsgArgRssi", 0)
 }
 
-func (a *adv) Address() bt.Addr {
+func (a *adv) Address() ble.Addr {
 	return xpc.UUID(a.args.MustGetUUID("kCBMsgArgDeviceUUID"))
 }

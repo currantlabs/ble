@@ -4,7 +4,7 @@ import (
 	"encoding/binary"
 	"log"
 
-	"github.com/currantlabs/x/io/bt"
+	"github.com/currantlabs/ble"
 )
 
 // A DB is a contiguous range of attributes.
@@ -62,7 +62,7 @@ func (r *DB) subrange(start, end uint16) []*attr {
 }
 
 // NewDB ...
-func NewDB(ss []*bt.Service, base uint16) *DB {
+func NewDB(ss []*ble.Service, base uint16) *DB {
 	h := base
 	var attrs []*attr
 	var aa []*attr
@@ -77,10 +77,10 @@ func NewDB(ss []*bt.Service, base uint16) *DB {
 	return &DB{attrs: attrs, base: base}
 }
 
-func genSvcAttr(s *bt.Service, h uint16) (uint16, []*attr) {
+func genSvcAttr(s *ble.Service, h uint16) (uint16, []*attr) {
 	a := &attr{
 		h:   h,
-		typ: bt.PrimaryServiceUUID,
+		typ: ble.PrimaryServiceUUID,
 		v:   s.UUID,
 	}
 	h++
@@ -96,12 +96,12 @@ func genSvcAttr(s *bt.Service, h uint16) (uint16, []*attr) {
 	return h, attrs
 }
 
-func genCharAttr(c *bt.Characteristic, h uint16) (uint16, []*attr) {
+func genCharAttr(c *ble.Characteristic, h uint16) (uint16, []*attr) {
 	vh := h + 1
 
 	a := &attr{
 		h:   h,
-		typ: bt.CharacteristicUUID,
+		typ: ble.CharacteristicUUID,
 		v:   append([]byte{byte(c.Property), byte(vh), byte((vh) >> 8)}, c.UUID...),
 	}
 
@@ -132,7 +132,7 @@ func genCharAttr(c *bt.Characteristic, h uint16) (uint16, []*attr) {
 	return h, attrs
 }
 
-func genDescAttr(d *bt.Descriptor, h uint16) *attr {
+func genDescAttr(d *ble.Descriptor, h uint16) *attr {
 	return &attr{
 		h:   h,
 		typ: d.UUID,
@@ -160,43 +160,43 @@ const (
 	cccIndicate = 0x0002
 )
 
-func newCCCD(c *bt.Characteristic) *bt.Descriptor {
-	var nn bt.Notifier
-	var in bt.Notifier
+func newCCCD(c *ble.Characteristic) *ble.Descriptor {
+	var nn ble.Notifier
+	var in ble.Notifier
 
-	d := bt.NewDescriptor(bt.ClientCharacteristicConfigUUID)
+	d := ble.NewDescriptor(ble.ClientCharacteristicConfigUUID)
 
-	d.HandleRead(bt.ReadHandlerFunc(func(req bt.Request, rsp bt.ResponseWriter) {
+	d.HandleRead(ble.ReadHandlerFunc(func(req ble.Request, rsp ble.ResponseWriter) {
 		cccs := req.Conn().Context().Value("ccc").(map[uint16]uint16)
 		ccc := cccs[c.Handle]
 		binary.Write(rsp, binary.LittleEndian, ccc)
 	}))
 
-	d.HandleWrite(bt.WriteHandlerFunc(func(req bt.Request, rsp bt.ResponseWriter) {
+	d.HandleWrite(ble.WriteHandlerFunc(func(req ble.Request, rsp ble.ResponseWriter) {
 		cccs := req.Conn().Context().Value("ccc").(map[uint16]uint16)
 		svr := req.Conn().Context().Value("svr").(*Server)
 		ccc := cccs[c.Handle]
 
 		newCCC := binary.LittleEndian.Uint16(req.Data())
 		if newCCC&cccNotify != 0 && ccc&cccNotify == 0 {
-			if c.Property&bt.CharNotify == 0 {
-				rsp.SetStatus(bt.ErrUnlikely)
+			if c.Property&ble.CharNotify == 0 {
+				rsp.SetStatus(ble.ErrUnlikely)
 				return
 			}
 			send := func(b []byte) (int, error) { return svr.notify(c.ValueHandle, b) }
-			nn = bt.NewNotifier(send)
+			nn = ble.NewNotifier(send)
 			go c.NotifyHandler.ServeNotify(req, nn)
 		}
 		if newCCC&cccNotify == 0 && ccc&cccNotify != 0 {
 			nn.Close()
 		}
 		if newCCC&cccIndicate != 0 && ccc&cccIndicate == 0 {
-			if c.Property&bt.CharIndicate == 0 {
-				rsp.SetStatus(bt.ErrUnlikely)
+			if c.Property&ble.CharIndicate == 0 {
+				rsp.SetStatus(ble.ErrUnlikely)
 				return
 			}
 			send := func(b []byte) (int, error) { return svr.indicate(c.ValueHandle, b) }
-			in = bt.NewNotifier(send)
+			in = ble.NewNotifier(send)
 			go c.IndicateHandler.ServeNotify(req, in)
 		}
 		if newCCC&cccIndicate == 0 && ccc&cccIndicate != 0 {

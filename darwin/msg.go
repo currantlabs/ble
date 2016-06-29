@@ -2,7 +2,7 @@ package darwin
 
 import (
 	"github.com/currantlabs/ble/darwin/xpc"
-	"github.com/currantlabs/x/io/bt"
+	"github.com/currantlabs/ble"
 )
 
 type msg xpc.Dict
@@ -46,7 +46,7 @@ func (m msg) supervisionTimeout() int { return xpc.Dict(m).MustGetInt("kCBMsgArg
 
 func (m msg) err() error {
 	if code := m.result(); code != 0 {
-		return bt.ATTError(code)
+		return ble.ATTError(code)
 	}
 	return nil
 }

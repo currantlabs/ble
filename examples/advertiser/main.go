@@ -4,16 +4,11 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/currantlabs/ble/gatt"
+	"github.com/currantlabs/ble/examples/lib/gatt"
 )
 
 func main() {
-	dev, err := gatt.NewBroadcaster()
-	if err != nil {
-		log.Fatalf("can't create broadcaster: %s", err)
-	}
-
-	if err := dev.AdvertiseNameAndServices("Hello"); err != nil {
+	if err := gatt.AdvertiseNameAndServices("Hello"); err != nil {
 		log.Fatalf("can't advertise: %s", err)
 	}
 

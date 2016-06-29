@@ -5,17 +5,17 @@ import (
 	"sync"
 
 	"github.com/currantlabs/ble/darwin/xpc"
-	"github.com/currantlabs/x/io/bt"
+	"github.com/currantlabs/ble"
 )
 
-func newConn(d *Device, a bt.Addr) *conn {
+func newConn(d *Device, a ble.Addr) *conn {
 	return &conn{
 		dev:   d,
 		rxMTU: 23,
 		txMTU: 23,
 		addr:  a,
 
-		notifiers: make(map[uint16]bt.Notifier),
+		notifiers: make(map[uint16]ble.Notifier),
 		subs:      make(map[uint16]*sub),
 
 		rspc: make(chan msg),
@@ -30,7 +30,7 @@ type conn struct {
 	ctx   context.Context
 	rxMTU int
 	txMTU int
-	addr  bt.Addr
+	addr  ble.Addr
 
 	rspc chan msg
 
@@ -38,7 +38,7 @@ type conn struct {
 	connLatency        int
 	supervisionTimeout int
 
-	notifiers map[uint16]bt.Notifier // central connection only
+	notifiers map[uint16]ble.Notifier // central connection only
 
 	subs map[uint16]*sub
 }
@@ -51,11 +51,11 @@ func (c *conn) SetContext(ctx context.Context) {
 	c.ctx = ctx
 }
 
-func (c *conn) LocalAddr() bt.Addr {
+func (c *conn) LocalAddr() ble.Addr {
 	return c.dev.Addr()
 }
 
-func (c *conn) RemoteAddr() bt.Addr {
+func (c *conn) RemoteAddr() ble.Addr {
 	return c.addr
 }
 
@@ -88,7 +88,7 @@ func (c *conn) Close() error {
 }
 
 // server (peripheral)
-func (c *conn) subscribed(char *bt.Characteristic) {
+func (c *conn) subscribed(char *ble.Characteristic) {
 	h := char.Handle
 	if _, found := c.notifiers[h]; found {
 		return
@@ -101,14 +101,14 @@ func (c *conn) subscribed(char *bt.Characteristic) {
 		})
 		return len(b), nil
 	}
-	n := bt.NewNotifier(send)
+	n := ble.NewNotifier(send)
 	c.notifiers[h] = n
-	req := bt.NewRequest(c, nil, 0) // convey *conn to user handler.
+	req := ble.NewRequest(c, nil, 0) // convey *conn to user handler.
 	go char.NotifyHandler.ServeNotify(req, n)
 }
 
 // server (peripheral)
-func (c *conn) unsubscribed(char *bt.Characteristic) {
+func (c *conn) unsubscribed(char *ble.Characteristic) {
 	if n, found := c.notifiers[char.Handle]; found {
 		n.Close()
 		delete(c.notifiers, char.Handle)

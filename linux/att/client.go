@@ -4,7 +4,7 @@ import (
 	"encoding/binary"
 	"time"
 
-	"github.com/currantlabs/x/io/bt"
+	"github.com/currantlabs/ble"
 	"github.com/pkg/errors"
 )
 
@@ -15,7 +15,7 @@ type NotificationHandler interface {
 
 // Client implementa an Attribute Protocol Client.
 type Client struct {
-	l2c  bt.Conn
+	l2c  ble.Conn
 	rspc chan []byte
 
 	rxBuf   []byte
@@ -25,12 +25,12 @@ type Client struct {
 }
 
 // NewClient returns an Attribute Protocol Client.
-func NewClient(l2c bt.Conn, h NotificationHandler) *Client {
+func NewClient(l2c ble.Conn, h NotificationHandler) *Client {
 	c := &Client{
 		l2c:     l2c,
 		rspc:    make(chan []byte),
 		chTxBuf: make(chan []byte, 1),
-		rxBuf:   make([]byte, bt.MaxMTU),
+		rxBuf:   make([]byte, ble.MaxMTU),
 		chErr:   make(chan error, 1),
 		handler: h,
 	}
@@ -41,7 +41,7 @@ func NewClient(l2c bt.Conn, h NotificationHandler) *Client {
 // ExchangeMTU informs the server of the client’s maximum receive MTU size and
 // request the server to respond with its maximum receive MTU size. [Vol 3, Part F, 3.4.2.1]
 func (c *Client) ExchangeMTU(clientRxMTU int) (serverRxMTU int, err error) {
-	if clientRxMTU < bt.DefaultMTU || clientRxMTU > bt.MaxMTU {
+	if clientRxMTU < ble.DefaultMTU || clientRxMTU > ble.MaxMTU {
 		return 0, ErrInvalidArgument
 	}
 
@@ -67,7 +67,7 @@ func (c *Client) ExchangeMTU(clientRxMTU int) (serverRxMTU int, err error) {
 	rsp := ExchangeMTUResponse(b)
 	switch {
 	case rsp[0] == ErrorResponseCode && len(rsp) == 5:
-		return 0, bt.ATTError(rsp[4])
+		return 0, ble.ATTError(rsp[4])
 	case rsp[0] == ErrorResponseCode && len(rsp) != 5:
 		fallthrough
 	case rsp[0] != rsp.AttributeOpcode():
@@ -114,7 +114,7 @@ func (c *Client) FindInformation(starth, endh uint16) (fmt int, data []byte, err
 	rsp := FindInformationResponse(b)
 	switch {
 	case rsp[0] == ErrorResponseCode && len(rsp) == 5:
-		return 0x00, nil, bt.ATTError(rsp[4])
+		return 0x00, nil, ble.ATTError(rsp[4])
 	case rsp[0] == ErrorResponseCode && len(rsp) != 5:
 		fallthrough
 	case rsp[0] != rsp.AttributeOpcode():
@@ -145,7 +145,7 @@ func (c *Client) FindInformation(starth, endh uint16) (fmt int, data []byte, err
 
 // ReadByType obtains the values of attributes where the attribute type is known
 // but the handle is not known. [Vol 3, Part F, 3.4.4.1 & 3.4.4.2]
-func (c *Client) ReadByType(starth, endh uint16, uuid bt.UUID) (int, []byte, error) {
+func (c *Client) ReadByType(starth, endh uint16, uuid ble.UUID) (int, []byte, error) {
 	if starth > endh || (len(uuid) != 2 && len(uuid) != 16) {
 		return 0, nil, ErrInvalidArgument
 	}
@@ -169,7 +169,7 @@ func (c *Client) ReadByType(starth, endh uint16, uuid bt.UUID) (int, []byte, err
 	rsp := ReadByTypeResponse(b)
 	switch {
 	case rsp[0] == ErrorResponseCode && len(rsp) == 5:
-		return 0, nil, bt.ATTError(rsp[4])
+		return 0, nil, ble.ATTError(rsp[4])
 	case rsp[0] == ErrorResponseCode && len(rsp) != 5:
 		fallthrough
 	case rsp[0] != rsp.AttributeOpcode():
@@ -201,7 +201,7 @@ func (c *Client) Read(handle uint16) ([]byte, error) {
 	rsp := ReadResponse(b)
 	switch {
 	case rsp[0] == ErrorResponseCode && len(rsp) == 5:
-		return nil, bt.ATTError(rsp[4])
+		return nil, ble.ATTError(rsp[4])
 	case rsp[0] == ErrorResponseCode && len(rsp) != 5:
 		fallthrough
 	case rsp[0] != rsp.AttributeOpcode():
@@ -235,7 +235,7 @@ func (c *Client) ReadBlob(handle, offset uint16) ([]byte, error) {
 	rsp := ReadBlobResponse(b)
 	switch {
 	case rsp[0] == ErrorResponseCode && len(rsp) == 5:
-		return nil, bt.ATTError(rsp[4])
+		return nil, ble.ATTError(rsp[4])
 	case rsp[0] == ErrorResponseCode && len(rsp) != 5:
 		fallthrough
 	case rsp[0] != rsp.AttributeOpcode():
@@ -279,7 +279,7 @@ func (c *Client) ReadMultiple(handles []uint16) ([]byte, error) {
 	rsp := ReadMultipleResponse(b)
 	switch {
 	case rsp[0] == ErrorResponseCode && len(rsp) == 5:
-		return nil, bt.ATTError(rsp[4])
+		return nil, ble.ATTError(rsp[4])
 	case rsp[0] == ErrorResponseCode && len(rsp) != 5:
 		fallthrough
 	case rsp[0] != rsp.AttributeOpcode():
@@ -293,7 +293,7 @@ func (c *Client) ReadMultiple(handles []uint16) ([]byte, error) {
 // ReadByGroupType obtains the values of attributes where the attribute type is known,
 // the type of a grouping attribute as defined by a higher layer specification, but
 // the handle is not known. [Vol 3, Part F, 3.4.4.9 & 3.4.4.10]
-func (c *Client) ReadByGroupType(starth, endh uint16, uuid bt.UUID) (int, []byte, error) {
+func (c *Client) ReadByGroupType(starth, endh uint16, uuid ble.UUID) (int, []byte, error) {
 	if starth > endh || (len(uuid) != 2 && len(uuid) != 16) {
 		return 0, nil, ErrInvalidArgument
 	}
@@ -317,7 +317,7 @@ func (c *Client) ReadByGroupType(starth, endh uint16, uuid bt.UUID) (int, []byte
 	rsp := ReadByGroupTypeResponse(b)
 	switch {
 	case rsp[0] == ErrorResponseCode && len(rsp) == 5:
-		return 0, nil, bt.ATTError(rsp[4])
+		return 0, nil, ble.ATTError(rsp[4])
 	case rsp[0] == ErrorResponseCode && len(rsp) != 5:
 		fallthrough
 	case rsp[0] != rsp.AttributeOpcode():
@@ -356,7 +356,7 @@ func (c *Client) Write(handle uint16, value []byte) error {
 	rsp := WriteResponse(b)
 	switch {
 	case rsp[0] == ErrorResponseCode && len(rsp) == 5:
-		return bt.ATTError(rsp[4])
+		return ble.ATTError(rsp[4])
 	case rsp[0] == ErrorResponseCode && len(rsp) != 5:
 		fallthrough
 	case rsp[0] != rsp.AttributeOpcode():
@@ -431,7 +431,7 @@ func (c *Client) PrepareWrite(handle uint16, offset uint16, value []byte) (uint1
 	rsp := PrepareWriteResponse(b)
 	switch {
 	case rsp[0] == ErrorResponseCode && len(rsp) == 5:
-		return 0, 0, nil, bt.ATTError(rsp[4])
+		return 0, 0, nil, ble.ATTError(rsp[4])
 	case rsp[0] == ErrorResponseCode && len(rsp) != 5:
 		fallthrough
 	case rsp[0] != rsp.AttributeOpcode():
@@ -464,7 +464,7 @@ func (c *Client) ExecuteWrite(flags uint8) error {
 	rsp := ExecuteWriteResponse(b)
 	switch {
 	case rsp[0] == ErrorResponseCode && len(rsp) == 5:
-		return bt.ATTError(rsp[4])
+		return ble.ATTError(rsp[4])
 	case rsp[0] == ErrorResponseCode && len(rsp) == 5:
 		fallthrough
 	case rsp[0] != rsp.AttributeOpcode():
@@ -492,7 +492,7 @@ func (c *Client) sendReq(b []byte) (rsp []byte, err error) {
 			// ATT requests asynchronously to us. // In this case, we
 			// returns an ErrReqNotSupp response, and continue to wait
 			// the response to our request.
-			errRsp := newErrorResponse(rsp[0], 0x0000, bt.ErrReqNotSupp)
+			errRsp := newErrorResponse(rsp[0], 0x0000, ble.ErrReqNotSupp)
 			_, err := c.l2c.Write(errRsp)
 			if err != nil {
 				return nil, errors.Wrap(err, "unexpected ATT response recieved")

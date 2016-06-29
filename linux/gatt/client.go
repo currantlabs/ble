@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	"github.com/currantlabs/ble/linux/att"
-	"github.com/currantlabs/x/io/bt"
+	"github.com/currantlabs/ble"
 )
 
 const (
@@ -15,7 +15,7 @@ const (
 )
 
 // NewClient ...
-func NewClient(conn bt.Conn) (*Client, error) {
+func NewClient(conn ble.Conn) (*Client, error) {
 	p := &Client{
 		subs: make(map[uint16]*sub),
 		conn: conn,
@@ -29,16 +29,16 @@ func NewClient(conn bt.Conn) (*Client, error) {
 type Client struct {
 	sync.RWMutex
 
-	svcs []*bt.Service
+	svcs []*ble.Service
 	name string
 	subs map[uint16]*sub
 
 	ac   *att.Client
-	conn bt.Conn
+	conn ble.Conn
 }
 
 // Address ...
-func (p *Client) Address() bt.Addr {
+func (p *Client) Address() ble.Addr {
 	p.RLock()
 	defer p.RUnlock()
 	return p.conn.RemoteAddr()
@@ -52,20 +52,20 @@ func (p *Client) Name() string {
 }
 
 // Services ...
-func (p *Client) Services() []*bt.Service {
+func (p *Client) Services() []*ble.Service {
 	p.RLock()
 	defer p.RUnlock()
 	return p.svcs
 }
 
 // DiscoverServices ...
-func (p *Client) DiscoverServices(filter []bt.UUID) ([]*bt.Service, error) {
+func (p *Client) DiscoverServices(filter []ble.UUID) ([]*ble.Service, error) {
 	p.Lock()
 	defer p.Unlock()
 	start := uint16(0x0001)
 	for {
-		length, b, err := p.ac.ReadByGroupType(start, 0xFFFF, bt.PrimaryServiceUUID)
-		if err == bt.ErrAttrNotFound {
+		length, b, err := p.ac.ReadByGroupType(start, 0xFFFF, ble.PrimaryServiceUUID)
+		if err == ble.ErrAttrNotFound {
 			return p.svcs, nil
 		}
 		if err != nil {
@@ -74,9 +74,9 @@ func (p *Client) DiscoverServices(filter []bt.UUID) ([]*bt.Service, error) {
 		for len(b) != 0 {
 			h := binary.LittleEndian.Uint16(b[:2])
 			endh := binary.LittleEndian.Uint16(b[2:4])
-			u := bt.UUID(b[4:length])
-			if filter == nil || bt.Contains(filter, u) {
-				s := &bt.Service{
+			u := ble.UUID(b[4:length])
+			if filter == nil || ble.Contains(filter, u) {
+				s := &ble.Service{
 					UUID:      u,
 					Handle:    h,
 					EndHandle: endh,
@@ -93,38 +93,38 @@ func (p *Client) DiscoverServices(filter []bt.UUID) ([]*bt.Service, error) {
 }
 
 // DiscoverIncludedServices ...
-func (p *Client) DiscoverIncludedServices(ss []bt.UUID, s *bt.Service) ([]*bt.Service, error) {
+func (p *Client) DiscoverIncludedServices(ss []ble.UUID, s *ble.Service) ([]*ble.Service, error) {
 	p.Lock()
 	defer p.Unlock()
 	return nil, nil
 }
 
 // DiscoverCharacteristics ...
-func (p *Client) DiscoverCharacteristics(filter []bt.UUID, s *bt.Service) ([]*bt.Characteristic, error) {
+func (p *Client) DiscoverCharacteristics(filter []ble.UUID, s *ble.Service) ([]*ble.Characteristic, error) {
 	p.Lock()
 	defer p.Unlock()
 	start := s.Handle
-	var lastChar *bt.Characteristic
+	var lastChar *ble.Characteristic
 	for start <= s.EndHandle {
-		length, b, err := p.ac.ReadByType(start, s.EndHandle, bt.CharacteristicUUID)
-		if err == bt.ErrAttrNotFound {
+		length, b, err := p.ac.ReadByType(start, s.EndHandle, ble.CharacteristicUUID)
+		if err == ble.ErrAttrNotFound {
 			break
 		} else if err != nil {
 			return nil, err
 		}
 		for len(b) != 0 {
 			h := binary.LittleEndian.Uint16(b[:2])
-			p := bt.Property(b[2])
+			p := ble.Property(b[2])
 			vh := binary.LittleEndian.Uint16(b[3:5])
-			u := bt.UUID(b[5:length])
-			c := &bt.Characteristic{
+			u := ble.UUID(b[5:length])
+			c := &ble.Characteristic{
 				UUID:        u,
 				Property:    p,
 				Handle:      h,
 				ValueHandle: vh,
 				EndHandle:   s.EndHandle,
 			}
-			if filter == nil || bt.Contains(filter, u) {
+			if filter == nil || ble.Contains(filter, u) {
 				s.Characteristics = append(s.Characteristics, c)
 			}
 			if lastChar != nil {
@@ -139,13 +139,13 @@ func (p *Client) DiscoverCharacteristics(filter []bt.UUID, s *bt.Service) ([]*bt
 }
 
 // DiscoverDescriptors ...
-func (p *Client) DiscoverDescriptors(filter []bt.UUID, c *bt.Characteristic) ([]*bt.Descriptor, error) {
+func (p *Client) DiscoverDescriptors(filter []ble.UUID, c *ble.Characteristic) ([]*ble.Descriptor, error) {
 	p.Lock()
 	defer p.Unlock()
 	start := c.ValueHandle + 1
 	for start <= c.EndHandle {
 		fmt, b, err := p.ac.FindInformation(start, c.EndHandle)
-		if err == bt.ErrAttrNotFound {
+		if err == ble.ErrAttrNotFound {
 			break
 		} else if err != nil {
 			return nil, err
@@ -156,12 +156,12 @@ func (p *Client) DiscoverDescriptors(filter []bt.UUID, c *bt.Characteristic) ([]
 		}
 		for len(b) != 0 {
 			h := binary.LittleEndian.Uint16(b[:2])
-			u := bt.UUID(b[2:length])
-			d := &bt.Descriptor{UUID: u, Handle: h}
-			if filter == nil || bt.Contains(filter, u) {
+			u := ble.UUID(b[2:length])
+			d := &ble.Descriptor{UUID: u, Handle: h}
+			if filter == nil || ble.Contains(filter, u) {
 				c.Descriptors = append(c.Descriptors, d)
 			}
-			if u.Equal(bt.ClientCharacteristicConfigUUID) {
+			if u.Equal(ble.ClientCharacteristicConfigUUID) {
 				c.CCCD = d
 			}
 			start = h + 1
@@ -172,21 +172,21 @@ func (p *Client) DiscoverDescriptors(filter []bt.UUID, c *bt.Characteristic) ([]
 }
 
 // ReadCharacteristic ...
-func (p *Client) ReadCharacteristic(c *bt.Characteristic) ([]byte, error) {
+func (p *Client) ReadCharacteristic(c *ble.Characteristic) ([]byte, error) {
 	p.Lock()
 	defer p.Unlock()
 	return p.ac.Read(c.ValueHandle)
 }
 
 // ReadLongCharacteristic ...
-func (p *Client) ReadLongCharacteristic(c *bt.Characteristic) ([]byte, error) {
+func (p *Client) ReadLongCharacteristic(c *ble.Characteristic) ([]byte, error) {
 	p.Lock()
 	defer p.Unlock()
 	return nil, nil
 }
 
 // WriteCharacteristic ...
-func (p *Client) WriteCharacteristic(c *bt.Characteristic, v []byte, noRsp bool) error {
+func (p *Client) WriteCharacteristic(c *ble.Characteristic, v []byte, noRsp bool) error {
 	p.Lock()
 	defer p.Unlock()
 	if noRsp {
@@ -197,14 +197,14 @@ func (p *Client) WriteCharacteristic(c *bt.Characteristic, v []byte, noRsp bool)
 }
 
 // ReadDescriptor ...
-func (p *Client) ReadDescriptor(d *bt.Descriptor) ([]byte, error) {
+func (p *Client) ReadDescriptor(d *ble.Descriptor) ([]byte, error) {
 	p.Lock()
 	defer p.Unlock()
 	return p.ac.Read(d.Handle)
 }
 
 // WriteDescriptor ...
-func (p *Client) WriteDescriptor(d *bt.Descriptor, v []byte) error {
+func (p *Client) WriteDescriptor(d *ble.Descriptor, v []byte) error {
 	p.Lock()
 	defer p.Unlock()
 	return p.ac.Write(d.Handle, v)
@@ -227,7 +227,7 @@ func (p *Client) ExchangeMTU(mtu int) (int, error) {
 }
 
 // Subscribe ...
-func (p *Client) Subscribe(c *bt.Characteristic, ind bool, h bt.NotificationHandler) error {
+func (p *Client) Subscribe(c *ble.Characteristic, ind bool, h ble.NotificationHandler) error {
 	p.Lock()
 	defer p.Unlock()
 	if ind {
@@ -237,7 +237,7 @@ func (p *Client) Subscribe(c *bt.Characteristic, ind bool, h bt.NotificationHand
 }
 
 // Unsubscribe ...
-func (p *Client) Unsubscribe(c *bt.Characteristic, ind bool) error {
+func (p *Client) Unsubscribe(c *ble.Characteristic, ind bool) error {
 	p.Lock()
 	defer p.Unlock()
 	if ind {
@@ -246,7 +246,7 @@ func (p *Client) Unsubscribe(c *bt.Characteristic, ind bool) error {
 	return p.setHandlers(c.CCCD.Handle, c.ValueHandle, cccNotify, nil)
 }
 
-func (p *Client) setHandlers(cccdh, vh, flag uint16, h bt.NotificationHandler) error {
+func (p *Client) setHandlers(cccdh, vh, flag uint16, h ble.NotificationHandler) error {
 	s, ok := p.subs[vh]
 	if !ok {
 		s = &sub{cccdh, 0x0000, nil, nil}
@@ -317,6 +317,6 @@ func (p *Client) HandleNotification(req []byte) {
 type sub struct {
 	cccdh    uint16
 	ccc      uint16
-	nHandler bt.NotificationHandler
-	iHandler bt.NotificationHandler
+	nHandler ble.NotificationHandler
+	iHandler ble.NotificationHandler
 }

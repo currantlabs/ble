@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/currantlabs/ble/gatt"
-	"github.com/currantlabs/x/io/bt"
+	"github.com/currantlabs/ble"
+	"github.com/currantlabs/ble/examples/lib/gatt"
 )
 
-func handle(a bt.Advertisement) {
+func handle(a ble.Advertisement) {
 	fmt.Printf("[%s]", a.Address())
 	comma := ""
 	if len(a.LocalName()) > 0 {
@@ -26,14 +26,10 @@ func handle(a bt.Advertisement) {
 }
 
 func main() {
-	dev, err := gatt.NewObserver()
-	if err != nil {
-		log.Fatalf("can't create observer: %s", err)
-	}
-	if err = dev.SetAdvHandler(bt.AdvHandlerFunc(handle)); err != nil {
+	if err := gatt.SetAdvHandler(ble.AdvHandlerFunc(handle)); err != nil {
 		log.Fatalf("can't set adv handler: %s", err)
 	}
-	if err = dev.Scan(true); err != nil {
+	if err := gatt.Scan(true); err != nil {
 		log.Fatalf("can't scan: %s", err)
 	}
 	select {}

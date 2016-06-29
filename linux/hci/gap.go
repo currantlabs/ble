@@ -6,8 +6,9 @@ import (
 	"time"
 
 	"github.com/currantlabs/ble/linux/adv"
+	"github.com/currantlabs/ble/linux/gatt"
 	"github.com/currantlabs/ble/linux/hci/cmd"
-	"github.com/currantlabs/x/io/bt"
+	"github.com/currantlabs/ble"
 )
 
 // ScanParams implements LE Set Scan Parameters (0x08|0x000B) [Vol 2, Part E, 7.8.10]
@@ -48,10 +49,10 @@ type ConnParams struct {
 }
 
 // Addr ...
-func (h *HCI) Addr() bt.Addr { return h.addr }
+func (h *HCI) Addr() ble.Addr { return h.addr }
 
 // SetAdvHandler ...
-func (h *HCI) SetAdvHandler(ah bt.AdvHandler) error {
+func (h *HCI) SetAdvHandler(ah ble.AdvHandler) error {
 	h.advHandler = ah
 	return nil
 }
@@ -75,7 +76,7 @@ func (h *HCI) StopScanning() error {
 // AdvertiseNameAndServices advertises device name, and specified service UUIDs.
 // It tries to fit the UUIDs in the advertising data as much as possible.
 // If name doesn't fit in the advertising data, it will be put in scan response.
-func (h *HCI) AdvertiseNameAndServices(name string, uuids ...bt.UUID) error {
+func (h *HCI) AdvertiseNameAndServices(name string, uuids ...ble.UUID) error {
 	ad, err := adv.NewPacket(adv.Flags(adv.FlagGeneralDiscoverable | adv.FlagLEOnly))
 	if err != nil {
 		return err
@@ -123,7 +124,7 @@ func (h *HCI) AdvertiseIBeaconData(md []byte) error {
 }
 
 // AdvertiseIBeacon advertises iBeacon with specified parameters.
-func (h *HCI) AdvertiseIBeacon(u bt.UUID, major, minor uint16, pwr int8) error {
+func (h *HCI) AdvertiseIBeacon(u ble.UUID, major, minor uint16, pwr int8) error {
 	ad, err := adv.NewPacket(adv.IBeacon(u, major, minor, pwr))
 	if err != nil {
 		return err
@@ -140,7 +141,7 @@ func (h *HCI) StopAdvertising() error {
 }
 
 // Accept starts advertising and accepts connection.
-func (h *HCI) Accept() (bt.Conn, error) {
+func (h *HCI) Accept() (ble.Conn, error) {
 	if err := h.states.set(Listening); err != nil {
 		return nil, err
 	}
@@ -161,7 +162,7 @@ func (h *HCI) Accept() (bt.Conn, error) {
 }
 
 // Dial ...
-func (h *HCI) Dial(a bt.Addr) (bt.Conn, error) {
+func (h *HCI) Dial(a ble.Addr) (ble.Client, error) {
 	b, err := net.ParseMAC(a.String())
 	if err != nil {
 		return nil, ErrInvalidAddr
@@ -181,12 +182,11 @@ func (h *HCI) Dial(a bt.Addr) (bt.Conn, error) {
 	case <-h.done:
 		return nil, h.err
 	case c := <-h.chMasterConn:
-		return c, nil
+		return gatt.NewClient(c)
 	case <-tmo:
-		if err := h.states.set(DialingCanceling); err == nil {
-			return <-h.chMasterConn, nil
-		}
-		return <-h.chMasterConn, fmt.Errorf("dialer timed out")
+		err := h.states.set(DialingCanceling)
+		<-h.chMasterConn
+		return nil, err
 	}
 }
 
@@ -206,7 +206,7 @@ func (h *HCI) Advertise() error {
 // SetAdvertisement sets advertising data and scanResp.
 func (h *HCI) SetAdvertisement(ad []byte, sr []byte) error {
 	if len(ad) > adv.MaxEIRPacketLength || len(sr) > adv.MaxEIRPacketLength {
-		return bt.ErrEIRPacketTooLong
+		return ble.ErrEIRPacketTooLong
 	}
 
 	h.states.Lock()

@@ -7,10 +7,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/currantlabs/ble"
 	"github.com/currantlabs/ble/linux/hci/cmd"
 	"github.com/currantlabs/ble/linux/hci/evt"
 	"github.com/currantlabs/ble/linux/hci/skt"
-	"github.com/currantlabs/x/io/bt"
 )
 
 // Command ...
@@ -33,7 +33,7 @@ type pkt struct {
 }
 
 // NewHCI returns a hci device.
-func NewHCI(opts ...Option) (*HCI, error) {
+func NewHCI(opts ...ble.Option) (*HCI, error) {
 	h := &HCI{
 		id: -1,
 
@@ -89,7 +89,7 @@ type HCI struct {
 	chEvt       chan []byte
 	chStartScan chan bool
 	chAdvEvt    chan []byte
-	advHandler  bt.AdvHandler
+	advHandler  ble.AdvHandler
 
 	// Host to Controller Data Flow Control Packet-based Data flow control for LE-U [Vol 2, Part E, 4.1.1]
 	// Minimum 27 bytes. 4 bytes of L2CAP Header, and 23 bytes Payload from upper layer (ATT)
@@ -120,14 +120,14 @@ func (h *HCI) Init(opts ...Option) error {
 	h.subh[evt.LEConnectionCompleteSubCode] = h.handleLEConnectionComplete
 	h.subh[evt.LEConnectionUpdateCompleteSubCode] = h.handleLEConnectionUpdateComplete
 	h.subh[evt.LELongTermKeyRequestSubCode] = h.handleLELongTermKeyRequest
-	// evt.EncryptionChangeCode:                     bt.todo),
-	// evt.ReadRemoteVersionInformationCompleteCode: bt.todo),
-	// evt.HardwareErrorCode:                        bt.todo),
-	// evt.DataBufferOverflowCode:                   bt.todo),
-	// evt.EncryptionKeyRefreshCompleteCode:         bt.todo),
-	// evt.AuthenticatedPayloadTimeoutExpiredCode:   bt.todo),
-	// evt.LEReadRemoteUsedFeaturesCompleteSubCode:   bt.todo),
-	// evt.LERemoteConnectionParameterRequestSubCode: bt.todo),
+	// evt.EncryptionChangeCode:                     todo),
+	// evt.ReadRemoteVersionInformationCompleteCode: todo),
+	// evt.HardwareErrorCode:                        todo),
+	// evt.DataBufferOverflowCode:                   todo),
+	// evt.EncryptionKeyRefreshCompleteCode:         todo),
+	// evt.AuthenticatedPayloadTimeoutExpiredCode:   todo),
+	// evt.LEReadRemoteUsedFeaturesCompleteSubCode:   todo),
+	// evt.LERemoteConnectionParameterRequestSubCode: todo),
 
 	if err := h.Option(opts...); err != nil {
 		return err

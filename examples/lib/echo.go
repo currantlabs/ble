@@ -5,16 +5,16 @@ import (
 	"sync"
 	"time"
 
-	"github.com/currantlabs/x/io/bt"
+	"github.com/currantlabs/ble"
 )
 
 // NewEchoChar ...
-func NewEchoChar() *bt.Characteristic {
+func NewEchoChar() *ble.Characteristic {
 	e := &echoChar{m: make(map[string]chan []byte)}
-	c := bt.NewCharacteristic(EchoCharUUID)
-	c.HandleWrite(bt.WriteHandlerFunc(e.written))
-	c.HandleNotify(bt.NotifyHandlerFunc(e.echo))
-	c.HandleIndicate(bt.NotifyHandlerFunc(e.echo))
+	c := ble.NewCharacteristic(EchoCharUUID)
+	c.HandleWrite(ble.WriteHandlerFunc(e.written))
+	c.HandleNotify(ble.NotifyHandlerFunc(e.echo))
+	c.HandleIndicate(ble.NotifyHandlerFunc(e.echo))
 	return c
 }
 
@@ -23,13 +23,13 @@ type echoChar struct {
 	m map[string]chan []byte
 }
 
-func (e *echoChar) written(req bt.Request, rsp bt.ResponseWriter) {
+func (e *echoChar) written(req ble.Request, rsp ble.ResponseWriter) {
 	e.Lock()
 	e.m[req.Conn().RemoteAddr().String()] <- req.Data()
 	e.Unlock()
 }
 
-func (e *echoChar) echo(req bt.Request, n bt.Notifier) {
+func (e *echoChar) echo(req ble.Request, n ble.Notifier) {
 	ch := make(chan []byte)
 	e.Lock()
 	e.m[req.Conn().RemoteAddr().String()] = ch

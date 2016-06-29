@@ -1,14 +1,14 @@
 package att
 
-import "github.com/currantlabs/x/io/bt"
+import "github.com/currantlabs/ble"
 
 // attr is a BLE attribute.
 type attr struct {
 	h    uint16
 	endh uint16
-	typ  bt.UUID
+	typ  ble.UUID
 
 	v  []byte
-	rh bt.ReadHandler
-	wh bt.WriteHandler
+	rh ble.ReadHandler
+	wh ble.WriteHandler
 }
