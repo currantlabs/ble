@@ -2,6 +2,7 @@ package att
 
 import (
 	"encoding/binary"
+	"fmt"
 	"time"
 
 	"github.com/currantlabs/ble"
@@ -479,6 +480,7 @@ func (c *Client) sendCmd(b []byte) error {
 }
 
 func (c *Client) sendReq(b []byte) (rsp []byte, err error) {
+	logger.Debug("client", "req", fmt.Sprintf("% X", b))
 	if _, err := c.l2c.Write(b); err != nil {
 		return nil, errors.Wrap(err, "send ATT request failed")
 	}
@@ -493,14 +495,15 @@ func (c *Client) sendReq(b []byte) (rsp []byte, err error) {
 			// returns an ErrReqNotSupp response, and continue to wait
 			// the response to our request.
 			errRsp := newErrorResponse(rsp[0], 0x0000, ble.ErrReqNotSupp)
+			logger.Debug("client", "req", fmt.Sprintf("% X", b))
 			_, err := c.l2c.Write(errRsp)
 			if err != nil {
 				return nil, errors.Wrap(err, "unexpected ATT response recieved")
 			}
 		case err := <-c.chErr:
-			return nil, err
+			return nil, errors.Wrap(err, "ATT request failed")
 		case <-time.After(30 * time.Second):
-			return nil, ErrSeqProtoTimeout
+			return nil, errors.Wrap(ErrSeqProtoTimeout, "ATT request timeout")
 		}
 	}
 }
@@ -510,6 +513,7 @@ func (c *Client) Loop() {
 	confirmation := []byte{HandleValueConfirmationCode}
 	for {
 		n, err := c.l2c.Read(c.rxBuf)
+		logger.Debug("client", "rsp", fmt.Sprintf("% X", c.rxBuf[:n]))
 		if err != nil {
 			// We don't expect any error from the bearer (L2CAP ACL-U)
 			// Pass it along to the pending request, if any, and escape.
@@ -530,6 +534,7 @@ func (c *Client) Loop() {
 
 		// Always write aknowledgement for an indication, even it was an invalid request.
 		if b[0] == HandleValueIndicationCode {
+			logger.Debug("client", "req", fmt.Sprintf("% X", b))
 			c.l2c.Write(confirmation)
 		}
 	}

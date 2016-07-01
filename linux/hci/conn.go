@@ -6,12 +6,12 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"log"
 	"net"
 
 	"github.com/currantlabs/ble"
 	"github.com/currantlabs/ble/linux/hci/cmd"
 	"github.com/currantlabs/ble/linux/hci/evt"
+	"github.com/pkg/errors"
 )
 
 // Conn ...
@@ -91,7 +91,9 @@ func newConn(h *HCI, param evt.LEConnectionComplete) *Conn {
 		for {
 			if err := c.recombine(); err != nil {
 				if err != io.EOF {
-					log.Printf("recombine failed: %s", err)
+					// TODO: wrap and pass the error up.
+					// err := errors.Wrap(err, "recombine failed")
+					logger.Error("recombine failed: ", "err", err)
 				}
 				close(c.chInPDU)
 				return
@@ -112,10 +114,13 @@ func (c *Conn) SetContext(ctx context.Context) {
 }
 
 // Read copies re-assembled L2CAP PDUs into sdu.
-func (c *Conn) Read(sdu []byte) (int, error) {
+func (c *Conn) Read(sdu []byte) (n int, err error) {
 	p, ok := <-c.chInPDU
-	if !ok || len(p) == 0 {
-		return 0, io.ErrUnexpectedEOF
+	if !ok {
+		return 0, errors.Wrap(io.ErrClosedPipe, "input channel closed")
+	}
+	if len(p) == 0 {
+		return 0, errors.Wrap(io.ErrUnexpectedEOF, "recieved empty packet")
 	}
 
 	// Assume it's a B-Frame.
@@ -127,7 +132,7 @@ func (c *Conn) Read(sdu []byte) (int, error) {
 		data = leFrameHdr(p).payload()
 	}
 	if cap(sdu) < slen {
-		return 0, io.ErrShortBuffer
+		return 0, errors.Wrapf(io.ErrShortBuffer, "payload recieved exceeds sdu buffer")
 	}
 	buf := bytes.NewBuffer(sdu)
 	buf.Reset()
@@ -142,7 +147,7 @@ func (c *Conn) Read(sdu []byte) (int, error) {
 // Write breaks down a L2CAP SDU into segmants [Vol 3, Part A, 7.3.1]
 func (c *Conn) Write(sdu []byte) (int, error) {
 	if len(sdu) > c.txMTU {
-		return 0, io.ErrShortWrite
+		return 0, errors.Wrap(io.ErrShortWrite, "payload exceeds mtu")
 	}
 
 	plen := len(sdu)
@@ -260,7 +265,8 @@ func (c *Conn) recombine() error {
 	case cidLESMP:
 		// TODO: Security Manager Protocol
 	default:
-		log.Printf("recombine(): unrecognized CID: 0x%04X, [%X]", p.cid(), p)
+		// log.Printf("recombine(): unrecognized CID: 0x%04X, [%X]", p.cid(), p)
+		logger.Info("recombine()", "unrecognized CID", fmt.Sprintf("%04X, [%X]", p.cid(), p))
 	}
 	return nil
 }

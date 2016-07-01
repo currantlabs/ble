@@ -6,7 +6,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"log"
 	"time"
 
 	"github.com/currantlabs/ble"
@@ -127,7 +126,7 @@ func (s *Server) Loop() {
 				select {
 				case s.chConfirm <- true:
 				default:
-					log.Printf("svr: recieved a spurious confirmation")
+					logger.Error("server", "recieved a spurious confirmation", nil)
 				}
 				continue
 			}
@@ -153,7 +152,7 @@ func (s *Server) close() error {
 
 func (s *Server) handleRequest(b []byte) []byte {
 	var resp []byte
-	// log.Printf("att req: % X", b)
+	logger.Debug("server", "req", fmt.Sprintf("% X", b))
 	switch reqType := b[0]; reqType {
 	case ExchangeMTURequestCode:
 		resp = s.handleExchangeMTURequest(b)
@@ -181,7 +180,7 @@ func (s *Server) handleRequest(b []byte) []byte {
 	default:
 		resp = newErrorResponse(reqType, 0x0000, ble.ErrReqNotSupp)
 	}
-	// log.Printf("att: rsp: % X", resp)
+	logger.Debug("server", "rsp", fmt.Sprintf("% X", resp))
 	return resp
 }
 

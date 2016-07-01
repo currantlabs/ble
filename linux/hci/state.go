@@ -9,7 +9,7 @@ import (
 	"github.com/mgutz/logxi/v1"
 )
 
-var logger = log.New("state")
+var logger = log.New("hci")
 
 // State ...
 type State string
@@ -152,9 +152,9 @@ func (s *states) send(c Command) error {
 
 func (s *states) handle(n nextState) {
 	s.err = nil
-	logger.Info(string(n.s) + " +")
+	logger.Info("state", "+", string(n.s))
 	defer func() {
-		logger.Info(string(n.s) + " -")
+		logger.Info("state", "-", string(n.s))
 		n.done <- s.err
 	}()
 	switch n.s {
