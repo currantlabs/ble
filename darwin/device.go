@@ -7,8 +7,8 @@ import (
 	"log"
 	"time"
 
-	"github.com/currantlabs/ble/darwin/xpc"
 	"github.com/currantlabs/ble"
+	"github.com/currantlabs/ble/darwin/xpc"
 )
 
 const (
@@ -130,7 +130,7 @@ func (d *Device) AdvertiseIBeaconData(md []byte) error {
 // AdvertiseIBeacon advertises iBeacon packet.
 func (d *Device) AdvertiseIBeacon(u ble.UUID, major, minor uint16, pwr int8) error {
 	b := make([]byte, 21)
-	copy(b, ble.Reverse(u))                    // Big endian
+	copy(b, ble.Reverse(u))                   // Big endian
 	binary.BigEndian.PutUint16(b[16:], major) // Big endian
 	binary.BigEndian.PutUint16(b[18:], minor) // Big endian
 	b[20] = uint8(pwr)                        // Measured Tx Power
@@ -301,7 +301,7 @@ func (d *Device) HandleXpcEvent(event xpc.Dict, err error) {
 	}
 	m := msg(event)
 	args := msg(msg(event).args())
-	// log.Printf(">> %d, %v", m.id(), m.args())
+	logger.Info("recv", "id", m.id(), "args", fmt.Sprintf("%v", m.args()))
 
 	switch m.id() {
 	case // Device event
@@ -450,7 +450,7 @@ func (d *Device) sendReq(id int, args xpc.Dict) msg {
 }
 
 func (d *Device) sendCmd(id int, args xpc.Dict) error {
-	// log.Printf("<< %d, %v", id, args)
+	logger.Info("send", "id", id, "args", fmt.Sprintf("%v", args))
 	d.xpc.Send(xpc.Dict{"kCBMsgId": id, "kCBMsgArgs": args}, false)
 	return nil
 }
