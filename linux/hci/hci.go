@@ -44,11 +44,6 @@ func NewHCI(opts ...Option) (*HCI, error) {
 		evth: map[int]handlerFn{},
 		subh: map[int]handlerFn{},
 
-		states: newStates(),
-
-		chEvt:       make(chan []byte, 64),
-		chStartScan: make(chan bool),
-
 		muConns:      &sync.Mutex{},
 		conns:        make(map[uint16]*Conn),
 		chMasterConn: make(chan *Conn),
@@ -63,6 +58,7 @@ func NewHCI(opts ...Option) (*HCI, error) {
 // HCI ...
 type HCI struct {
 	sync.Mutex
+	states
 
 	skt io.ReadWriteCloser
 	id  int
@@ -84,12 +80,9 @@ type HCI struct {
 	addr    net.HardwareAddr
 	txPwrLv int
 
-	states *states
-
-	chEvt       chan []byte
-	chStartScan chan bool
-	chAdvEvt    chan []byte
-	advHandler  ble.AdvHandler
+	advHandler ble.AdvHandler
+	ad         []*Advertisement
+	last       int
 
 	// Host to Controller Data Flow Control Packet-based Data flow control for LE-U [Vol 2, Part E, 4.1.1]
 	// Minimum 27 bytes. 4 bytes of L2CAP Header, and 23 bytes Payload from upper layer (ATT)
@@ -141,15 +134,16 @@ func (h *HCI) Init(opts ...Option) error {
 
 	h.chCmdBufs <- make([]byte, 64)
 
-	go h.asyncLoop()
 	go h.sktLoop()
 	h.init()
-	h.states.init(h)
+	h.states.init()
 
 	// Pre-allocate buffers with additional head room for lower layer headers.
 	// HCI header (1 Byte) + ACL Data Header (4 bytes) + L2CAP PDU (or fragment)
 	h.pool = NewPool(1+4+h.bufSize, h.bufCnt-1)
 
+	h.Send(&h.advParams, nil)
+	h.Send(&h.scanParams, nil)
 	return nil
 }
 
@@ -218,6 +212,9 @@ func (h *HCI) Send(c Command, r CommandRP) error {
 	if err != nil {
 		return err
 	}
+	if len(b) > 0 && b[0] != 0x00 {
+		return ErrCommand(b[0])
+	}
 	if r != nil {
 		return r.Unmarshal(b)
 	}
@@ -253,65 +250,6 @@ func (h *HCI) send(c Command) ([]byte, error) {
 	}
 }
 
-func (h *HCI) asyncLoop() {
-	var ad []*Advertisement
-	var last int
-	for {
-		select {
-		case <-h.done:
-			return
-		case b := <-h.chEvt:
-			code, plen := int(b[0]), int(b[1])
-			if plen != len(b[2:]) {
-				h.err = fmt.Errorf("hci: corrupt event packet: [ % X ]", b)
-			}
-			if f := h.evth[code]; f != nil {
-				h.err = f(b[2:])
-			}
-			// err = fmt.Errorf("hci: unsupported event packet: [ % X ]", b)
-		case <-h.chStartScan:
-			h.chAdvEvt = make(chan []byte, 16)
-			ad = make([]*Advertisement, 16)
-			last = 0
-		case b := <-h.chAdvEvt:
-			e := evt.LEAdvertisingReport(b)
-			for i := 0; i < int(e.NumReports()); i++ {
-				var a *Advertisement
-				switch e.EventType(i) {
-				case evtTypAdvInd:
-					fallthrough
-				case evtTypAdvScanInd:
-					a = newAdvertisement(e, i)
-					ad[last] = a
-					last++
-					if last == len(ad) {
-						last = 0
-					}
-				case evtTypScanRsp:
-					sr := newAdvertisement(e, i)
-					for idx := last - 1; idx != last; idx-- {
-						if idx == -1 {
-							idx = len(ad) - 1
-						}
-						if ad[idx] == nil {
-							break
-						}
-						if ad[idx].Address().String() == sr.Address().String() {
-							ad[idx].setScanResponse(sr)
-							a = ad[idx]
-							break
-						}
-					}
-				default:
-					a = newAdvertisement(e, i)
-				}
-				// FIXME:
-				go h.advHandler.Handle(a)
-			}
-		}
-	}
-}
-
 func (h *HCI) sktLoop() {
 	b := make([]byte, 4096)
 	defer close(h.done)
@@ -331,28 +269,26 @@ func (h *HCI) sktLoop() {
 }
 
 func (h *HCI) stop(err error) error {
-	if err := h.skt.Close(); err != nil {
-		return err
-	}
-	return nil
+	h.err = err
+	return h.skt.Close()
 }
 
 func (h *HCI) handlePkt(b []byte) error {
-	// Strip the HCI header, and pass down the rest of the packet.
+	// Strip the 1-byte HCI header and pass down the rest of the packet.
 	t, b := b[0], b[1:]
 	switch t {
 	case pktTypeCommand:
-		return fmt.Errorf("HCI: unmanaged cmd: [ % X ]", b)
+		return fmt.Errorf("unmanaged cmd: % X", b)
 	case pktTypeACLData:
 		return h.handleACL(b)
 	case pktTypeSCOData:
-		return fmt.Errorf("HCI: unsupported sco packet: [ % X ]", b)
+		return fmt.Errorf("unsupported sco packet: % X", b)
 	case pktTypeEvent:
 		return h.handleEvt(b)
 	case pktTypeVendor:
-		return fmt.Errorf("HCI: unsupported vendor packet: [ % X ]", b)
+		return fmt.Errorf("unsupported vendor packet: % X", b)
 	default:
-		return fmt.Errorf("HCI: invalid packet: 0x%02X [ % X ]", t, b)
+		return fmt.Errorf("invalid packet: 0x%02X % X", t, b)
 	}
 }
 
@@ -361,7 +297,7 @@ func (h *HCI) handleACL(b []byte) error {
 	c, ok := h.conns[packet(b).handle()]
 	h.muConns.Unlock()
 	if !ok {
-		return fmt.Errorf("l2cap: incoming packet for non-existing connection")
+		return fmt.Errorf("invalid connection handle")
 	}
 	c.chInPkt <- b
 	return nil
@@ -370,15 +306,21 @@ func (h *HCI) handleACL(b []byte) error {
 func (h *HCI) handleEvt(b []byte) error {
 	code, plen := int(b[0]), int(b[1])
 	if plen != len(b[2:]) {
-		return fmt.Errorf("hci: corrupt event packet: [ % X ]", b)
+		return fmt.Errorf("invalid event packet: % X", b)
 	}
 	if code == evt.CommandCompleteCode || code == evt.CommandStatusCode {
 		if f := h.evth[code]; f != nil {
 			return f(b[2:])
 		}
 	}
-	h.chEvt <- b
-	return nil
+	if plen != len(b[2:]) {
+		h.err = fmt.Errorf("invalid event packet: % X", b)
+	}
+	if f := h.evth[code]; f != nil {
+		h.err = f(b[2:])
+		return nil
+	}
+	return fmt.Errorf("unsupported event packet: % X", b)
 }
 
 func (h *HCI) handleLEMeta(b []byte) error {
@@ -386,18 +328,48 @@ func (h *HCI) handleLEMeta(b []byte) error {
 	if f := h.subh[subcode]; f != nil {
 		return f(b)
 	}
-	return fmt.Errorf("hci: unsupported LE event: [ % X ]", b)
+	return fmt.Errorf("unsupported LE event: % X", b)
 }
 
 func (h *HCI) handleLEAdvertisingReport(b []byte) error {
 	if h.advHandler == nil {
 		return nil
 	}
-	select {
-	case h.chAdvEvt <- evt.LEAdvertisingReport(b):
-	default:
-		// discard the advertisement.
+
+	e := evt.LEAdvertisingReport(b)
+	for i := 0; i < int(e.NumReports()); i++ {
+		var a *Advertisement
+		switch e.EventType(i) {
+		case evtTypAdvInd:
+			fallthrough
+		case evtTypAdvScanInd:
+			a = newAdvertisement(e, i)
+			h.ad[h.last] = a
+			h.last++
+			if h.last == len(h.ad) {
+				h.last = 0
+			}
+		case evtTypScanRsp:
+			sr := newAdvertisement(e, i)
+			for idx := h.last - 1; idx != h.last; idx-- {
+				if idx == -1 {
+					idx = len(h.ad) - 1
+				}
+				if h.ad[idx] == nil {
+					break
+				}
+				if h.ad[idx].Address().String() == sr.Address().String() {
+					h.ad[idx].setScanResponse(sr)
+					a = h.ad[idx]
+					break
+				}
+			}
+		default:
+			a = newAdvertisement(e, i)
+		}
+		go h.advHandler.Handle(a)
 	}
+
 	return nil
 }
 
@@ -414,7 +386,7 @@ func (h *HCI) handleCommandComplete(b []byte) error {
 	}
 	p, found := h.sent[int(e.CommandOpcode())]
 	if !found {
-		return fmt.Errorf("hci: can't find the cmd for CommandCompleteEP: % X", e)
+		return fmt.Errorf("can't find the cmd for CommandCompleteEP: % X", e)
 	}
 	p.done <- e.ReturnParameters()
 	return nil
@@ -428,7 +400,7 @@ func (h *HCI) handleCommandStatus(b []byte) error {
 
 	p, found := h.sent[int(e.CommandOpcode())]
 	if !found {
-		return fmt.Errorf("hci: can't find the cmd for CommandStatusEP: % X", e)
+		return fmt.Errorf("can't find the cmd for CommandStatusEP: % X", e)
 	}
 	close(p.done)
 	return nil
@@ -443,14 +415,30 @@ func (h *HCI) handleLEConnectionComplete(b []byte) error {
 	if e.Role() == roleMaster {
 		if e.Status() == 0x00 {
 			h.chMasterConn <- c
-		} else if ErrCommand(e.Status()) == ErrConnID {
-			// nil for a canceled connection.
-			h.chMasterConn <- nil
+			return nil
+		}
+		if ErrCommand(e.Status()) == ErrConnID {
+			// The connection was canceled successfully.
+			return nil
 		}
 		return nil
 	}
 	if e.Status() == 0x00 {
 		h.chSlaveConn <- c
+		// When a controller accepts a connection, it moves from advertising
+		// state to idle/ready state. Host needs to explicitly ask the
+		// controller to re-enable advertising. Note that the host was most
+		// likely in advertising state. Otherwise it couldn't accept the
+		// connection in the first place. The only exception is that user
+		// asked the host to stop advertising during this tiny window.
+		// The re-enabling might failed or ignored by the controller, if
+		// it had reached the maximum number of concurrent connections.
+		// So we also re-enable the advertising when a connection disconnected
+		h.states.RLock()
+		if h.advEnable.AdvertisingEnable == 1 {
+			go h.Send(&h.advEnable, nil)
+		}
+		h.states.RUnlock()
 	}
 	return nil
 }
@@ -466,16 +454,24 @@ func (h *HCI) handleDisconnectionComplete(b []byte) error {
 	delete(h.conns, e.ConnectionHandle())
 	h.muConns.Unlock()
 	if !found {
-		return fmt.Errorf("l2cap: disconnecting an invalid handle %04X", e.ConnectionHandle())
+		return fmt.Errorf("disconnecting an invalid handle %04X", e.ConnectionHandle())
 	}
 	close(c.chInPkt)
 	if c.param.Role() == roleSlave {
-		h.states.set(CentralDisconnected)
+		// Re-enable advertising, if it was advertising. Refer to the
+		// handleLEConnectionComplete() for details.
+		// This may failed with ErrCommandDisallowed, if the controller
+		// was actually in advertising state. It does no harm though.
+		h.states.RLock()
+		if h.advEnable.AdvertisingEnable == 1 {
+			go h.Send(&h.advEnable, nil)
+		}
+		h.states.RUnlock()
 	} else {
-		h.states.set(PeripheralDisconnected)
+		// log.Printf("peripheral disconnected")
 	}
 	// When a connection disconnects, all the sent packets and weren't acked yet
-	// will be recylecd. [Vol2, Part E 4.1.1]
+	// will be recycled. [Vol2, Part E 4.1.1]
 	c.txBuffer.PutAll()
 	return nil
 }

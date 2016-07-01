@@ -273,12 +273,18 @@ func (c *Conn) recombine() error {
 
 // Close disconnects the connection by sending hci disconnect command to the device.
 func (c *Conn) Close() error {
-	c.hci.Send(&cmd.Disconnect{
-		ConnectionHandle: c.param.ConnectionHandle(),
-		Reason:           0x13,
-	}, nil)
-	close(c.chDone)
-	return nil
+	select {
+	case <-c.chDone:
+		// Return if it's already closed.
+		return nil
+	default:
+		c.hci.Send(&cmd.Disconnect{
+			ConnectionHandle: c.param.ConnectionHandle(),
+			Reason:           0x13,
+		}, nil)
+		close(c.chDone)
+		return nil
+	}
 }
 
 // LocalAddr returns local device's MAC address.

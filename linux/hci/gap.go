@@ -8,45 +8,8 @@ import (
 	"github.com/currantlabs/ble"
 	"github.com/currantlabs/ble/linux/adv"
 	"github.com/currantlabs/ble/linux/gatt"
-	"github.com/currantlabs/ble/linux/hci/cmd"
+	"github.com/pkg/errors"
 )
-
-// ScanParams implements LE Set Scan Parameters (0x08|0x000B) [Vol 2, Part E, 7.8.10]
-type ScanParams struct {
-	LEScanType           uint8
-	LEScanInterval       uint16
-	LEScanWindow         uint16
-	OwnAddressType       uint8
-	ScanningFilterPolicy uint8
-}
-
-// AdvParams implements LE Set Advertising Parameters (0x08|0x0006) [Vol 2, Part E, 7.8.5]
-type AdvParams struct {
-	AdvertisingIntervalMin  uint16
-	AdvertisingIntervalMax  uint16
-	AdvertisingType         uint8
-	OwnAddressType          uint8
-	DirectAddressType       uint8
-	DirectAddress           [6]byte
-	AdvertisingChannelMap   uint8
-	AdvertisingFilterPolicy uint8
-}
-
-// ConnParams implements LE Create Connection (0x08|0x000D) [Vol 2, Part E, 7.8.12]
-type ConnParams struct {
-	LEScanInterval        uint16
-	LEScanWindow          uint16
-	InitiatorFilterPolicy uint8
-	PeerAddressType       uint8
-	PeerAddress           [6]byte
-	OwnAddressType        uint8
-	ConnIntervalMin       uint16
-	ConnIntervalMax       uint16
-	ConnLatency           uint16
-	SupervisionTimeout    uint16
-	MinimumCELength       uint16
-	MaximumCELength       uint16
-}
 
 // Addr ...
 func (h *HCI) Addr() ble.Addr { return h.addr }
@@ -59,18 +22,20 @@ func (h *HCI) SetAdvHandler(ah ble.AdvHandler) error {
 
 // Scan starts scanning.
 func (h *HCI) Scan(allowDup bool) error {
-	h.states.Lock()
-	h.states.scanEnable.FilterDuplicates = 1
+	h.scanEnable.FilterDuplicates = 1
 	if allowDup {
-		h.states.scanEnable.FilterDuplicates = 0
+		h.scanEnable.FilterDuplicates = 0
 	}
-	h.states.Unlock()
-	return h.states.set(Scanning)
+	h.scanEnable.LEScanEnable = 1
+	h.ad = make([]*Advertisement, 16)
+	h.last = 0
+	return h.Send(&h.scanEnable, nil)
 }
 
 // StopScanning stops scanning.
 func (h *HCI) StopScanning() error {
-	return h.states.set(StopScanning)
+	h.scanEnable.LEScanEnable = 0
+	return h.Send(&h.scanEnable, nil)
 }
 
 // AdvertiseNameAndServices advertises device name, and specified service UUIDs.
@@ -137,14 +102,12 @@ func (h *HCI) AdvertiseIBeacon(u ble.UUID, major, minor uint16, pwr int8) error 
 
 // StopAdvertising stops advertising.
 func (h *HCI) StopAdvertising() error {
-	return h.states.set(StopAdvertising)
+	h.advEnable.AdvertisingEnable = 0
+	return h.Send(&h.advEnable, nil)
 }
 
 // Accept starts advertising and accepts connection.
 func (h *HCI) Accept() (ble.Conn, error) {
-	if err := h.states.set(Listening); err != nil {
-		return nil, err
-	}
 	var tmo <-chan time.Time
 	if h.listenerTmo != time.Duration(0) {
 		tmo = time.After(h.listenerTmo)
@@ -153,10 +116,8 @@ func (h *HCI) Accept() (ble.Conn, error) {
 	case <-h.done:
 		return nil, h.err
 	case c := <-h.chSlaveConn:
-		h.states.set(CentralConnected)
 		return c, nil
 	case <-tmo:
-		h.states.set(StopListening)
 		return nil, fmt.Errorf("listner timed out")
 	}
 }
@@ -167,16 +128,13 @@ func (h *HCI) Dial(a ble.Addr) (ble.Client, error) {
 	if err != nil {
 		return nil, ErrInvalidAddr
 	}
-	h.states.Lock()
 	h.states.connParams.PeerAddress = [6]byte{b[5], b[4], b[3], b[2], b[1], b[0]}
 	if _, ok := a.(RandomAddress); ok {
 		h.states.connParams.PeerAddressType = 1
 	}
-	h.states.Unlock()
-	if err := h.states.set(Dialing); err != nil {
+	if err = h.Send(&h.connParams, nil); err != nil {
 		return nil, err
 	}
-	defer h.states.set(StopDialing)
 	var tmo <-chan time.Time
 	if h.dialerTmo != time.Duration(0) {
 		tmo = time.After(h.dialerTmo)
@@ -187,9 +145,17 @@ func (h *HCI) Dial(a ble.Addr) (ble.Client, error) {
 	case c := <-h.chMasterConn:
 		return gatt.NewClient(c)
 	case <-tmo:
-		err := h.states.set(DialingCanceling)
-		<-h.chMasterConn
-		return nil, err
+		err := h.Send(&h.states.connCancel, nil)
+		if err == nil {
+			// The pending connection was canceled successfully.
+			return nil, fmt.Errorf("connection timed out")
+		}
+		// The connection has been established, the cancel command
+		// failed with ErrDisallowed.
+		if err == ErrDisallowed {
+			return gatt.NewClient(<-h.chMasterConn)
+		}
+		return nil, errors.Wrap(err, "cancel connection failed")
 	}
 }
 
@@ -203,7 +169,8 @@ func (h *HCI) Close() error {
 
 // Advertise starts advertising.
 func (h *HCI) Advertise() error {
-	return h.states.set(Advertising)
+	h.advEnable.AdvertisingEnable = 1
+	return h.Send(&h.advEnable, nil)
 }
 
 // SetAdvertisement sets advertising data and scanResp.
@@ -212,37 +179,16 @@ func (h *HCI) SetAdvertisement(ad []byte, sr []byte) error {
 		return ble.ErrEIRPacketTooLong
 	}
 
-	h.states.Lock()
 	h.states.advData.AdvertisingDataLength = uint8(len(ad))
 	copy(h.states.advData.AdvertisingData[:], ad)
+	if err := h.Send(&h.advData, nil); err != nil {
+		return err
+	}
 
 	h.states.scanResp.ScanResponseDataLength = uint8(len(sr))
 	copy(h.states.scanResp.ScanResponseData[:], sr)
-	h.states.Unlock()
-
-	return h.states.set(AdvertisingUpdated)
-}
-
-// SetScanParams sets scanning parameters.
-func (h *HCI) SetScanParams(p ScanParams) error {
-	h.states.Lock()
-	h.states.scanParams = cmd.LESetScanParameters(p)
-	h.states.Unlock()
-	return h.states.set(ScanningUpdated)
-}
-
-// SetAdvParams sets advertising parameters.
-func (h *HCI) SetAdvParams(p AdvParams) error {
-	h.states.Lock()
-	h.states.advParams = cmd.LESetAdvertisingParameters(p)
-	h.states.Unlock()
-	return h.states.set(AdvertisingUpdated)
-}
-
-// SetConnParams sets connection parameters.
-func (h *HCI) SetConnParams(p ConnParams) error {
-	h.states.Lock()
-	h.states.connParams = cmd.LECreateConnection(p)
-	h.states.Unlock()
-	return h.states.set(DialingUpdated)
+	if err := h.Send(&h.scanResp, nil); err != nil {
+		return err
+	}
+	return nil
 }

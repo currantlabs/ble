@@ -53,7 +53,6 @@ func start(dev *hci.HCI, s *gatt.Server) error {
 	}
 	go func() {
 		for {
-			dev.StopAdvertising()
 			l2c, err := dev.Accept()
 			if err != nil {
 				log.Printf("can't accept: %s", err)
