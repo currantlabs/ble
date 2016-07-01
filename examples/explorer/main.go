@@ -48,7 +48,7 @@ func explorer(cln ble.Client) error {
 			return fmt.Errorf("can't discover characteristics: %s\n", err)
 		}
 		for _, c := range cs {
-			fmt.Printf("  Characteristic: %s, Property: 0x%02X, %s\n", c.UUID, c.Property, ble.Name(c.UUID))
+			fmt.Printf("  Characteristic: %s, Property: 0x%02X (%s), %s\n", c.UUID, c.Property, propString(c.Property), ble.Name(c.UUID))
 			if (c.Property & ble.CharRead) != 0 {
 				b, err := cln.ReadCharacteristic(c)
 				if err != nil {
@@ -102,6 +102,25 @@ func explorer(cln ble.Client) error {
 		fmt.Printf("\n")
 	}
 	return nil
+}
+
+func propString(p ble.Property) string {
+	var s string
+	for k, v := range map[ble.Property]string{
+		ble.CharBroadcast:   "B",
+		ble.CharRead:        "R",
+		ble.CharWriteNR:     "w",
+		ble.CharWrite:       "W",
+		ble.CharNotify:      "N",
+		ble.CharIndicate:    "I",
+		ble.CharSignedWrite: "S",
+		ble.CharExtended:    "E",
+	} {
+		if p&k != 0 {
+			s += v
+		}
+	}
+	return s
 }
 
 func main() {
