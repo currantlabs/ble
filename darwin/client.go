@@ -1,8 +1,8 @@
 package darwin
 
 import (
-	"github.com/currantlabs/ble/darwin/xpc"
 	"github.com/currantlabs/ble"
+	"github.com/raff/goble/xpc"
 )
 
 // A Client is a GATT client.

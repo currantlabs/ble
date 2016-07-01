@@ -4,8 +4,8 @@ import (
 	"context"
 	"sync"
 
-	"github.com/currantlabs/ble/darwin/xpc"
 	"github.com/currantlabs/ble"
+	"github.com/raff/goble/xpc"
 )
 
 func newConn(d *Device, a ble.Addr) *conn {

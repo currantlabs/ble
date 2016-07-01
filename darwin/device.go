@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/currantlabs/ble"
-	"github.com/currantlabs/ble/darwin/xpc"
+	"github.com/raff/goble/xpc"
 )
 
 const (
