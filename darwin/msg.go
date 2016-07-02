@@ -18,7 +18,19 @@ func (m msg) attributeID() int     { return xpc.Dict(m).MustGetInt("kCBMsgArgAtt
 func (m msg) characteristicHandle() int {
 	return xpc.Dict(m).MustGetInt("kCBMsgArgCharacteristicHandle")
 }
-func (m msg) data() []byte               { return xpc.Dict(m).MustGetBytes("kCBMsgArgData") }
+func (m msg) data() []byte {
+	// return xpc.Dict(m).MustGetBytes("kCBMsgArgData")
+	v := m["kCBMsgArgData"]
+	switch v.(type) {
+	case string:
+		return []byte(v.(string))
+	case []byte:
+		return v.([]byte)
+	default:
+		return nil
+	}
+}
+
 func (m msg) deviceUUID() xpc.UUID       { return xpc.Dict(m).MustGetUUID("kCBMsgArgDeviceUUID") }
 func (m msg) ignoreResponse() int        { return xpc.Dict(m).MustGetInt("kCBMsgArgIgnoreResponse") }
 func (m msg) offset() int                { return xpc.Dict(m).MustGetInt("kCBMsgArgOffset") }
