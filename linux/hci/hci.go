@@ -33,7 +33,7 @@ type pkt struct {
 }
 
 // NewHCI returns a hci device.
-func NewHCI(opts ...ble.Option) (*HCI, error) {
+func NewHCI(opts ...Option) (*HCI, error) {
 	h := &HCI{
 		id: -1,
 

@@ -1,33 +1,36 @@
 package gatt
 
 import (
+	"context"
+	"fmt"
 	"log"
 
+	"github.com/currantlabs/ble"
+	"github.com/currantlabs/ble/linux/att"
 	"github.com/currantlabs/ble/linux/gatt"
 	"github.com/currantlabs/ble/linux/hci"
-	"github.com/currantlabs/ble"
 )
 
 type manager struct {
-	server ble.Server
-	dev    ble.Device
+	server *gatt.Server
+	dev    *hci.HCI
 }
 
 var m manager
 
-func server() ble.Server {
+func server() *gatt.Server {
 	if m.server == nil {
-		s, err := gatt.NewServer(dev())
+		s, err := gatt.NewServer()
 		if err != nil {
 			log.Fatalf("create server failed: %s", err)
 		}
 		m.server = s
-		s.Start()
+		start(dev(), s)
 	}
 	return m.server
 }
 
-func dev() ble.Device {
+func dev() *hci.HCI {
 	if m.dev != nil {
 		return m.dev
 	}
@@ -40,6 +43,39 @@ func dev() ble.Device {
 	}
 	m.dev = dev
 	return dev
+}
+
+func start(dev *hci.HCI, s *gatt.Server) error {
+	mtu := ble.DefaultMTU
+	mtu = ble.MaxMTU // TODO: get this from user using Option.
+	if mtu > ble.MaxMTU {
+		return fmt.Errorf("maximum ATT_MTU is %d", ble.MaxMTU)
+	}
+	go func() {
+		for {
+			dev.StopAdvertising()
+			l2c, err := dev.Accept()
+			if err != nil {
+				log.Printf("can't accept: %s", err)
+				return
+			}
+
+			// Initialize the per-connection cccd values.
+			l2c.SetContext(context.WithValue(l2c.Context(), "ccc", make(map[uint16]uint16)))
+			l2c.SetRxMTU(mtu)
+
+			s.Lock()
+			as, err := att.NewServer(s.DB(), l2c)
+			s.Unlock()
+			if err != nil {
+				log.Printf("can't create ATT server: %s", err)
+				continue
+
+			}
+			go as.Loop()
+		}
+	}()
+	return nil
 }
 
 // AddService adds a service to database.
@@ -60,7 +96,7 @@ func SetServices(svcs []*ble.Service) error {
 
 // Stop detatch the GATT server from a peripheral device.
 func Stop() error {
-	return server().Stop()
+	return nil
 }
 
 // AdvertiseNameAndServices advertises device name, and specified service UUIDs.

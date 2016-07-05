@@ -1,19 +1,16 @@
 package gatt
 
 import (
-	"context"
-	"fmt"
 	"log"
 	"sync"
 
-	"github.com/currantlabs/ble/linux/att"
 	"github.com/currantlabs/ble"
+	"github.com/currantlabs/ble/linux/att"
 )
 
 // NewServer ...
-func NewServer(d ble.Device) (*Server, error) {
+func NewServer() (*Server, error) {
 	return &Server{
-		dev:  d,
 		svcs: defaultServices("Gopher"),
 		db:   att.NewDB(defaultServices("Gopher"), uint16(1)),
 	}, nil
@@ -23,7 +20,6 @@ func NewServer(d ble.Device) (*Server, error) {
 type Server struct {
 	sync.Mutex
 
-	dev  ble.Device
 	svcs []*ble.Service
 	db   *att.DB
 }
@@ -55,45 +51,9 @@ func (s *Server) SetServices(svcs []*ble.Service) error {
 	return nil
 }
 
-// Start ...
-func (s *Server) Start() error {
-	mtu := ble.DefaultMTU
-	mtu = ble.MaxMTU // TODO: get this from user using Option.
-	if mtu > ble.MaxMTU {
-		return fmt.Errorf("maximum ATT_MTU is %d", ble.MaxMTU)
-	}
-	go func() {
-		for {
-			s.dev.StopAdvertising()
-			l2c, err := s.dev.Accept()
-			if err != nil {
-				log.Printf("can't accept: %s", err)
-				return
-			}
-
-			// Initialize the per-connection cccd values.
-			l2c.SetContext(context.WithValue(l2c.Context(), "ccc", make(map[uint16]uint16)))
-			l2c.SetRxMTU(mtu)
-
-			s.Lock()
-			as, err := att.NewServer(s.db, l2c)
-			s.Unlock()
-			if err != nil {
-				log.Printf("can't create ATT server: %s", err)
-				continue
-
-			}
-			go as.Loop()
-		}
-	}()
-	return nil
-}
-
-// Stop ...
-func (s *Server) Stop() error {
-	s.Lock()
-	defer s.Unlock()
-	return nil
+// DB ...
+func (s *Server) DB() *att.DB {
+	return s.DB()
 }
 
 func defaultServices(name string) []*ble.Service {

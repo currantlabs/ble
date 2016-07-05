@@ -5,10 +5,10 @@ import (
 	"net"
 	"time"
 
+	"github.com/currantlabs/ble"
 	"github.com/currantlabs/ble/linux/adv"
 	"github.com/currantlabs/ble/linux/gatt"
 	"github.com/currantlabs/ble/linux/hci/cmd"
-	"github.com/currantlabs/ble"
 )
 
 // ScanParams implements LE Set Scan Parameters (0x08|0x000B) [Vol 2, Part E, 7.8.10]

@@ -64,22 +64,3 @@ type Client interface {
 
 // A NotificationHandler handles notification or indication from a server.
 type NotificationHandler func(req []byte)
-
-// A Server is a GATT server.
-type Server interface {
-	// AddService adds a service to database.
-	AddService(svc *Service) error
-
-	// RemoveAllServices removes all services that are currently in the database.
-	RemoveAllServices() error
-
-	// SetServices set the specified service to the database.
-	// It removes all currently added services, if any.
-	SetServices(svcs []*Service) error
-
-	// Start attach the GATT server to a peripheral device.
-	Start() error
-
-	// Stop detatch the GATT server from a peripheral device.
-	Stop() error
-}
