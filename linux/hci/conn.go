@@ -54,6 +54,7 @@ type Conn struct {
 	sigID uint8
 
 	sigSent chan []byte
+	smpSent chan []byte
 
 	chInPkt chan packet
 	chInPDU chan pdu
@@ -263,6 +264,7 @@ func (c *Conn) recombine() error {
 	case cidLESignal:
 		c.handleSignal(p)
 	case cidLESMP:
+		c.handleSMP(p)
 		// TODO: Security Manager Protocol
 	default:
 		// log.Printf("recombine(): unrecognized CID: 0x%04X, [%X]", p.cid(), p)
