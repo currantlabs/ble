@@ -163,7 +163,7 @@ func (c *Conn) Write(sdu []byte) (int, error) {
 	} else {
 		copy(b[4:], sdu)
 	}
-	sent, err := c.writePDU(cidLEAtt, b)
+	sent, err := c.writePDU(b)
 	if err != nil {
 		return sent, err
 	}
@@ -174,7 +174,7 @@ func (c *Conn) Write(sdu []byte) (int, error) {
 		if plen > c.txMTU {
 			plen = c.txMTU
 		}
-		n, err := c.writePDU(cidLEAtt, sdu[:plen])
+		n, err := c.writePDU(sdu[:plen])
 		sent += n
 		if err != nil {
 			return sent, err
@@ -185,7 +185,7 @@ func (c *Conn) Write(sdu []byte) (int, error) {
 }
 
 // writePDU breaks down a L2CAP PDU into fragments if it's larger than the HCI buffer size. [Vol 3, Part A, 7.2.1]
-func (c *Conn) writePDU(cid uint16, pdu []byte) (int, error) {
+func (c *Conn) writePDU(pdu []byte) (int, error) {
 	sent := 0
 	flags := uint16(pbfHostToControllerStart << 4) // ACL boundary flags
 

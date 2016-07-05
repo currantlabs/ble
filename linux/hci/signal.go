@@ -27,6 +27,9 @@ func (s sigCmd) data() []byte { return s[:4+s.len()] }
 func (c *Conn) Signal(req Signal, rsp Signal) error {
 	data := req.Marshal()
 	buf := bytes.NewBuffer(make([]byte, 0))
+	binary.Write(buf, binary.LittleEndian, uint16(4+len(data)))
+	binary.Write(buf, binary.LittleEndian, uint16(cidLESignal))
+
 	binary.Write(buf, binary.LittleEndian, uint8(req.Code()))
 	binary.Write(buf, binary.LittleEndian, uint8(c.sigID))
 	binary.Write(buf, binary.LittleEndian, uint16(len(data)))
@@ -34,7 +37,7 @@ func (c *Conn) Signal(req Signal, rsp Signal) error {
 
 	c.sigSent = make(chan []byte)
 	defer close(c.sigSent)
-	if _, err := c.writePDU(cidLESignal, buf.Bytes()); err != nil {
+	if _, err := c.writePDU(buf.Bytes()); err != nil {
 		return err
 	}
 	var s sigCmd
@@ -61,13 +64,15 @@ func (c *Conn) Signal(req Signal, rsp Signal) error {
 func (c *Conn) sendResponse(code uint8, id uint8, r Signal) (int, error) {
 	data := r.Marshal()
 	buf := bytes.NewBuffer(make([]byte, 0))
+	binary.Write(buf, binary.LittleEndian, uint16(4+len(data)))
+	binary.Write(buf, binary.LittleEndian, uint16(cidLESignal))
 	binary.Write(buf, binary.LittleEndian, uint8(code))
 	binary.Write(buf, binary.LittleEndian, uint8(id))
 	binary.Write(buf, binary.LittleEndian, uint16(len(data)))
 	if err := binary.Write(buf, binary.LittleEndian, data); err != nil {
 		return 0, err
 	}
-	return c.writePDU(cidLESignal, buf.Bytes())
+	return c.writePDU(buf.Bytes())
 }
 
 func (c *Conn) handleSignal(p pdu) error {
