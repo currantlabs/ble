@@ -72,6 +72,20 @@ func explorer(cln ble.Client) error {
 				fmt.Printf("    Value         %x | %q\n", b, b)
 			}
 			if *sub != 0 {
+				// Don't bother to subscribe the Service Changed characteristics.
+				if c.UUID.Equal(ble.ServiceChangedUUID) {
+					continue
+				}
+
+				// Don't touch the Apple-specific Service/Characteristic.
+				// Service: D0611E78BBB44591A5F8487910AE4366
+				// Characteristic: 8667556C9A374C9184ED54EE27D90049, Property: 0x18 (WN),
+				//   Descriptor: 2902, Client Characteristic Configuration
+				//   Value         0000 | "\x00\x00"
+				if c.UUID.Equal(ble.MustParse("8667556C9A374C9184ED54EE27D90049")) {
+					continue
+				}
+
 				if (c.Property & ble.CharNotify) != 0 {
 					fmt.Printf("\n-- Subscribe to notification for %s --\n", *sub)
 					h := func(req []byte) { fmt.Printf("Notified: %q [ % X ]\n", string(req), req) }
