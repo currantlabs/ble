@@ -169,6 +169,9 @@ func (h *HCI) Dial(a ble.Addr) (ble.Client, error) {
 	}
 	h.states.Lock()
 	h.states.connParams.PeerAddress = [6]byte{b[5], b[4], b[3], b[2], b[1], b[0]}
+	if _, ok := a.(RandomAddress); ok {
+		h.states.connParams.PeerAddressType = 1
+	}
 	h.states.Unlock()
 	if err := h.states.set(Dialing); err != nil {
 		return nil, err

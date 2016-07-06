@@ -8,6 +8,11 @@ import (
 	"github.com/currantlabs/ble/linux/hci/evt"
 )
 
+// RandomAddress is a Random Device Address.
+type RandomAddress struct {
+	ble.Addr
+}
+
 // [Vol 6, Part B, 4.4.2] [Vol 3, Part C, 11]
 const (
 	evtTypAdvInd        = 0x00 // Connectable undirected advertising (ADV_IND).
@@ -95,7 +100,11 @@ func (a *Advertisement) RSSI() int {
 // Address returns the address of the remote peripheral.
 func (a *Advertisement) Address() ble.Addr {
 	b := a.e.Address(a.i)
-	return net.HardwareAddr([]byte{b[5], b[4], b[3], b[2], b[1], b[0]})
+	addr := net.HardwareAddr([]byte{b[5], b[4], b[3], b[2], b[1], b[0]})
+	if a.e.AddressType(a.i) == 1 {
+		return RandomAddress{addr}
+	}
+	return addr
 }
 
 // EventType returns the event type of Advertisement.
