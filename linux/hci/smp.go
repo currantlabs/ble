@@ -26,7 +26,8 @@ const (
 func (c *Conn) sendSMP(p pdu) error {
 	buf := bytes.NewBuffer(make([]byte, 0))
 	binary.Write(buf, binary.LittleEndian, uint16(4+len(p)))
-	binary.Write(buf, binary.LittleEndian, uint16(cidLESignal))
+	binary.Write(buf, binary.LittleEndian, cidSMP)
+	binary.Write(buf, binary.LittleEndian, p)
 	_, err := c.writePDU(buf.Bytes())
 	logger.Debug("smp", "send", fmt.Sprintf("[%X]", buf.Bytes()))
 	return err

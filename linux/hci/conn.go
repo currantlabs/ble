@@ -263,7 +263,7 @@ func (c *Conn) recombine() error {
 		c.chInPDU <- p
 	case cidLESignal:
 		c.handleSignal(p)
-	case cidLESMP:
+	case cidSMP:
 		c.handleSMP(p)
 	default:
 		logger.Info("recombine()", "unrecognized CID", fmt.Sprintf("%04X, [%X]", p.cid(), p))
