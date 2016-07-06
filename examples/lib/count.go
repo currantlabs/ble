@@ -22,7 +22,7 @@ func NewCountChar() *ble.Characteristic {
 		log.Printf("count: Wrote %s", string(req.Data()))
 	}))
 
-	f := func(req ble.Request, n ble.Notifier) {
+	c.HandleNotify(ble.NotifyHandlerFunc(func(req ble.Request, n ble.Notifier) {
 		cnt := 0
 		log.Printf("count: Notification subscribed")
 		for {
@@ -40,9 +40,26 @@ func NewCountChar() *ble.Characteristic {
 				cnt++
 			}
 		}
-	}
+	}))
 
-	c.HandleNotify(ble.NotifyHandlerFunc(f))
-	c.HandleIndicate(ble.NotifyHandlerFunc(f))
+	c.HandleIndicate(ble.NotifyHandlerFunc(func(req ble.Request, n ble.Notifier) {
+		cnt := 0
+		log.Printf("count: Indication subscribed")
+		for {
+			select {
+			case <-n.Context().Done():
+				log.Printf("count: Indication unsubscribed")
+				return
+			case <-time.After(time.Second):
+				log.Printf("count: Indicate: %d", cnt)
+				if _, err := fmt.Fprintf(n, "Count: %d", cnt); err != nil {
+					// Client disconnected prematurely before unsubscription.
+					log.Printf("count: Failed to indicate : %s", err)
+					return
+				}
+				cnt++
+			}
+		}
+	}))
 	return c
 }
