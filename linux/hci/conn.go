@@ -265,9 +265,7 @@ func (c *Conn) recombine() error {
 		c.handleSignal(p)
 	case cidLESMP:
 		c.handleSMP(p)
-		// TODO: Security Manager Protocol
 	default:
-		// log.Printf("recombine(): unrecognized CID: 0x%04X, [%X]", p.cid(), p)
 		logger.Info("recombine()", "unrecognized CID", fmt.Sprintf("%04X, [%X]", p.cid(), p))
 	}
 	return nil
