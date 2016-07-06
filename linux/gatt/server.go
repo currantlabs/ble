@@ -53,7 +53,7 @@ func (s *Server) SetServices(svcs []*ble.Service) error {
 
 // DB ...
 func (s *Server) DB() *att.DB {
-	return s.DB()
+	return s.db
 }
 
 func defaultServices(name string) []*ble.Service {
