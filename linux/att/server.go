@@ -2,7 +2,6 @@ package att
 
 import (
 	"bytes"
-	"context"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -11,10 +10,18 @@ import (
 	"github.com/currantlabs/ble"
 )
 
+type conn struct {
+	ble.Conn
+	svr  *Server
+	cccs map[uint16]uint16
+	nn   map[uint16]ble.Notifier
+	in   map[uint16]ble.Notifier
+}
+
 // Server implementas an ATT (Attribute Protocol) server.
 type Server struct {
-	l2c ble.Conn
-	db  *DB
+	conn *conn
+	db   *DB
 
 	// Refer to [Vol 3, Part F, 3.3.2 & 3.3.3] for the requirement of
 	// sequential request-response protocol, and transactions.
@@ -37,8 +44,13 @@ func NewServer(db *DB, l2c ble.Conn) (*Server, error) {
 	// not discovered, and only the default ATT_MTU (23 bytes) of it shall
 	// be used until remote central request ExchangeMTU.
 	s := &Server{
-		l2c: l2c,
-		db:  db,
+		conn: &conn{
+			Conn: l2c,
+			cccs: make(map[uint16]uint16),
+			in:   make(map[uint16]ble.Notifier),
+			nn:   make(map[uint16]ble.Notifier),
+		},
+		db: db,
 
 		rxMTU:     mtu,
 		txBuf:     make([]byte, ble.DefaultMTU, ble.DefaultMTU),
@@ -48,7 +60,7 @@ func NewServer(db *DB, l2c ble.Conn) (*Server, error) {
 
 		dummyRspWriter: ble.NewResponseWriter(nil),
 	}
-	l2c.SetContext(context.WithValue(l2c.Context(), "svr", s))
+	s.conn.svr = s
 	s.chNotBuf <- make([]byte, ble.DefaultMTU, ble.DefaultMTU)
 	s.chIndBuf <- make([]byte, ble.DefaultMTU, ble.DefaultMTU)
 	return s, nil
@@ -69,7 +81,7 @@ func (s *Server) notify(h uint16, data []byte) (int, error) {
 		data = data[:buf.Cap()]
 	}
 	buf.Write(data)
-	return s.l2c.Write(rsp[:3+buf.Len()])
+	return s.conn.Write(rsp[:3+buf.Len()])
 }
 
 // indicate sends indication to remote central.
@@ -87,7 +99,7 @@ func (s *Server) indicate(h uint16, data []byte) (int, error) {
 		data = data[:buf.Cap()]
 	}
 	buf.Write(data)
-	n, err := s.l2c.Write(rsp[:3+buf.Len()])
+	n, err := s.conn.Write(rsp[:3+buf.Len()])
 	if err != nil {
 		return n, err
 	}
@@ -116,7 +128,7 @@ func (s *Server) Loop() {
 	go func() {
 		b := <-pool
 		for {
-			n, err := s.l2c.Read(b.buf)
+			n, err := s.conn.Read(b.buf)
 			if n == 0 || err != nil {
 				close(seq)
 				s.close()
@@ -138,16 +150,27 @@ func (s *Server) Loop() {
 	for req := range seq {
 		if rsp := s.handleRequest(req.buf[:req.len]); rsp != nil {
 			if len(rsp) != 0 {
-				s.l2c.Write(rsp)
+				s.conn.Write(rsp)
 			}
 		}
 		pool <- req
+	}
+	for h, ccc := range s.conn.cccs {
+		if ccc != 0 {
+			logger.Info("cleanup", "ccc", fmt.Sprintf("0x%02X", ccc))
+		}
+		if ccc&cccIndicate != 0 {
+			s.conn.in[h].Close()
+		}
+		if ccc&cccNotify != 0 {
+			s.conn.nn[h].Close()
+		}
 	}
 }
 
 func (s *Server) close() error {
 	s.chConfirm <- false
-	return s.l2c.Close()
+	return s.conn.Close()
 }
 
 func (s *Server) handleRequest(b []byte) []byte {
@@ -195,7 +218,7 @@ func (s *Server) handleExchangeMTURequest(r ExchangeMTURequest) []byte {
 	}
 
 	txMTU := int(r.ClientRxMTU())
-	s.l2c.SetTxMTU(txMTU)
+	s.conn.SetTxMTU(txMTU)
 
 	if txMTU != len(s.txBuf) {
 		// Apply the txMTU afer this response has been sent and before
@@ -282,7 +305,7 @@ func (s *Server) handleFindByTypeValueRequest(r FindByTypeValueRequest) []byte {
 			// Since ResponseWriter caps the value at the capacity,
 			// we allocate one extra byte, and the written length.
 			buf2 := bytes.NewBuffer(make([]byte, 0, len(s.txBuf)-7+1))
-			e := handleATT(a, s.l2c, r, ble.NewResponseWriter(buf2))
+			e := handleATT(a, s.conn, r, ble.NewResponseWriter(buf2))
 			if e != ble.ErrSuccess || buf2.Len() > len(s.txBuf)-7 {
 				return newErrorResponse(r.AttributeOpcode(), r.StartingHandle(), ble.ErrInvalidHandle)
 			}
@@ -330,7 +353,7 @@ func (s *Server) handleReadByTypeRequest(r ReadByTypeRequest) []byte {
 		v := a.v
 		if v == nil {
 			buf2 := bytes.NewBuffer(make([]byte, 0, len(s.txBuf)-2))
-			if e := handleATT(a, s.l2c, r, ble.NewResponseWriter(buf2)); e != ble.ErrSuccess {
+			if e := handleATT(a, s.conn, r, ble.NewResponseWriter(buf2)); e != ble.ErrSuccess {
 				// Return if the first value read cause an error.
 				if dlen == 0 {
 					return newErrorResponse(r.AttributeOpcode(), r.StartingHandle(), e)
@@ -392,7 +415,7 @@ func (s *Server) handleReadRequest(r ReadRequest) []byte {
 
 	// Pass the request to upper layer with the ResponseWriter, which caps
 	// the buffer to a valid length of payload.
-	if e := handleATT(a, s.l2c, r, ble.NewResponseWriter(buf)); e != ble.ErrSuccess {
+	if e := handleATT(a, s.conn, r, ble.NewResponseWriter(buf)); e != ble.ErrSuccess {
 		return newErrorResponse(r.AttributeOpcode(), r.AttributeHandle(), e)
 	}
 	return rsp[:1+buf.Len()]
@@ -424,7 +447,7 @@ func (s *Server) handleReadBlobRequest(r ReadBlobRequest) []byte {
 
 	// Pass the request to upper layer with the ResponseWriter, which caps
 	// the buffer to a valid length of payload.
-	if e := handleATT(a, s.l2c, r, ble.NewResponseWriter(buf)); e != ble.ErrSuccess {
+	if e := handleATT(a, s.conn, r, ble.NewResponseWriter(buf)); e != ble.ErrSuccess {
 		return newErrorResponse(r.AttributeOpcode(), r.AttributeHandle(), e)
 	}
 	return rsp[:1+buf.Len()]
@@ -450,7 +473,7 @@ func (s *Server) handleReadByGroupRequest(r ReadByGroupTypeRequest) []byte {
 		v := a.v
 		if v == nil {
 			buf2 := bytes.NewBuffer(make([]byte, buf.Cap()-buf.Len()-4))
-			if e := handleATT(a, s.l2c, r, ble.NewResponseWriter(buf2)); e != ble.ErrSuccess {
+			if e := handleATT(a, s.conn, r, ble.NewResponseWriter(buf2)); e != ble.ErrSuccess {
 				return newErrorResponse(r.AttributeOpcode(), r.StartingHandle(), e)
 			}
 			v = buf2.Bytes()
@@ -498,7 +521,7 @@ func (s *Server) handleWriteRequest(r WriteRequest) []byte {
 	if a == nil {
 		return newErrorResponse(r.AttributeOpcode(), r.AttributeHandle(), ble.ErrWriteNotPerm)
 	}
-	if e := handleATT(a, s.l2c, r, ble.NewResponseWriter(nil)); e != ble.ErrSuccess {
+	if e := handleATT(a, s.conn, r, ble.NewResponseWriter(nil)); e != ble.ErrSuccess {
 		return newErrorResponse(r.AttributeOpcode(), r.AttributeHandle(), e)
 	}
 	return []byte{WriteResponseCode}
@@ -521,7 +544,7 @@ func (s *Server) handleWriteCommand(r WriteCommand) []byte {
 	if a == nil {
 		return nil
 	}
-	if e := handleATT(a, s.l2c, r, s.dummyRspWriter); e != ble.ErrSuccess {
+	if e := handleATT(a, s.conn, r, s.dummyRspWriter); e != ble.ErrSuccess {
 		return nil
 	}
 	return nil

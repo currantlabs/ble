@@ -161,21 +161,17 @@ const (
 )
 
 func newCCCD(c *ble.Characteristic) *ble.Descriptor {
-	var nn ble.Notifier
-	var in ble.Notifier
-
 	d := ble.NewDescriptor(ble.ClientCharacteristicConfigUUID)
 
 	d.HandleRead(ble.ReadHandlerFunc(func(req ble.Request, rsp ble.ResponseWriter) {
-		cccs := req.Conn().Context().Value("ccc").(map[uint16]uint16)
+		cccs := req.Conn().(*conn).cccs
 		ccc := cccs[c.Handle]
 		binary.Write(rsp, binary.LittleEndian, ccc)
 	}))
 
 	d.HandleWrite(ble.WriteHandlerFunc(func(req ble.Request, rsp ble.ResponseWriter) {
-		cccs := req.Conn().Context().Value("ccc").(map[uint16]uint16)
-		svr := req.Conn().Context().Value("svr").(*Server)
-		ccc := cccs[c.Handle]
+		cn := req.Conn().(*conn)
+		ccc := cn.cccs[c.Handle]
 
 		newCCC := binary.LittleEndian.Uint16(req.Data())
 		if newCCC&cccNotify != 0 && ccc&cccNotify == 0 {
@@ -183,26 +179,26 @@ func newCCCD(c *ble.Characteristic) *ble.Descriptor {
 				rsp.SetStatus(ble.ErrUnlikely)
 				return
 			}
-			send := func(b []byte) (int, error) { return svr.notify(c.ValueHandle, b) }
-			nn = ble.NewNotifier(send)
-			go c.NotifyHandler.ServeNotify(req, nn)
+			send := func(b []byte) (int, error) { return cn.svr.notify(c.ValueHandle, b) }
+			cn.nn[c.Handle] = ble.NewNotifier(send)
+			go c.NotifyHandler.ServeNotify(req, cn.nn[c.Handle])
 		}
 		if newCCC&cccNotify == 0 && ccc&cccNotify != 0 {
-			nn.Close()
+			cn.nn[c.Handle].Close()
 		}
 		if newCCC&cccIndicate != 0 && ccc&cccIndicate == 0 {
 			if c.Property&ble.CharIndicate == 0 {
 				rsp.SetStatus(ble.ErrUnlikely)
 				return
 			}
-			send := func(b []byte) (int, error) { return svr.indicate(c.ValueHandle, b) }
-			in = ble.NewNotifier(send)
-			go c.IndicateHandler.ServeNotify(req, in)
+			send := func(b []byte) (int, error) { return cn.svr.indicate(c.ValueHandle, b) }
+			cn.in[c.Handle] = ble.NewNotifier(send)
+			go c.IndicateHandler.ServeNotify(req, cn.in[c.Handle])
 		}
 		if newCCC&cccIndicate == 0 && ccc&cccIndicate != 0 {
-			in.Close()
+			cn.in[c.Handle].Close()
 		}
-		cccs[c.Handle] = newCCC
+		cn.cccs[c.Handle] = newCCC
 	}))
 	return d
 }
