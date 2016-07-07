@@ -1,17 +1,28 @@
 # PROGS ?= $(notdir $(shell go list ./...))
-PROGS ?= $(filter-out bin Makefile,$(shell ls))
+PROGS ?= $(filter-out bin Makefile devices,$(shell ls))
 
-GOOS		?= linux
-BUILD_CMD	?= GOGC=off GOOS=$(GOOS) go build $(LDFLAGS) -i -o bin/$@ $@/*.go
-DEPLOY_CMD	?= scp bin/$< gentoo:/tmp
-RUN_CMD		?= ssh -t gentoo sudo LOGXI=${LOGXI} /tmp/$<
+BUILD_CMD	?= GOGC=off GOARCH=$(GOARCH) GOOS=$(GOOS) go build $(LDFLAGS) -i -o bin/$@ $@/*.go
 ARGS		?=
-DEPLOY_CMD	=
+
+ifeq ($(TARGET),gentoo)
+GOOS		?= linux
+DEPLOY_CMD	?= scp bin/$< gentoo:/tmp
+RUN_CMD		?= ssh -t gentoo sudo LOGXI=${LOGXI} /tmp/$< ${ARGS}
+endif
+
+ifeq ($(TARGET),herc)
+GOOS		?= linux
+GOARCH		?= arm
+DEPLOY_CMD	?= scp bin/$< herc:/tmp
+RUN_CMD		?= ssh -t herc LOGXI=${LOGXI} /tmp/$< ${ARGS}
+endif
 
 ifeq ($(shell uname),Linux)
-RUN_CMD		= sudo LOGXI=${LOGXI} bin/$< ${ARGS}
+GOOS		?= linux
+RUN_CMD		?= sudo LOGXI=${LOGXI} bin/$< ${ARGS}
 else
-RUN_CMD		= LOGXI=${LOGXI} bin/$< ${ARGS}
+GOOS		?= darwin
+RUN_CMD		?= LOGXI=${LOGXI} bin/$< ${ARGS}
 endif
 
 .PHONY: $(PROGS)
@@ -28,8 +39,8 @@ LDFLAGS		?= -ldflags="-w -X $(BUILDDATESYM)=$(BUILDDATE) -X $(GITSYM)=$(GITHEAD)
 all: $(PROGS)
 
 build:
-	GOOS=linux make -j4
-	GOOS=darwin make -j4
+	GOOS=linux make -j
+	GOOS=darwin make -j
 
 $(PROGS):
 	$(Q) $(BUILD_CMD)
