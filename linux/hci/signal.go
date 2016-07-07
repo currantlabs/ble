@@ -107,22 +107,23 @@ func (c *Conn) handleSignal(p pdu) error {
 			c.LECreditBasedConnectionRequest(s)
 		case SignalLEFlowControlCredit:
 			c.LEFlowControlCredit(s)
-		}
-
-		// Check if it's a response to a sent command.
-		select {
-		case c.sigSent <- s:
-			continue
 		default:
+			// Check if it's a response to a sent command.
+			select {
+			case c.sigSent <- s:
+				continue
+			default:
+			}
+
+			c.sendResponse(
+				SignalCommandReject,
+				s.id(),
+				&CommandReject{
+					Reason: 0x0000, // Command not understood.
+				})
+			s = s[4+s.len():] // advance to next the packet.
 		}
 
-		c.sendResponse(
-			SignalCommandReject,
-			s.id(),
-			&CommandReject{
-				Reason: 0x0000, // Command not understood.
-			})
-		s = s[4+s.len():] // advance to next the packet.
 	}
 	return nil
 }
