@@ -41,14 +41,15 @@ func explorer(cln ble.Client) error {
 		return fmt.Errorf("can't discover services: %s\n", err)
 	}
 	for _, s := range ss {
-		fmt.Printf("Service: %s %s\n", s.UUID.String(), ble.Name(s.UUID))
+		fmt.Printf("Service: %s %s, Handle (0x%02X)\n", s.UUID.String(), ble.Name(s.UUID), s.Handle)
 
 		cs, err := cln.DiscoverCharacteristics(nil, s)
 		if err != nil {
 			return fmt.Errorf("can't discover characteristics: %s\n", err)
 		}
 		for _, c := range cs {
-			fmt.Printf("  Characteristic: %s, Property: 0x%02X (%s), %s\n", c.UUID, c.Property, propString(c.Property), ble.Name(c.UUID))
+			fmt.Printf("  Characteristic: %s, Property: 0x%02X (%s), %s, Handle(0x%02X), VHandle(0x%02X)\n",
+				c.UUID, c.Property, propString(c.Property), ble.Name(c.UUID), c.Handle, c.ValueHandle)
 			if (c.Property & ble.CharRead) != 0 {
 				b, err := cln.ReadCharacteristic(c)
 				if err != nil {
@@ -63,7 +64,7 @@ func explorer(cln ble.Client) error {
 				return fmt.Errorf("can't discover descriptors: %s\n", err)
 			}
 			for _, d := range ds {
-				fmt.Printf("    Descriptor: %s, %s\n", d.UUID, ble.Name(d.UUID))
+				fmt.Printf("    Descriptor: %s, %s, Handle(0x%02x)\n", d.UUID, ble.Name(d.UUID), d.Handle)
 				b, err := cln.ReadDescriptor(d)
 				if err != nil {
 					fmt.Printf("Failed to read descriptor: %s\n", err)
