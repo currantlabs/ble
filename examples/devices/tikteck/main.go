@@ -7,6 +7,12 @@ import (
 	"strings"
 
 	"github.com/currantlabs/ble"
+	"github.com/currantlabs/ble/examples/lib/gatt"
+)
+
+var (
+	charPair = ble.NewCharacteristic(ble.MustParse("000102030405060708090A0B0C0D1914"))
+	charCmd  = ble.NewCharacteristic(ble.MustParse("000102030405060708090A0B0C0D1912"))
 )
 
 var (
@@ -35,10 +41,11 @@ func encPacket(sk []byte, m []byte, p []byte) []byte {
 }
 
 type bulb struct {
+	ble.Client
+
 	cnt uint16
 	mac []byte
 	sk  []byte
-	d   *discoverer
 	cmd *ble.Characteristic
 }
 
@@ -63,12 +70,12 @@ func (b *bulb) sendPacket(msgid uint16, cmd byte, data []byte) {
 }
 
 func (b *bulb) send(p []byte) {
-	c, ok := b.d.find(ble.NewCharacteristic(ble.MustParse("000102030405060708090A0B0C0D1912"))).(*ble.Characteristic)
+	c, ok := b.Profile().Find(charCmd).(*ble.Characteristic)
 	if !ok {
 		log.Fatalf("can't find command char")
 	}
 	log.Printf("found command char %s, h: 0x%02X, vh: 0x%02X", c.UUID, c.Handle, c.ValueHandle)
-	b.d.WriteCharacteristic(c, p, false)
+	b.WriteCharacteristic(c, p, false)
 }
 
 func (b *bulb) setState(red, green, blue, brightness byte) {
@@ -88,45 +95,13 @@ func main() {
 		}
 	}
 
-	d := newDiscoverer()
-
-	// Connect to the light bulb, and perform service/characteristic discovery.
-	if err := d.connect(match); err != nil {
-		log.Fatalf("can't conect: %s", err)
-	}
-	_, err := d.discover()
+	cln, err := gatt.Discover(gatt.MatcherFunc(match))
+	p, err := cln.DiscoverProfile(true)
 	if err != nil {
-		log.Fatalf("can't discover: %s", err)
+		log.Fatalf("can't discover profile: %s", err)
 	}
 
-	// Service: 000102030405060708090A0B0C0D1910 , Handle (0x10)
-	//   Characteristic: 000102030405060708090A0B0C0D1911, Property: 0x1A (RWN), , Handle(0x11), VHandle(0x12)
-	//     Value         01 | "\x01"
-	//     Descriptor: 2901, Characteristic User Description, Handle(0x13)
-	//     Value         537461747573 | "Status"
-	//
-	//   Characteristic: 000102030405060708090A0B0C0D1912, Property: 0x0E (wWR), , Handle(0x14), VHandle(0x15)
-	//     Value         00000000000000000000000000000000 | "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
-	//     Descriptor: 2901, Characteristic User Description, Handle(0x16)
-	//     Value         436f6d6d616e64 | "Command"
-	//
-	//   Characteristic: 000102030405060708090A0B0C0D1913, Property: 0x06 (Rw), , Handle(0x17), VHandle(0x18)
-	//     Value         e0000000000000000000000000000000 | "\xe0\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
-	//     Descriptor: 2901, Characteristic User Description, Handle(0x19)
-	//     Value         4f5441 | "OTA"
-	//
-	//   Characteristic: 000102030405060708090A0B0C0D1914, Property: 0x0A (RW), , Handle(0x1A), VHandle(0x1B)
-	//     Value         007857b58d2af70eb269e149192262b66b | "\x00xW\xb5\x8d*\xf7\x0e\xb2i\xe1I\x19\"b\xb6k"
-	//     Descriptor: 2901, Characteristic User Description, Handle(0x1c)
-	//     Value         50616972 | "Pair"
-	//
-	// Service: 19200D0C0B0A09080706050403020100 , Handle (0x1D)
-	//   Characteristic: 19210D0C0B0A09080706050403020100, Property: 0x0A (RW), , Handle(0x1E), VHandle(0x1F)
-	//     Value         d0000000000000000000000000000000 | "\xd0\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
-	//     Descriptor: 2901, Characteristic User Description, Handle(0x20)
-	//     Value         534c434d44 | "SLCMD"
-
-	c, ok := d.find(ble.NewCharacteristic(ble.MustParse("000102030405060708090A0B0C0D1914"))).(*ble.Characteristic)
+	c, ok := p.Find(charPair).(*ble.Characteristic)
 	if !ok {
 		log.Fatalf("can't find pair char: %s", err)
 	}
@@ -142,8 +117,8 @@ func main() {
 	pkt = append(pkt, data[:8]...)
 	pkt = append(pkt, req[:8]...)
 	log.Printf("pairing pkt: % X", pkt)
-	d.WriteCharacteristic(c, pkt, false)
-	rsp, err := d.ReadCharacteristic(c)
+	cln.WriteCharacteristic(c, pkt, false)
+	rsp, err := cln.ReadCharacteristic(c)
 	if err != nil {
 		log.Fatalf("can't read pair char: %s", err)
 	}
@@ -155,18 +130,18 @@ func main() {
 	log.Printf("sk: % X", sk)
 
 	// read and reverse the mac address.
-	mac, err := net.ParseMAC(d.Address().String())
+	mac, err := net.ParseMAC(cln.Address().String())
 	if err != nil {
-		log.Fatalf("can't parse mac (%s): %s", d.Address().String(), err)
+		log.Fatalf("can't parse mac (%s): %s", cln.Address().String(), err)
 	}
 	mac = []byte{mac[5], mac[4], mac[3], mac[2], mac[1], mac[0]}
 
 	b := &bulb{
-		mac: mac,
-		cnt: 2012,
-		sk:  sk,
-		d:   d,
+		Client: cln,
+		mac:    mac,
+		cnt:    2012,
+		sk:     sk,
 	}
 	b.setState(0xff, 0x00, 0x00, 0x80)
-	d.CancelConnection()
+	cln.CancelConnection()
 }
