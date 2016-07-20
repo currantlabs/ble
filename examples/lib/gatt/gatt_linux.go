@@ -11,6 +11,16 @@ import (
 	"github.com/currantlabs/ble/linux/hci"
 )
 
+// DefaultDevice returns the default HCI device.
+func DefaultDevice() *hci.HCI {
+	return dev()
+}
+
+// DefaultServer returns the default GATT server.
+func DefaultServer() *gatt.Server {
+	return server()
+}
+
 type manager struct {
 	server *gatt.Server
 	dev    *hci.HCI
