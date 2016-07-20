@@ -17,22 +17,6 @@ var (
 	sub  = flag.Duration("sub", 0, "subscribe to notification and indication for a specified period")
 )
 
-// matcher returns true if the advertisement matches our search criteria.
-type matcher func(a ble.Advertisement) bool
-
-// explorer connects to a remote peripheral and explores its GATT server.
-type explorerer struct {
-	match matcher
-	ch    chan ble.Advertisement
-}
-
-func (e *explorerer) Handle(a ble.Advertisement) {
-	if e.match(a) {
-		gatt.StopScanning()
-		e.ch <- a
-	}
-}
-
 func explorer(cln ble.Client) error {
 	fmt.Printf("Exploring Peripheral [ %s ] ...\n", cln.Address())
 
@@ -153,26 +137,9 @@ func main() {
 		}
 	}
 
-	exp := &explorerer{
-		ch:    make(chan ble.Advertisement),
-		match: match,
-	}
-
-	if err := gatt.SetAdvHandler(exp); err != nil {
-		log.Fatalf("can't set adv handler: %s", err)
-	}
-
-	if err := gatt.Scan(false); err != nil {
-		log.Fatalf("can't scan: %s", err)
-	}
-
-	// Wait for the exploration is done.
-	a := <-exp.ch
-
-	// Dial connects to the remote device.
-	cln, err := gatt.Dial(a.Address())
+	cln, err := gatt.Discover(gatt.MatcherFunc(match))
 	if err != nil {
-		log.Fatalf("can't dial: %s", err)
+		log.Fatalf("can't discover: %s", err)
 	}
 
 	// Start the exploration.
