@@ -9,9 +9,11 @@ type Client interface {
 	// This can be the advertised name, if exists, or the GAP device name, which takes priority.
 	Name() string
 
-	// Services returns discovered services.
-	Services() []*Service
+	// Profile returns discovered profile.
+	Profile() *Profile
 
+	// DiscoverProfile discovers the whole hierachy of a server.
+	DiscoverProfile(force bool) (*Profile, error)
 	// DiscoverServices finds all the primary services on a server. [Vol 3, Part G, 4.4.1]
 	// If filter is specified, only filtered services are returned.
 	DiscoverServices(filter []UUID) ([]*Service, error)

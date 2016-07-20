@@ -1,14 +1,16 @@
 package darwin
 
 import (
+	"fmt"
+
 	"github.com/currantlabs/ble"
 	"github.com/raff/goble/xpc"
 )
 
 // A Client is a GATT client.
 type Client struct {
-	svcs []*ble.Service
-	name string
+	profile *ble.Profile
+	name    string
 
 	id   xpc.UUID
 	conn *conn
@@ -33,9 +35,34 @@ func (cln *Client) Name() string {
 	return cln.name
 }
 
-// Services returns discovered services.
-func (cln *Client) Services() []*ble.Service {
-	return cln.svcs
+// Profile returns the discovered profile.
+func (cln *Client) Profile() *ble.Profile {
+	return cln.profile
+}
+
+// DiscoverProfile discovers the whole hierachy of a server.
+func (cln *Client) DiscoverProfile(force bool) (*ble.Profile, error) {
+	if cln.profile != nil && !force {
+		return cln.profile, nil
+	}
+	ss, err := cln.DiscoverServices(nil)
+	if err != nil {
+		return nil, fmt.Errorf("can't discover services: %s\n", err)
+	}
+	for _, s := range ss {
+		cs, err := cln.DiscoverCharacteristics(nil, s)
+		if err != nil {
+			return nil, fmt.Errorf("can't discover characteristics: %s\n", err)
+		}
+		for _, c := range cs {
+			_, err := cln.DiscoverDescriptors(nil, c)
+			if err != nil {
+				return nil, fmt.Errorf("can't discover descriptors: %s\n", err)
+			}
+		}
+	}
+	cln.profile = &ble.Profile{Services: ss}
+	return cln.profile, nil
 }
 
 // DiscoverServices finds all the primary services on a server. [Vol 3, Part G, 4.4.1]
@@ -57,7 +84,9 @@ func (cln *Client) DiscoverServices(ss []ble.UUID) ([]*ble.Service, error) {
 			EndHandle: uint16(xs.serviceEndHandle()),
 		})
 	}
-	cln.svcs = svcs
+	if cln.profile == nil {
+		cln.profile = &ble.Profile{Services: svcs}
+	}
 	return svcs, nil
 }
 

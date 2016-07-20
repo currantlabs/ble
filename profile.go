@@ -30,12 +30,17 @@ const (
 	CharExtended    Property = 0x80 // supports extended properties
 )
 
+// A Profile is composed of one or more services necessary to fulfill a use case.
+type Profile struct {
+	Services []*Service
+}
+
 // A Service is a BLE service.
 type Service struct {
 	UUID            UUID
 	Characteristics []*Characteristic
 
-	Handle       uint16
+	Handle    uint16
 	EndHandle uint16
 }
 
@@ -72,9 +77,9 @@ type Characteristic struct {
 	NotifyHandler   NotifyHandler
 	IndicateHandler NotifyHandler
 
-	Handle       uint16
-	ValueHandle  uint16
-	EndHandle uint16
+	Handle      uint16
+	ValueHandle uint16
+	EndHandle   uint16
 }
 
 // AddDescriptor adds a descriptor to a characteristic.

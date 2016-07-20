@@ -20,18 +20,14 @@ var (
 func explorer(cln ble.Client) error {
 	fmt.Printf("Exploring Peripheral [ %s ] ...\n", cln.Address())
 
-	ss, err := cln.DiscoverServices(nil)
+	p, err := cln.DiscoverProfile(true)
 	if err != nil {
 		return fmt.Errorf("can't discover services: %s\n", err)
 	}
-	for _, s := range ss {
+	for _, s := range p.Services {
 		fmt.Printf("Service: %s %s, Handle (0x%02X)\n", s.UUID.String(), ble.Name(s.UUID), s.Handle)
 
-		cs, err := cln.DiscoverCharacteristics(nil, s)
-		if err != nil {
-			return fmt.Errorf("can't discover characteristics: %s\n", err)
-		}
-		for _, c := range cs {
+		for _, c := range s.Characteristics {
 			fmt.Printf("  Characteristic: %s, Property: 0x%02X (%s), %s, Handle(0x%02X), VHandle(0x%02X)\n",
 				c.UUID, c.Property, propString(c.Property), ble.Name(c.UUID), c.Handle, c.ValueHandle)
 			if (c.Property & ble.CharRead) != 0 {
@@ -43,11 +39,7 @@ func explorer(cln ble.Client) error {
 				fmt.Printf("    Value         %x | %q\n", b, b)
 			}
 
-			ds, err := cln.DiscoverDescriptors(nil, c)
-			if err != nil {
-				return fmt.Errorf("can't discover descriptors: %s\n", err)
-			}
-			for _, d := range ds {
+			for _, d := range c.Descriptors {
 				fmt.Printf("    Descriptor: %s, %s, Handle(0x%02x)\n", d.UUID, ble.Name(d.UUID), d.Handle)
 				b, err := cln.ReadDescriptor(d)
 				if err != nil {
