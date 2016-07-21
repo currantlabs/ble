@@ -7,36 +7,21 @@ import (
 )
 
 type ecb struct {
-	b         cipher.Block
-	blockSize int
+	cipher.Block
 }
 
-func newECB(b cipher.Block) *ecb {
-	return &ecb{
-		b:         b,
-		blockSize: b.BlockSize(),
-	}
+func newECB(b cipher.Block) cipher.BlockMode {
+	return &ecb{Block: b}
 }
 
-type ecbEncrypter ecb
-
-func newECBEncrypter(b cipher.Block) cipher.BlockMode {
-	return (*ecbEncrypter)(newECB(b))
-}
-
-func (x *ecbEncrypter) BlockSize() int { return x.blockSize }
-
-func (x *ecbEncrypter) CryptBlocks(dst, src []byte) {
-	if len(src)%x.blockSize != 0 {
-		panic("crypto/cipher: input not full blocks")
-	}
+func (e *ecb) CryptBlocks(dst, src []byte) {
 	if len(dst) < len(src) {
 		panic("crypto/cipher: output smaller than input")
 	}
 	for len(src) > 0 {
-		x.b.Encrypt(dst, src[:x.blockSize])
-		src = src[x.blockSize:]
-		dst = dst[x.blockSize:]
+		e.Encrypt(dst, src[:e.BlockSize()])
+		src = src[e.BlockSize():]
+		dst = dst[e.BlockSize():]
 	}
 }
 
@@ -78,6 +63,6 @@ func encrypt(key, data []byte) []byte {
 		log.Fatalf("can't create aes block: %s", err)
 	}
 	enc := make([]byte, 16)
-	newECBEncrypter(b).CryptBlocks(enc, reverse(data))
+	newECB(b).CryptBlocks(enc, reverse(data))
 	return reverse(enc)
 }
