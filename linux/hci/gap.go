@@ -27,8 +27,8 @@ func (h *HCI) Scan(allowDup bool) error {
 		h.scanEnable.FilterDuplicates = 0
 	}
 	h.scanEnable.LEScanEnable = 1
-	h.ad = make([]*Advertisement, 16)
-	h.last = 0
+	h.adHist = make([]*Advertisement, 128)
+	h.adLast = 0
 	return h.Send(&h.scanEnable, nil)
 }
 
