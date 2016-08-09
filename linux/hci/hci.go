@@ -11,6 +11,7 @@ import (
 	"github.com/currantlabs/ble/linux/hci/cmd"
 	"github.com/currantlabs/ble/linux/hci/evt"
 	"github.com/currantlabs/ble/linux/hci/skt"
+	"github.com/pkg/errors"
 )
 
 // Command ...
@@ -51,6 +52,10 @@ func NewHCI(opts ...Option) (*HCI, error) {
 
 		done: make(chan bool),
 	}
+	h.params.init()
+	if err := h.Option(opts...); err != nil {
+		return nil, errors.Wrap(err, "can't set options")
+	}
 
 	return h, nil
 }
@@ -58,7 +63,8 @@ func NewHCI(opts ...Option) (*HCI, error) {
 // HCI ...
 type HCI struct {
 	sync.Mutex
-	states
+
+	params params
 
 	skt io.ReadWriteCloser
 	id  int
@@ -109,7 +115,7 @@ type HCI struct {
 }
 
 // Init ...
-func (h *HCI) Init(opts ...Option) error {
+func (h *HCI) Init() error {
 	h.evth[0x3E] = h.handleLEMeta
 	h.evth[evt.CommandCompleteCode] = h.handleCommandComplete
 	h.evth[evt.CommandStatusCode] = h.handleCommandStatus
@@ -129,10 +135,6 @@ func (h *HCI) Init(opts ...Option) error {
 	// evt.LEReadRemoteUsedFeaturesCompleteSubCode:   todo),
 	// evt.LERemoteConnectionParameterRequestSubCode: todo),
 
-	if err := h.Option(opts...); err != nil {
-		return err
-	}
-
 	skt, err := skt.NewSocket(h.id)
 	if err != nil {
 		return err
@@ -143,14 +145,13 @@ func (h *HCI) Init(opts ...Option) error {
 
 	go h.sktLoop()
 	h.init()
-	h.states.init()
 
 	// Pre-allocate buffers with additional head room for lower layer headers.
 	// HCI header (1 Byte) + ACL Data Header (4 bytes) + L2CAP PDU (or fragment)
 	h.pool = NewPool(1+4+h.bufSize, h.bufCnt-1)
 
-	h.Send(&h.advParams, nil)
-	h.Send(&h.scanParams, nil)
+	h.Send(&h.params.advParams, nil)
+	h.Send(&h.params.scanParams, nil)
 	return nil
 }
 
@@ -445,11 +446,11 @@ func (h *HCI) handleLEConnectionComplete(b []byte) error {
 		// The re-enabling might failed or ignored by the controller, if
 		// it had reached the maximum number of concurrent connections.
 		// So we also re-enable the advertising when a connection disconnected
-		h.states.RLock()
-		if h.advEnable.AdvertisingEnable == 1 {
-			go h.Send(&h.advEnable, nil)
+		h.params.RLock()
+		if h.params.advEnable.AdvertisingEnable == 1 {
+			go h.Send(&h.params.advEnable, nil)
 		}
-		h.states.RUnlock()
+		h.params.RUnlock()
 	}
 	return nil
 }
@@ -473,11 +474,11 @@ func (h *HCI) handleDisconnectionComplete(b []byte) error {
 		// handleLEConnectionComplete() for details.
 		// This may failed with ErrCommandDisallowed, if the controller
 		// was actually in advertising state. It does no harm though.
-		h.states.RLock()
-		if h.advEnable.AdvertisingEnable == 1 {
-			go h.Send(&h.advEnable, nil)
+		h.params.RLock()
+		if h.params.advEnable.AdvertisingEnable == 1 {
+			go h.Send(&h.params.advEnable, nil)
 		}
-		h.states.RUnlock()
+		h.params.RUnlock()
 	} else {
 		// log.Printf("peripheral disconnected")
 	}

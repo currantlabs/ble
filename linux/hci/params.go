@@ -6,7 +6,7 @@ import (
 	"github.com/currantlabs/ble/linux/hci/cmd"
 )
 
-type states struct {
+type params struct {
 	sync.RWMutex
 
 	advEnable  cmd.LESetAdvertiseEnable
@@ -20,15 +20,15 @@ type states struct {
 	connParams cmd.LECreateConnection
 }
 
-func (s *states) init() {
-	s.scanParams = cmd.LESetScanParameters{
+func (p *params) init() {
+	p.scanParams = cmd.LESetScanParameters{
 		LEScanType:           0x01,   // 0x00: passive, 0x01: active
 		LEScanInterval:       0x0004, // 0x0004 - 0x4000; N * 0.625msec
 		LEScanWindow:         0x0004, // 0x0004 - 0x4000; N * 0.625msec
 		OwnAddressType:       0x00,   // 0x00: public, 0x01: random
 		ScanningFilterPolicy: 0x00,   // 0x00: accept all, 0x01: ignore non-white-listed.
 	}
-	s.advParams = cmd.LESetAdvertisingParameters{
+	p.advParams = cmd.LESetAdvertisingParameters{
 		AdvertisingIntervalMin:  0x0020,    // 0x0020 - 0x4000; N * 0.625 msec
 		AdvertisingIntervalMax:  0x0020,    // 0x0020 - 0x4000; N * 0.625 msec
 		AdvertisingType:         0x00,      // 00: ADV_IND, 0x01: DIRECT(HIGH), 0x02: SCAN, 0x03: NONCONN, 0x04: DIRECT(LOW)
@@ -38,7 +38,7 @@ func (s *states) init() {
 		AdvertisingChannelMap:   0x7,       // 0x07 0x01: ch37, 0x2: ch38, 0x4: ch39
 		AdvertisingFilterPolicy: 0x00,
 	}
-	s.connParams = cmd.LECreateConnection{
+	p.connParams = cmd.LECreateConnection{
 		LEScanInterval:        0x0004,    // 0x0004 - 0x4000; N * 0.625 msec
 		LEScanWindow:          0x0004,    // 0x0004 - 0x4000; N * 0.625 msec
 		InitiatorFilterPolicy: 0x00,      // White list is not used

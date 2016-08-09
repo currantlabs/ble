@@ -8,6 +8,11 @@ import (
 	"github.com/currantlabs/ble"
 )
 
+// DefaultDevice returns the default device.
+func DefaultDevice() Device {
+	return nil
+}
+
 type manager struct {
 	central    *darwin.Device
 	peripheral *darwin.Device

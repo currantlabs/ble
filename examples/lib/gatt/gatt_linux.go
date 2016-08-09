@@ -12,7 +12,7 @@ import (
 )
 
 // DefaultDevice returns the default HCI device.
-func DefaultDevice() *hci.HCI {
+func DefaultDevice() Device {
 	return dev()
 }
 

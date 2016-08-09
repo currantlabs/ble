@@ -1,6 +1,10 @@
 package hci
 
-import "time"
+import (
+	"time"
+
+	"github.com/currantlabs/ble/linux/hci/cmd"
+)
 
 // An Option is a configuration function, which configures the device.
 type Option func(*HCI) error
@@ -25,6 +29,14 @@ func OptDialerTimeout(d time.Duration) Option {
 func OptListenerTimeout(d time.Duration) Option {
 	return func(h *HCI) error {
 		h.listenerTmo = d
+		return nil
+	}
+}
+
+// OptConnParams overrides default connection parameters.
+func OptConnParams(param cmd.LECreateConnection) Option {
+	return func(h *HCI) error {
+		h.params.connParams = param
 		return nil
 	}
 }
