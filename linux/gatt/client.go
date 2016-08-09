@@ -264,6 +264,9 @@ func (p *Client) ExchangeMTU(mtu int) (int, error) {
 func (p *Client) Subscribe(c *ble.Characteristic, ind bool, h ble.NotificationHandler) error {
 	p.Lock()
 	defer p.Unlock()
+	if c.CCCD == nil {
+		return fmt.Errorf("CCCD not found")
+	}
 	if ind {
 		return p.setHandlers(c.CCCD.Handle, c.ValueHandle, cccIndicate, h)
 	}
@@ -275,6 +278,9 @@ func (p *Client) Subscribe(c *ble.Characteristic, ind bool, h ble.NotificationHa
 func (p *Client) Unsubscribe(c *ble.Characteristic, ind bool) error {
 	p.Lock()
 	defer p.Unlock()
+	if c.CCCD == nil {
+		return fmt.Errorf("CCCD not found")
+	}
 	if ind {
 		return p.setHandlers(c.CCCD.Handle, c.ValueHandle, cccIndicate, nil)
 	}
