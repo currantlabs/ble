@@ -121,8 +121,8 @@ func (c *Conn) handleSignal(p pdu) error {
 				&CommandReject{
 					Reason: 0x0000, // Command not understood.
 				})
-			s = s[4+s.len():] // advance to next the packet.
 		}
+		s = s[4+s.len():] // advance to next the packet.
 
 	}
 	return nil
@@ -173,7 +173,7 @@ func (c *Conn) handleConnectionParameterUpdateRequest(s sigCmd) {
 	// Section 5.1.7). If an LE slave Host receives a Connection Parameter Update
 	// Request packet it shall respond with a Command Reject packet with reason
 	// 0x0000 (Command not understood).
-	if c.param.Role() == roleMaster {
+	if c.param.Role() != roleMaster {
 		c.sendResponse(
 			SignalCommandReject,
 			s.id(),
