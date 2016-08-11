@@ -10,7 +10,7 @@ import (
 	"github.com/currantlabs/ble"
 	"github.com/currantlabs/ble/linux/hci/cmd"
 	"github.com/currantlabs/ble/linux/hci/evt"
-	"github.com/currantlabs/ble/linux/hci/skt"
+	"github.com/currantlabs/ble/linux/hci/socket"
 	"github.com/pkg/errors"
 )
 
@@ -135,7 +135,7 @@ func (h *HCI) Init() error {
 	// evt.LEReadRemoteUsedFeaturesCompleteSubCode:   todo),
 	// evt.LERemoteConnectionParameterRequestSubCode: todo),
 
-	skt, err := skt.NewSocket(h.id)
+	skt, err := socket.NewSocket(h.id)
 	if err != nil {
 		return err
 	}
