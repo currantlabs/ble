@@ -6,24 +6,26 @@ import (
 	"github.com/currantlabs/ble"
 )
 
-// Matcher matches returns true if advertisement matches specific confition.
-type Matcher interface {
-	Match(a ble.Advertisement) bool
+// Filter is the interface that wraps the basic Filt method.
+//
+// Filter returns true if the advertisement matches specified condition.
+type Filter interface {
+	Filter(a ble.Advertisement) bool
 }
 
-// MatcherFunc is an adapter to allow the use of ordinary functions as Matchers.
-type MatcherFunc func(a ble.Advertisement) bool
+// FilterFunc is an adapter to allow the use of ordinary functions as Filters.
+type FilterFunc func(a ble.Advertisement) bool
 
-// Match returns true if the adversisement matches specific condition.
-func (m MatcherFunc) Match(a ble.Advertisement) bool {
-	return m(a)
+// Filter returns true if the adversisement matches specified condition.
+func (f FilterFunc) Filter(a ble.Advertisement) bool {
+	return f(a)
 }
 
 // Discover searches for and connects to a Peripheral which matches specified condition.
-func Discover(m Matcher) (ble.Client, error) {
+func Discover(f Filter) (ble.Client, error) {
 	ch := make(chan ble.Advertisement)
 	fn := func(a ble.Advertisement) {
-		if !m.Match(a) {
+		if !f.Filter(a) {
 			return
 		}
 		StopScanning()

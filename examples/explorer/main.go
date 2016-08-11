@@ -120,13 +120,13 @@ func main() {
 	flag.Parse()
 
 	// Default to search device with name of Gopher (or specified by user).
-	match := func(a ble.Advertisement) bool {
+	filter := func(a ble.Advertisement) bool {
 		return strings.ToUpper(a.LocalName()) == strings.ToUpper(*name)
 	}
 
 	// If addr is specified, search for addr instead.
 	if len(*addr) != 0 {
-		match = func(a ble.Advertisement) bool {
+		filter = func(a ble.Advertisement) bool {
 			return strings.ToUpper(a.Address().String()) == strings.ToUpper(*addr)
 		}
 	}
@@ -134,7 +134,7 @@ func main() {
 	// Set connection parameters. Only supported on Linux platform.
 	d := gatt.DefaultDevice()
 	if h, ok := d.(*hci.HCI); ok {
-		if err := h.Option(hci.OptConnParam(
+		if err := h.Option(hci.OptConnParams(
 			cmd.LECreateConnection{
 				LEScanInterval:        0x0004,    // 0x0004 - 0x4000; N * 0.625 msec
 				LEScanWindow:          0x0004,    // 0x0004 - 0x4000; N * 0.625 msec
@@ -153,7 +153,7 @@ func main() {
 		}
 	}
 
-	cln, err := gatt.Discover(gatt.MatcherFunc(match))
+	cln, err := gatt.Discover(gatt.FilterFunc(filter))
 	if err != nil {
 		log.Fatalf("can't discover: %s", err)
 	}
