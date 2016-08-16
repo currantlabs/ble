@@ -414,7 +414,7 @@ func (h *HCI) handleCommandStatus(b []byte) error {
 	if !found {
 		return fmt.Errorf("can't find the cmd for CommandStatusEP: % X", e)
 	}
-	close(p.done)
+	p.done <- []byte{e.Status()}
 	return nil
 }
 
