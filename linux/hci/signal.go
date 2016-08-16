@@ -22,7 +22,7 @@ type sigCmd []byte
 func (s sigCmd) code() int    { return int(s[0]) }
 func (s sigCmd) id() uint8    { return s[1] }
 func (s sigCmd) len() int     { return int(binary.LittleEndian.Uint16(s[2:4])) }
-func (s sigCmd) data() []byte { return s[:4+s.len()] }
+func (s sigCmd) data() []byte { return s[4 : 4+s.len()] }
 
 // Signal ...
 func (c *Conn) Signal(req Signal, rsp Signal) error {
