@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+package bled;
+
+service bled {
+  rpc NewCentral (DeviceOptions) returns (DeviceID) {}
+  rpc Scan (Dummy) returns (stream Advertisement) {}
+  rpc StopScanning (Dummy) returns (Dummy) {}
+}
+
+message Dummy {
+}
+
+message DeviceOptions {
+  string name = 1;
+}
+
+message DeviceID {
+  int32 id = 1;
+}
+
+message Advertisement {
+	string LocalName = 1;
+	bytes ManufacturerData = 2;
+	repeated ServiceData ServiceData = 3;
+	repeated UUID Services = 4;
+	repeated UUID OverflowService = 5;
+	int32 TxPowerLevel = 6;
+	bool Connectable = 7;
+	UUID SolicitedService = 8;
+	int32 RSSI = 9;
+	string Address = 10;
+}
+
+message UUID {
+	bytes UUID = 1;
+}
+
+message ServiceData {
+	UUID UUID = 1;
+	bytes Data = 2;
+}
