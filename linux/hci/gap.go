@@ -5,6 +5,8 @@ import (
 	"net"
 	"time"
 
+	"golang.org/x/net/context"
+
 	"github.com/currantlabs/ble"
 	"github.com/currantlabs/ble/linux/adv"
 	"github.com/currantlabs/ble/linux/gatt"
@@ -123,7 +125,7 @@ func (h *HCI) Accept() (ble.Conn, error) {
 }
 
 // Dial ...
-func (h *HCI) Dial(a ble.Addr) (ble.Client, error) {
+func (h *HCI) Dial(ctx context.Context, a ble.Addr) (ble.Client, error) {
 	b, err := net.ParseMAC(a.String())
 	if err != nil {
 		return nil, ErrInvalidAddr
@@ -140,6 +142,8 @@ func (h *HCI) Dial(a ble.Addr) (ble.Client, error) {
 		tmo = time.After(h.dialerTmo)
 	}
 	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
 	case <-h.done:
 		return nil, h.err
 	case c := <-h.chMasterConn:

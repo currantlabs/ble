@@ -1,8 +1,9 @@
 package darwin
 
 import (
-	"context"
 	"sync"
+
+	"golang.org/x/net/context"
 
 	"github.com/currantlabs/ble"
 	"github.com/raff/goble/xpc"
@@ -52,7 +53,8 @@ func (c *conn) SetContext(ctx context.Context) {
 }
 
 func (c *conn) LocalAddr() ble.Addr {
-	return c.dev.Addr()
+	// return c.dev.Address()
+	return c.addr // FIXME
 }
 
 func (c *conn) RemoteAddr() ble.Addr {
@@ -94,7 +96,7 @@ func (c *conn) subscribed(char *ble.Characteristic) {
 		return
 	}
 	send := func(b []byte) (int, error) {
-		c.dev.sendCmd(15, xpc.Dict{
+		c.dev.sendCmd(c.dev.pm, 15, xpc.Dict{
 			"kCBMsgArgUUIDs":       [][]byte{},
 			"kCBMsgArgAttributeID": h,
 			"kCBMsgArgData":        b,
@@ -116,11 +118,11 @@ func (c *conn) unsubscribed(char *ble.Characteristic) {
 }
 
 func (c *conn) sendReq(id int, args xpc.Dict) msg {
-	c.dev.sendCmd(id, args)
+	c.dev.sendCmd(c.dev.cm, id, args)
 	m := <-c.rspc
 	return msg(m.args())
 }
 
 func (c *conn) sendCmd(id int, args xpc.Dict) {
-	c.dev.sendCmd(id, args)
+	c.dev.sendCmd(c.dev.pm, id, args)
 }

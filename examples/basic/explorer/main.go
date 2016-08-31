@@ -7,17 +7,66 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
+	"golang.org/x/net/context"
+
 	"github.com/currantlabs/ble"
-	"github.com/currantlabs/ble/examples/lib/gatt"
-	"github.com/currantlabs/ble/linux/hci"
-	"github.com/currantlabs/ble/linux/hci/cmd"
+	"github.com/currantlabs/ble/examples/lib/dev"
 )
 
 var (
-	name = flag.String("name", "Gopher", "name of remote peripheral")
-	addr = flag.String("addr", "", "address of remote peripheral (MAC on Linux, UUID on OS X)")
-	sub  = flag.Duration("sub", 0, "subscribe to notification and indication for a specified period")
+	device = flag.String("device", "default", "implementation of ble")
+	name   = flag.String("name", "Gopher", "name of remote peripheral")
+	addr   = flag.String("addr", "", "address of remote peripheral (MAC on Linux, UUID on OS X)")
+	sub    = flag.Duration("sub", 0, "subscribe to notification and indication for a specified period")
+	sd     = flag.Duration("sd", 5*time.Second, "scanning duration, 0 for indefinitely")
 )
+
+func main() {
+	flag.Parse()
+
+	d, err := dev.NewDevice(*device)
+	if err != nil {
+		log.Fatalf("can't new device : %s", err)
+	}
+	ble.SetDefaultDevice(d)
+
+	// Default to search device with name of Gopher (or specified by user).
+	filter := func(a ble.Advertisement) bool {
+		return strings.ToUpper(a.LocalName()) == strings.ToUpper(*name)
+	}
+
+	// If addr is specified, search for addr instead.
+	if len(*addr) != 0 {
+		filter = func(a ble.Advertisement) bool {
+			return strings.ToUpper(a.Address().String()) == strings.ToUpper(*addr)
+		}
+	}
+
+	// Scan for specified durantion, or until interrupted by user.
+	fmt.Printf("Scanning for %s...\n", *sd)
+	ctx := ble.WithSighandler(context.WithTimeout(context.Background(), *sd))
+	cln, err := ble.Discover(ctx, ble.FilterFunc(filter))
+	if err != nil {
+		switch errors.Cause(err) {
+		case context.DeadlineExceeded:
+			log.Printf("not found")
+			return
+		case context.Canceled:
+			log.Printf("canceled")
+			return
+		default:
+			log.Fatalf("can't discover: %s", err)
+		}
+	}
+
+	// Start the exploration.
+	explorer(cln)
+
+	// Disconnect the connection. (On OS X, this might take a while.)
+	fmt.Printf("Disconnecting [ %s ]... (this might take up to few seconds on OS X)\n", cln.Address())
+	cln.CancelConnection()
+}
 
 func explorer(cln ble.Client) error {
 	fmt.Printf("Exploring Peripheral [ %s ] ...\n", cln.Address())
@@ -116,52 +165,14 @@ func propString(p ble.Property) string {
 	return s
 }
 
-func main() {
-	flag.Parse()
-
-	// Default to search device with name of Gopher (or specified by user).
-	filter := func(a ble.Advertisement) bool {
-		return strings.ToUpper(a.LocalName()) == strings.ToUpper(*name)
+func chkErr(err error) {
+	switch errors.Cause(err) {
+	case nil:
+	case context.DeadlineExceeded:
+		fmt.Printf("done\n")
+	case context.Canceled:
+		fmt.Printf("canceled\n")
+	default:
+		log.Fatalf(err.Error())
 	}
-
-	// If addr is specified, search for addr instead.
-	if len(*addr) != 0 {
-		filter = func(a ble.Advertisement) bool {
-			return strings.ToUpper(a.Address().String()) == strings.ToUpper(*addr)
-		}
-	}
-
-	// Set connection parameters. Only supported on Linux platform.
-	d := gatt.DefaultDevice()
-	if h, ok := d.(*hci.HCI); ok {
-		if err := h.Option(hci.OptConnParams(
-			cmd.LECreateConnection{
-				LEScanInterval:        0x0004,    // 0x0004 - 0x4000; N * 0.625 msec
-				LEScanWindow:          0x0004,    // 0x0004 - 0x4000; N * 0.625 msec
-				InitiatorFilterPolicy: 0x00,      // White list is not used
-				PeerAddressType:       0x00,      // Public Device Address
-				PeerAddress:           [6]byte{}, //
-				OwnAddressType:        0x00,      // Public Device Address
-				ConnIntervalMin:       0x0006,    // 0x0006 - 0x0C80; N * 1.25 msec
-				ConnIntervalMax:       0x0006,    // 0x0006 - 0x0C80; N * 1.25 msec
-				ConnLatency:           0x0000,    // 0x0000 - 0x01F3; N * 1.25 msec
-				SupervisionTimeout:    0x0048,    // 0x000A - 0x0C80; N * 10 msec
-				MinimumCELength:       0x0000,    // 0x0000 - 0xFFFF; N * 0.625 msec
-				MaximumCELength:       0x0000,    // 0x0000 - 0xFFFF; N * 0.625 msec
-			})); err != nil {
-			log.Fatalf("can't set advertising param: %s", err)
-		}
-	}
-
-	cln, err := gatt.Discover(gatt.FilterFunc(filter))
-	if err != nil {
-		log.Fatalf("can't discover: %s", err)
-	}
-
-	// Start the exploration.
-	explorer(cln)
-
-	// Disconnect the connection. (On OS X, this might take a while.)
-	fmt.Printf("Disconnecting [ %s ]... (this might take up to few seconds on OS X)\n", cln.Address())
-	cln.CancelConnection()
 }

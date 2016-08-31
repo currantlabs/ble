@@ -2,7 +2,7 @@ package hci
 
 import (
 	"bytes"
-	"context"
+	"golang.org/x/net/context"
 	"encoding/binary"
 	"fmt"
 	"io"

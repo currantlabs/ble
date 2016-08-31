@@ -7,8 +7,11 @@ import (
 	"log"
 	"time"
 
-	"github.com/currantlabs/ble"
+	"github.com/pkg/errors"
 	"github.com/raff/goble/xpc"
+	"golang.org/x/net/context"
+
+	"github.com/currantlabs/ble"
 )
 
 const (
@@ -41,7 +44,9 @@ const (
 
 // Device is either a Peripheral or Central device.
 type Device struct {
-	xpc  xpc.XPC
+	pm xpc.XPC // peripheralManager
+	cm xpc.XPC // centralManager
+
 	role int // 1: peripheralManager (server), 0: centralManager (client)
 
 	rspc chan msg
@@ -70,9 +75,10 @@ func NewDevice(opts ...Option) (*Device, error) {
 		return nil, err
 	}
 
-	d.xpc = xpc.XpcConnect("com.apple.blued", d)
+	d.pm = xpc.XpcConnect("com.apple.blued", d)
+	d.cm = xpc.XpcConnect("com.apple.blued", d)
 
-	return d, nil
+	return d, errors.Wrap(d.Init(), "can't init")
 }
 
 // Option sets the options specified.
@@ -86,86 +92,114 @@ func (d *Device) Option(opts ...Option) error {
 
 // Init ...
 func (d *Device) Init() error {
-	rsp := d.sendReq(1, xpc.Dict{
+	rsp := d.sendReq(d.cm, 1, xpc.Dict{
 		"kCBMsgArgName": fmt.Sprintf("gopher-%v", time.Now().Unix()),
 		"kCBMsgArgOptions": xpc.Dict{
 			"kCBInitOptionShowPowerAlert": 1,
 		},
-		"kCBMsgArgType": d.role,
+		"kCBMsgArgType": 0,
 	})
-	if s := State(rsp.state()); s != StatePoweredOn {
+	s := State(rsp.state())
+	if s != StatePoweredOn {
+		return fmt.Errorf("state: %s", s)
+	}
+
+	rsp = d.sendReq(d.pm, 1, xpc.Dict{
+		"kCBMsgArgName": fmt.Sprintf("gopher-%v", time.Now().Unix()),
+		"kCBMsgArgOptions": xpc.Dict{
+			"kCBInitOptionShowPowerAlert": 1,
+		},
+		"kCBMsgArgType": 1,
+	})
+	s = State(rsp.state())
+	if s != StatePoweredOn {
 		return fmt.Errorf("state: %s", s)
 	}
 	return nil
 }
 
 // AdvertiseMfgData ...
-func (d *Device) AdvertiseMfgData(b []byte) error {
-	return d.sendReq(8, xpc.Dict{
+func (d *Device) AdvertiseMfgData(ctx context.Context, b []byte) error {
+	if err := d.sendReq(d.pm, 8, xpc.Dict{
 		"kCBAdvDataAppleMfgData": b,
-	}).err()
+	}).err(); err != nil {
+		return errors.Wrap(err, "can't advertise")
+	}
+	<-ctx.Done()
+	return ctx.Err()
 }
 
 // AdvertiseNameAndServices advertises name and specifid service UUIDs.
-func (d *Device) AdvertiseNameAndServices(name string, ss ...ble.UUID) error {
-	return d.sendReq(8, xpc.Dict{
+func (d *Device) AdvertiseNameAndServices(ctx context.Context, name string, ss ...ble.UUID) error {
+	if err := d.sendReq(d.pm, 8, xpc.Dict{
 		"kCBAdvDataLocalName":    name,
 		"kCBAdvDataServiceUUIDs": uuidSlice(ss)},
-	).err()
+	).err(); err != nil {
+		return err
+	}
+	<-ctx.Done()
+	d.stopAdvertising()
+	return ctx.Err()
 }
 
 // AdvertiseIBeaconData advertises iBeacon packet with specified manufacturer data.
-func (d *Device) AdvertiseIBeaconData(md []byte) error {
+func (d *Device) AdvertiseIBeaconData(ctx context.Context, md []byte) error {
 	var utsname xpc.Utsname
 	xpc.Uname(&utsname)
 
 	if utsname.Release >= "14." {
 		l := len(md)
 		b := []byte{byte(l + 5), 0xFF, 0x4C, 0x00, 0x02, byte(l)}
-		return d.AdvertiseMfgData(append(b, md...))
+		return d.AdvertiseMfgData(ctx, append(b, md...))
 	}
-	return d.sendReq(8, xpc.Dict{"kCBAdvDataAppleBeaconKey": md}).err()
+	if err := d.sendReq(d.pm, 8, xpc.Dict{"kCBAdvDataAppleBeaconKey": md}).err(); err != nil {
+		return err
+	}
+	<-ctx.Done()
+	return d.stopAdvertising()
 }
 
 // AdvertiseIBeacon advertises iBeacon packet.
-func (d *Device) AdvertiseIBeacon(u ble.UUID, major, minor uint16, pwr int8) error {
+func (d *Device) AdvertiseIBeacon(ctx context.Context, u ble.UUID, major, minor uint16, pwr int8) error {
 	b := make([]byte, 21)
 	copy(b, ble.Reverse(u))                   // Big endian
 	binary.BigEndian.PutUint16(b[16:], major) // Big endian
 	binary.BigEndian.PutUint16(b[18:], minor) // Big endian
 	b[20] = uint8(pwr)                        // Measured Tx Power
-	return d.AdvertiseIBeaconData(b)
+	return d.AdvertiseIBeaconData(ctx, b)
 }
 
-// StopAdvertising stops advertising.
-func (d *Device) StopAdvertising() error {
-	return d.sendReq(9, nil).err()
-}
-
-// SetAdvHandler ...
-func (d *Device) SetAdvHandler(ah ble.AdvHandler) error {
-	d.advHandler = ah
-	return nil
+// stopAdvertising stops advertising.
+func (d *Device) stopAdvertising() error {
+	return errors.Wrap(d.sendReq(d.pm, 9, nil).err(), "can't stop advertising")
 }
 
 // Scan ...
-func (d *Device) Scan(allowDup bool) error {
-	return d.sendCmd(29, xpc.Dict{
+func (d *Device) Scan(ctx context.Context, allowDup bool, h ble.AdvHandler) error {
+	d.advHandler = h
+	if err := d.sendCmd(d.cm, 29, xpc.Dict{
 		// "kCBMsgArgUUIDs": uuidSlice(ss),
 		"kCBMsgArgOptions": xpc.Dict{
 			"kCBScanOptionAllowDuplicates": map[bool]int{true: 1, false: 0}[allowDup],
 		},
-	})
+	}); err != nil {
+		return err
+	}
+	<-ctx.Done()
+	if err := d.stopScanning(); err != nil {
+		return errors.Wrap(ctx.Err(), err.Error())
+	}
+	return ctx.Err()
 }
 
-// StopScanning stops scanning
-func (d *Device) StopScanning() error {
-	return d.sendCmd(30, nil)
+// stopAdvertising stops advertising.
+func (d *Device) stopScanning() error {
+	return errors.Wrap(d.sendCmd(d.cm, 30, nil), "can't stop scanning")
 }
 
 // RemoveAllServices removes all services of device's
 func (d *Device) RemoveAllServices() error {
-	return d.sendCmd(12, nil)
+	return d.sendCmd(d.pm, 12, nil)
 }
 
 // AddService adds a service to device's database.
@@ -266,7 +300,7 @@ func (d *Device) AddService(s *ble.Service) error {
 	}
 	xs["kCBMsgArgCharacteristics"] = xcs
 
-	return d.sendReq(10, xs).err()
+	return d.sendReq(d.pm, 10, xs).err()
 }
 
 // SetServices ...
@@ -283,14 +317,24 @@ func (d *Device) SetServices(ss []*ble.Service) error {
 }
 
 // Dial ...
-func (d *Device) Dial(a ble.Addr) (ble.Client, error) {
-	d.sendCmd(31, xpc.Dict{
+func (d *Device) Dial(ctx context.Context, a ble.Addr) (ble.Client, error) {
+	d.sendCmd(d.cm, 31, xpc.Dict{
 		"kCBMsgArgDeviceUUID": xpc.MakeUUID(a.String()),
 		"kCBMsgArgOptions": xpc.Dict{
 			"kCBConnectOptionNotifyOnDisconnection": 1,
 		},
 	})
-	return NewClient(<-d.chConn)
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case c := <-d.chConn:
+		return NewClient(c)
+	}
+}
+
+// Stop ...
+func (d *Device) Stop() error {
+	return nil
 }
 
 // HandleXpcEvent process Device events and asynchronous errors.
@@ -316,7 +360,7 @@ func (d *Device) HandleXpcEvent(event xpc.Dict, err error) {
 			break
 		}
 		a := &adv{args: m.args(), ad: args.advertisementData()}
-		go d.advHandler.Handle(a)
+		go d.advHandler(a)
 
 	case evtConfirmation:
 		// log.Printf("confirmed: %d", args.attributeID())
@@ -349,7 +393,7 @@ func (d *Device) HandleXpcEvent(event xpc.Dict, err error) {
 			v = buf.Bytes()
 		}
 
-		d.sendCmd(13, xpc.Dict{
+		d.sendCmd(d.pm, 13, xpc.Dict{
 			"kCBMsgArgAttributeID":   aid,
 			"kCBMsgArgData":          v,
 			"kCBMsgArgTransactionID": args.transactionID(),
@@ -366,7 +410,7 @@ func (d *Device) HandleXpcEvent(event xpc.Dict, err error) {
 			if xw.ignoreResponse() == 1 {
 				continue
 			}
-			d.sendCmd(13, xpc.Dict{
+			d.sendCmd(d.pm, 13, xpc.Dict{
 				"kCBMsgArgAttributeID":   aid,
 				"kCBMsgArgData":          nil,
 				"kCBMsgArgTransactionID": args.transactionID(),
@@ -422,16 +466,6 @@ func (d *Device) HandleXpcEvent(event xpc.Dict, err error) {
 	}
 }
 
-// Addr ...
-func (d *Device) Addr() ble.Addr {
-	return nil
-}
-
-// Stop ...
-func (d *Device) Stop() error {
-	return nil
-}
-
 func (d *Device) conn(m msg) *conn {
 	// Convert xpc.UUID to ble.UUID.
 	a := ble.MustParse(m.deviceUUID().String())
@@ -444,13 +478,13 @@ func (d *Device) conn(m msg) *conn {
 }
 
 // sendReq sends a message and waits for its reply.
-func (d *Device) sendReq(id int, args xpc.Dict) msg {
-	d.sendCmd(id, args)
+func (d *Device) sendReq(x xpc.XPC, id int, args xpc.Dict) msg {
+	d.sendCmd(x, id, args)
 	return <-d.rspc
 }
 
-func (d *Device) sendCmd(id int, args xpc.Dict) error {
+func (d *Device) sendCmd(x xpc.XPC, id int, args xpc.Dict) error {
 	logger.Info("send", "id", id, "args", fmt.Sprintf("%v", args))
-	d.xpc.Send(xpc.Dict{"kCBMsgId": id, "kCBMsgArgs": args}, false)
+	x.Send(xpc.Dict{"kCBMsgId": id, "kCBMsgArgs": args}, false)
 	return nil
 }

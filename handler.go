@@ -2,8 +2,9 @@ package ble
 
 import (
 	"bytes"
-	"context"
 	"io"
+
+	"golang.org/x/net/context"
 )
 
 // A ReadHandler handles GATT requests.
