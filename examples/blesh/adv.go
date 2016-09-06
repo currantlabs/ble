@@ -7,6 +7,7 @@ import (
 )
 
 func advHandler(a ble.Advertisement) {
+	curr.addr = a.Address()
 	if a.Connectable() {
 		fmt.Printf("[%s] C %3d:", a.Address(), a.RSSI())
 	} else {

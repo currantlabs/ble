@@ -7,7 +7,6 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
-	"time"
 
 	"golang.org/x/net/context"
 
@@ -20,7 +19,20 @@ import (
 	"github.com/currantlabs/ble/linux"
 )
 
-var device ble.Device
+var curr struct {
+	device  ble.Device
+	client  ble.Client
+	uuid    ble.UUID
+	addr    ble.Addr
+	profile *ble.Profile
+}
+
+var (
+	errNotConnected = fmt.Errorf("not connected")
+	errNoProfile    = fmt.Errorf("no profile")
+	errNoUUID       = fmt.Errorf("no UUID")
+	errInvalidUUID  = fmt.Errorf("invalid UUID")
+)
 
 func main() {
 	app := cli.NewApp()
@@ -39,64 +51,112 @@ func main() {
 
 	app.Commands = []cli.Command{
 		{
-			Name:    "scan",
-			Aliases: []string{"s"},
-			Usage:   "Scan surrounding with specified filter",
-			Action:  scan,
-			Flags: []cli.Flag{
-				cli.DurationFlag{Name: "duration, d", Value: time.Second * 5, Usage: "duration"},
-				cli.StringFlag{Name: "name, n", Usage: "name"},
-				cli.StringFlag{Name: "addr, a", Usage: "addr"},
-				cli.BoolTFlag{Name: "dup", Usage: "allowDup"},
-			},
-		},
-		{
-			Name:    "exp",
-			Aliases: []string{"e"},
-			Usage:   "Scan and explore surrounding with specified filter",
-			Action:  exp,
-			Flags: []cli.Flag{
-				cli.DurationFlag{Name: "duration, d", Value: time.Second * 5, Usage: "duration"},
-				cli.StringFlag{Name: "name, n", Usage: "name"},
-				cli.StringFlag{Name: "addr, a", Usage: "addr"},
-				cli.BoolTFlag{Name: "dup", Usage: "allowDup"},
-				cli.DurationFlag{Name: "sub", Usage: "subscribe to notifications and indications"},
-			},
+			Name:    "status",
+			Aliases: []string{"st"},
+			Usage:   "Display current status",
+			Before:  setup,
+			Action:  cmdStatus,
 		},
 		{
 			Name:    "adv",
 			Aliases: []string{"a"},
 			Usage:   "Advertise name, UUIDs, iBeacon (TODO)",
-			Action:  adv,
-			Flags: []cli.Flag{
-				cli.DurationFlag{Name: "duration, d", Value: time.Second * 5, Usage: "duration"},
-				cli.StringFlag{Name: "name, n", Value: "Gopher", Usage: "Device Name"},
-			},
+			Before:  setup,
+			Action:  cmdAdv,
+			Flags:   []cli.Flag{flgTimeout, flgName},
 		},
 		{
 			Name:    "serve",
 			Aliases: []string{"sv"},
 			Usage:   "Start the GATT Server",
-			Action:  serve,
-			Flags: []cli.Flag{
-				cli.DurationFlag{Name: "duration, d", Value: time.Second * 5, Usage: "duration"},
-				cli.StringFlag{Name: "name, n", Value: "Gopher", Usage: "Device Name"},
-			},
+			Before:  setup,
+			Action:  cmdServe,
+			Flags:   []cli.Flag{flgTimeout, flgName},
+		},
+		{
+			Name:    "scan",
+			Aliases: []string{"s"},
+			Usage:   "Scan surrounding with specified filter",
+			Before:  setup,
+			Action:  cmdScan,
+			Flags:   []cli.Flag{flgTimeout, flgName, flgAddr, flgAllowDup},
+		},
+		{
+			Name:    "connect",
+			Aliases: []string{"c"},
+			Usage:   "Connect to a peripheral device",
+			Before:  setup,
+			Action:  cmdConnect,
+			Flags:   []cli.Flag{flgTimeout, flgName, flgAddr},
+		},
+		{
+			Name:    "disconnect",
+			Aliases: []string{"x"},
+			Usage:   "Disconnect a connected peripheral device",
+			Before:  setup,
+			Action:  cmdDisconnect,
+		},
+		{
+			Name:    "discover",
+			Aliases: []string{"d"},
+			Usage:   "Discover profile on connected device",
+			Before:  setup,
+			Action:  cmdDiscover,
+			Flags:   []cli.Flag{flgTimeout, flgName, flgAddr},
+		},
+		{
+			Name:    "explore",
+			Aliases: []string{"e"},
+			Usage:   "Display discovered profile",
+			Before:  setup,
+			Action:  cmdExplore,
+			Flags:   []cli.Flag{flgTimeout, flgName, flgAddr},
+		},
+		{
+			Name:    "read",
+			Aliases: []string{"r"},
+			Usage:   "Read value from a characteristic or descriptor",
+			Before:  setup,
+			Action:  cmdRead,
+			Flags:   []cli.Flag{flgUUID, flgTimeout, flgName, flgAddr},
+		},
+		{
+			Name:    "write",
+			Aliases: []string{"w"},
+			Usage:   "Write value to a characteristic or descriptor",
+			Before:  setup,
+			Action:  cmdWrite,
+			Flags:   []cli.Flag{flgUUID, flgTimeout, flgName, flgAddr},
+		},
+		{
+			Name:   "sub",
+			Usage:  "Subscribe to notification (or indication)",
+			Before: setup,
+			Action: cmdSub,
+			Flags:  []cli.Flag{flgUUID, flgInd, flgTimeout, flgName, flgAddr},
+		},
+		{
+			Name:   "unsub",
+			Usage:  "Unsubscribe to notification (or indication)",
+			Before: setup,
+			Action: cmdUnsub,
+			Flags:  []cli.Flag{flgUUID, flgInd},
 		},
 		{
 			Name:    "shell",
 			Aliases: []string{"sh"},
-			Usage:   "Entering interactive mode",
-			Action:  func(c *cli.Context) { shell(app) },
+			Usage:   "Enter interactive mode",
+			Before:  setup,
+			Action:  func(c *cli.Context) { cmdShell(app) },
 		},
 	}
 
-	app.Before = setup
+	// app.Before = setup
 	app.Run(os.Args)
 }
 
 func setup(c *cli.Context) error {
-	if device != nil {
+	if curr.device != nil {
 		return nil
 	}
 	fmt.Printf("Initializing device ...\n")
@@ -105,7 +165,7 @@ func setup(c *cli.Context) error {
 		return errors.Wrap(err, "can't new device")
 	}
 	ble.SetDefaultDevice(d)
-	device = d
+	curr.device = d
 
 	// Optinal. Demostrate changing HCI parameters on Linux.
 	if dev, ok := d.(*linux.Device); ok {
@@ -114,20 +174,51 @@ func setup(c *cli.Context) error {
 
 	return nil
 }
+func cmdStatus(c *cli.Context) error {
+	m := map[bool]string{true: "yes", false: "no"}
+	fmt.Printf("Current status:\n")
+	fmt.Printf("  Initialized: %s\n", m[curr.device != nil])
 
-func adv(c *cli.Context) error {
-	fmt.Printf("Advertising for %s...\n", c.Duration("d"))
-	ctx := ble.WithSigHandler(context.WithTimeout(context.Background(), c.Duration("d")))
+	if curr.addr != nil {
+		fmt.Printf("  Address:     %s\n", curr.addr)
+	} else {
+		fmt.Printf("  Address:\n")
+	}
+
+	if curr.client != nil {
+		fmt.Printf("  Connected:   %s\n", curr.client.Address())
+	} else {
+		fmt.Printf("  Connected:\n")
+	}
+
+	fmt.Printf("  Profile:\n")
+	if curr.profile != nil {
+		fmt.Printf("\n")
+		explore(curr.client, curr.profile)
+	}
+
+	if curr.uuid != nil {
+		fmt.Printf("  UUID:       %s\n", curr.uuid)
+	} else {
+		fmt.Printf("  UUID:\n")
+	}
+
+	return nil
+}
+
+func cmdAdv(c *cli.Context) error {
+	fmt.Printf("Advertising for %s...\n", c.Duration("tmo"))
+	ctx := ble.WithSigHandler(context.WithTimeout(context.Background(), c.Duration("tmo")))
 	return chkErr(ble.AdvertiseNameAndServices(ctx, "Gopher"))
 }
 
-func scan(c *cli.Context) error {
-	fmt.Printf("Scanning for %s...\n", c.Duration("d"))
-	ctx := ble.WithSigHandler(context.WithTimeout(context.Background(), c.Duration("d")))
+func cmdScan(c *cli.Context) error {
+	fmt.Printf("Scanning for %s...\n", c.Duration("tmo"))
+	ctx := ble.WithSigHandler(context.WithTimeout(context.Background(), c.Duration("tmo")))
 	return chkErr(ble.Scan(ctx, c.Bool("dup"), advHandler, filter(c)))
 }
 
-func serve(c *cli.Context) error {
+func cmdServe(c *cli.Context) error {
 	testSvc := ble.NewService(lib.TestSvcUUID)
 	testSvc.AddCharacteristic(lib.NewCountChar())
 	testSvc.AddCharacteristic(lib.NewEchoChar())
@@ -136,29 +227,166 @@ func serve(c *cli.Context) error {
 		return errors.Wrap(err, "can't add service")
 	}
 
-	fmt.Printf("Serving GATT Server for %s...\n", c.Duration("d"))
-	ctx := ble.WithSigHandler(context.WithTimeout(context.Background(), c.Duration("d")))
+	fmt.Printf("Serving GATT Server for %s...\n", c.Duration("tmo"))
+	ctx := ble.WithSigHandler(context.WithTimeout(context.Background(), c.Duration("tmo")))
 	return chkErr(ble.AdvertiseNameAndServices(ctx, "Gopher", testSvc.UUID))
 }
 
-func exp(c *cli.Context) error {
-	ctx := ble.WithSigHandler(context.WithTimeout(context.Background(), c.Duration("d")))
-	cln, err := ble.Connect(ctx, filter(c))
-	if err != nil {
-		return err
-	}
+func cmdConnect(c *cli.Context) error {
+	curr.client = nil
 
-	explorer(cln, c.Duration("sub"))
-	fmt.Printf("Disconnecting [ %s ]... (this might take up to few seconds on OS X)\n", cln.Address())
-	return cln.CancelConnection()
+	var cln ble.Client
+	var err error
+
+	fmt.Printf("Connecting...\n")
+	ctx := ble.WithSigHandler(context.WithTimeout(context.Background(), c.Duration("tmo")))
+	if filter(c) != nil {
+		if cln, err = ble.Connect(ctx, filter(c)); err == nil {
+			curr.addr = cln.Address()
+		}
+	} else if curr.addr != nil {
+		cln, err = ble.Dial(ctx, curr.addr)
+	} else {
+		return fmt.Errorf("no filter specified, and cached peripheral address")
+	}
+	if err == nil {
+		curr.client = cln
+	}
+	return err
 }
 
-func shell(app *cli.App) {
+func cmdDisconnect(c *cli.Context) error {
+	if curr.client == nil {
+		return errNotConnected
+	}
+	defer func() {
+		curr.client = nil
+		curr.profile = nil
+	}()
+
+	fmt.Printf("Disconnecting [ %s ]... (this might take up to few seconds on OS X)\n", curr.client.Address())
+	return curr.client.CancelConnection()
+}
+
+func cmdDiscover(c *cli.Context) error {
+	curr.profile = nil
+	if curr.client == nil {
+		if err := cmdConnect(c); err != nil {
+			return errors.Wrap(err, "can't connect")
+		}
+	}
+
+	fmt.Printf("Discovering profile...\n")
+	p, err := curr.client.DiscoverProfile(true)
+	if err != nil {
+		return errors.Wrap(err, "can't discover profile")
+	}
+
+	curr.profile = p
+	return nil
+}
+
+func cmdExplore(c *cli.Context) error {
+	if curr.client == nil {
+		if err := cmdConnect(c); err != nil {
+			return errors.Wrap(err, "can't connect")
+		}
+	}
+	if curr.profile == nil {
+		if err := cmdDiscover(c); err != nil {
+			return errors.Wrap(err, "can't discover profile")
+		}
+	}
+	return explore(curr.client, curr.profile)
+}
+
+func cmdRead(c *cli.Context) error {
+	if err := doGetUUID(c); err != nil {
+		return err
+	}
+	if err := doConnect(c); err != nil {
+		return err
+	}
+	if err := doDiscover(c); err != nil {
+		return err
+	}
+	if u := curr.profile.Find(ble.NewCharacteristic(curr.uuid)); u != nil {
+		b, err := curr.client.ReadCharacteristic(u.(*ble.Characteristic))
+		if err != nil {
+			return errors.Wrap(err, "can't read characteristic")
+		}
+		fmt.Printf("    Value         %x | %q\n", b, b)
+		return nil
+	}
+	if u := curr.profile.Find(ble.NewDescriptor(curr.uuid)); u != nil {
+		b, err := curr.client.ReadDescriptor(u.(*ble.Descriptor))
+		if err != nil {
+			return errors.Wrap(err, "can't read descriptor")
+		}
+		fmt.Printf("    Value         %x | %q\n", b, b)
+		return nil
+	}
+	return errNoUUID
+}
+
+func cmdWrite(c *cli.Context) error {
+	if err := doGetUUID(c); err != nil {
+		return err
+	}
+	if err := doConnect(c); err != nil {
+		return err
+	}
+	if err := doDiscover(c); err != nil {
+		return err
+	}
+	if u := curr.profile.Find(ble.NewCharacteristic(curr.uuid)); u != nil {
+		err := curr.client.WriteCharacteristic(u.(*ble.Characteristic), []byte("hello"), true)
+		return errors.Wrap(err, "can't write characteristic")
+	}
+	if u := curr.profile.Find(ble.NewDescriptor(curr.uuid)); u != nil {
+		err := curr.client.WriteDescriptor(u.(*ble.Descriptor), []byte("fixme"))
+		return errors.Wrap(err, "can't write descriptor")
+	}
+	return errNoUUID
+}
+
+func cmdSub(c *cli.Context) error {
+	if err := doGetUUID(c); err != nil {
+		return err
+	}
+	if err := doConnect(c); err != nil {
+		return err
+	}
+	// NotificationHandler
+	h := func(req []byte) { fmt.Printf("notified: %x | %q\n", req, req) }
+	if u := curr.profile.Find(ble.NewCharacteristic(curr.uuid)); u != nil {
+		err := curr.client.Subscribe(u.(*ble.Characteristic), c.Bool("ind"), h)
+		return errors.Wrap(err, "can't subscribe to characteristic")
+	}
+	return errNoUUID
+}
+
+func cmdUnsub(c *cli.Context) error {
+	if err := doGetUUID(c); err != nil {
+		return err
+	}
+	if err := doConnect(c); err != nil {
+		return err
+	}
+	if u := curr.profile.Find(ble.NewCharacteristic(curr.uuid)); u != nil {
+		err := curr.client.Unsubscribe(u.(*ble.Characteristic), c.Bool("ind"))
+		return errors.Wrap(err, "can't unsubscribe to characteristic")
+	}
+	return errNoUUID
+}
+
+func cmdShell(app *cli.App) {
+	cli.OsExiter = func(c int) {}
 	reader := bufio.NewReader(os.Stdin)
 	sigs := make(chan os.Signal, 1)
 	go func() {
 		for range sigs {
-			fmt.Printf("\n(type quit or q to exit)\n")
+			fmt.Printf("\n(type quit or q to exit)\n\nblesh >")
 		}
 	}()
 	defer close(sigs)
@@ -176,16 +404,4 @@ func shell(app *cli.App) {
 		app.Run(append(os.Args[1:], strings.Split(text, " ")...))
 	}
 	signal.Stop(sigs)
-}
-
-func chkErr(err error) error {
-	switch errors.Cause(err) {
-	case context.DeadlineExceeded:
-		// Sepcified duration passed, which is the expected case.
-		return nil
-	case context.Canceled:
-		fmt.Printf("\n(Canceled)\n")
-		return nil
-	}
-	return err
 }
