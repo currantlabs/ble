@@ -2,7 +2,7 @@ package att
 
 import (
 	"encoding/binary"
-	"log"
+	"fmt"
 
 	"github.com/currantlabs/ble"
 )
@@ -144,14 +144,14 @@ func genDescAttr(d *ble.Descriptor, h uint16) *attr {
 
 // DumpAttributes ...
 func DumpAttributes(aa []*attr) {
-	log.Printf("Generating attribute table:")
-	log.Printf("handle\tend\ttype\tvalue")
+	logger.Debug("server", "db", "Generating attribute table:")
+	logger.Debug("server", "db", "handle   endh   type")
 	for _, a := range aa {
 		if a.v != nil {
-			log.Printf("0x%04X\t0x%04X\t0x%s\t[ % X ]", a.h, a.endh, a.typ, a.v)
+			logger.Debug("server", "db", fmt.Sprintf("0x%04X 0x%04X 0x%s [% X]", a.h, a.endh, a.typ, a.v))
 			continue
 		}
-		log.Printf("0x%04X\t0x%04X\t0x%s", a.h, a.endh, a.typ)
+		logger.Debug("server", "db", fmt.Sprintf("0x%04X 0x%04X 0x%s", a.h, a.endh, a.typ))
 	}
 }
 
