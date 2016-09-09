@@ -357,6 +357,9 @@ func cmdSub(c *cli.Context) error {
 	if err := doConnect(c); err != nil {
 		return err
 	}
+	if err := doDiscover(c); err != nil {
+		return err
+	}
 	// NotificationHandler
 	h := func(req []byte) { fmt.Printf("notified: %x | %q\n", req, req) }
 	if u := curr.profile.Find(ble.NewCharacteristic(curr.uuid)); u != nil {
