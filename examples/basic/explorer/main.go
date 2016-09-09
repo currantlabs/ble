@@ -45,60 +45,52 @@ func main() {
 
 	// Scan for specified durantion, or until interrupted by user.
 	fmt.Printf("Scanning for %s...\n", *sd)
-	ctx := ble.WithSighandler(context.WithTimeout(context.Background(), *sd))
-	cln, err := ble.Discover(ctx, ble.FilterFunc(filter))
+	ctx := ble.WithSigHandler(context.WithTimeout(context.Background(), *sd))
+	cln, err := ble.Connect(ctx, filter)
 	if err != nil {
-		switch errors.Cause(err) {
-		case context.DeadlineExceeded:
-			log.Printf("not found")
-			return
-		case context.Canceled:
-			log.Printf("canceled")
-			return
-		default:
-			log.Fatalf("can't discover: %s", err)
-		}
+		log.Fatalf("can't connect : %s", err)
+	}
+
+	fmt.Printf("Discovering profile...\n")
+	p, err := cln.DiscoverProfile(true)
+	if err != nil {
+		log.Fatalf("can't discover profile: %s", err)
 	}
 
 	// Start the exploration.
-	explorer(cln)
+	explore(cln, p)
 
 	// Disconnect the connection. (On OS X, this might take a while.)
 	fmt.Printf("Disconnecting [ %s ]... (this might take up to few seconds on OS X)\n", cln.Address())
 	cln.CancelConnection()
 }
 
-func explorer(cln ble.Client) error {
-	fmt.Printf("Exploring Peripheral [ %s ] ...\n", cln.Address())
-
-	p, err := cln.DiscoverProfile(true)
-	if err != nil {
-		return fmt.Errorf("can't discover services: %s\n", err)
-	}
+func explore(cln ble.Client, p *ble.Profile) error {
 	for _, s := range p.Services {
-		fmt.Printf("Service: %s %s, Handle (0x%02X)\n", s.UUID.String(), ble.Name(s.UUID), s.Handle)
+		fmt.Printf("    Service: %s %s, Handle (0x%02X)\n", s.UUID, ble.Name(s.UUID), s.Handle)
 
 		for _, c := range s.Characteristics {
-			fmt.Printf("  Characteristic: %s, Property: 0x%02X (%s), %s, Handle(0x%02X), VHandle(0x%02X)\n",
-				c.UUID, c.Property, propString(c.Property), ble.Name(c.UUID), c.Handle, c.ValueHandle)
+			fmt.Printf("      Characteristic: %s %s, Property: 0x%02X (%s), Handle(0x%02X), VHandle(0x%02X)\n",
+				c.UUID, ble.Name(c.UUID), c.Property, propString(c.Property), c.Handle, c.ValueHandle)
 			if (c.Property & ble.CharRead) != 0 {
 				b, err := cln.ReadCharacteristic(c)
 				if err != nil {
 					fmt.Printf("Failed to read characteristic: %s\n", err)
 					continue
 				}
-				fmt.Printf("    Value         %x | %q\n", b, b)
+				fmt.Printf("        Value         %x | %q\n", b, b)
 			}
 
 			for _, d := range c.Descriptors {
-				fmt.Printf("    Descriptor: %s, %s, Handle(0x%02x)\n", d.UUID, ble.Name(d.UUID), d.Handle)
+				fmt.Printf("        Descriptor: %s %s, Handle(0x%02x)\n", d.UUID, ble.Name(d.UUID), d.Handle)
 				b, err := cln.ReadDescriptor(d)
 				if err != nil {
 					fmt.Printf("Failed to read descriptor: %s\n", err)
 					continue
 				}
-				fmt.Printf("    Value         %x | %q\n", b, b)
+				fmt.Printf("        Value         %x | %q\n", b, b)
 			}
+
 			if *sub != 0 {
 				// Don't bother to subscribe the Service Changed characteristics.
 				if c.UUID.Equal(ble.ServiceChangedUUID) {
@@ -139,7 +131,6 @@ func explorer(cln ble.Client) error {
 					fmt.Printf("-- Unsubscribe to indication --\n")
 				}
 			}
-
 		}
 		fmt.Printf("\n")
 	}
