@@ -144,7 +144,7 @@ func main() {
 			Usage:  "Unsubscribe to notification (or indication)",
 			Before: setup,
 			Action: cmdUnsub,
-			Flags:  []cli.Flag{flgUUID, flgInd},
+			Flags:  []cli.Flag{flgUUID, flgInd, flgAddr},
 		},
 		{
 			Name:    "shell",
@@ -255,7 +255,7 @@ func cmdConnect(c *cli.Context) error {
 
 		}
 	} else if curr.addr != nil {
-		fmt.Printf("Dialing to implicit address: %s", curr.addr)
+		fmt.Printf("Dialing to implicit address: %s\n", curr.addr)
 		cln, err = ble.Dial(ctx, curr.addr)
 	} else {
 		return fmt.Errorf("no filter specified, and cached peripheral address")
