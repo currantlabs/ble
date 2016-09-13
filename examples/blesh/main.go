@@ -22,6 +22,7 @@ import (
 var curr struct {
 	device  ble.Device
 	client  ble.Client
+	clients map[string]ble.Client
 	uuid    ble.UUID
 	addr    ble.Addr
 	profile *ble.Profile
@@ -35,6 +36,8 @@ var (
 )
 
 func main() {
+	curr.clients = make(map[string]ble.Client)
+
 	app := cli.NewApp()
 
 	app.Name = "blesh"
@@ -95,6 +98,7 @@ func main() {
 			Usage:   "Disconnect a connected peripheral device",
 			Before:  setup,
 			Action:  cmdDisconnect,
+			Flags:   []cli.Flag{flgAddr},
 		},
 		{
 			Name:    "discover",
@@ -185,11 +189,11 @@ func cmdStatus(c *cli.Context) error {
 		fmt.Printf("  Address:\n")
 	}
 
-	if curr.client != nil {
-		fmt.Printf("  Connected:   %s\n", curr.client.Address())
-	} else {
-		fmt.Printf("  Connected:\n")
+	fmt.Printf("  Connected:")
+	for k := range curr.clients {
+		fmt.Printf(" %s", k)
 	}
+	fmt.Printf("\n")
 
 	fmt.Printf("  Profile:\n")
 	if curr.profile != nil {
@@ -238,28 +242,40 @@ func cmdConnect(c *cli.Context) error {
 	var cln ble.Client
 	var err error
 
-	fmt.Printf("Connecting...\n")
 	ctx := ble.WithSigHandler(context.WithTimeout(context.Background(), c.Duration("tmo")))
-	if filter(c) != nil {
+	if c.String("addr") != "" {
+		curr.addr = ble.NewAddr(c.String("addr"))
+		fmt.Printf("Dialing to specified address: %s\n", curr.addr)
+		cln, err = ble.Dial(ctx, curr.addr)
+	} else if filter(c) != nil {
+		fmt.Printf("Scanning with filter...\n")
 		if cln, err = ble.Connect(ctx, filter(c)); err == nil {
 			curr.addr = cln.Address()
+			fmt.Printf("Connected to %s\n", curr.addr)
+
 		}
 	} else if curr.addr != nil {
+		fmt.Printf("Dialing to implicit address: %s", curr.addr)
 		cln, err = ble.Dial(ctx, curr.addr)
 	} else {
 		return fmt.Errorf("no filter specified, and cached peripheral address")
 	}
 	if err == nil {
 		curr.client = cln
+		curr.clients[cln.Address().String()] = cln
 	}
 	return err
 }
 
 func cmdDisconnect(c *cli.Context) error {
+	if c.String("addr") != "" {
+		curr.client = curr.clients[c.String("addr")]
+	}
 	if curr.client == nil {
 		return errNotConnected
 	}
 	defer func() {
+		delete(curr.clients, curr.client.Address().String())
 		curr.client = nil
 		curr.profile = nil
 	}()

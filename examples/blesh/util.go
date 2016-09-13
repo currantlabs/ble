@@ -26,6 +26,7 @@ func doGetUUID(c *cli.Context) error {
 func doConnect(c *cli.Context) error {
 	if c.String("addr") != "" {
 		curr.addr = ble.NewAddr(c.String("addr"))
+		curr.client = curr.clients[curr.addr.String()]
 	}
 	if curr.client != nil {
 		return nil
