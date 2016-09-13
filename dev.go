@@ -2,11 +2,6 @@ package ble
 
 import "golang.org/x/net/context"
 
-// Addr represents a network end point address.
-type Addr interface {
-	String() string
-}
-
 // Device ...
 type Device interface {
 	// AddService adds a service to database.
