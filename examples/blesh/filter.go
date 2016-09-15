@@ -8,14 +8,24 @@ import (
 )
 
 func filter(c *cli.Context) ble.AdvFilter {
-	if len(c.String("name")) != 0 {
+	if c.String("name") != "" {
 		return func(a ble.Advertisement) bool {
-			return strings.ToUpper(a.LocalName()) == strings.ToUpper(c.String("name"))
+			return strings.ToLower(a.LocalName()) == strings.ToLower(c.String("name"))
 		}
 	}
-	if len(c.String("addr")) != 0 {
+	if c.String("addr") != "" {
 		return func(a ble.Advertisement) bool {
 			return a.Address().String() == strings.ToLower(c.String("addr"))
+		}
+	}
+	if svc := strings.ToLower(c.String("svc")); svc != "" {
+		return func(a ble.Advertisement) bool {
+			for _, s := range a.Services() {
+				if s.String() == svc {
+					return true
+				}
+			}
+			return false
 		}
 	}
 	return nil

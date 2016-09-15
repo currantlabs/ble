@@ -82,7 +82,7 @@ func main() {
 			Usage:   "Scan surrounding with specified filter",
 			Before:  setup,
 			Action:  cmdScan,
-			Flags:   []cli.Flag{flgTimeout, flgName, flgAddr, flgAllowDup},
+			Flags:   []cli.Flag{flgTimeout, flgName, flgAddr, flgSvc, flgAllowDup},
 		},
 		{
 			Name:    "connect",
@@ -90,7 +90,7 @@ func main() {
 			Usage:   "Connect to a peripheral device",
 			Before:  setup,
 			Action:  cmdConnect,
-			Flags:   []cli.Flag{flgTimeout, flgName, flgAddr},
+			Flags:   []cli.Flag{flgTimeout, flgName, flgAddr, flgSvc},
 		},
 		{
 			Name:    "disconnect",
