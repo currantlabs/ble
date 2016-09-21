@@ -530,7 +530,7 @@ func (c *Client) Loop() {
 		}
 
 		// Deliver the full request to upper layer.
-		go c.handler.HandleNotification(b)
+		c.handler.HandleNotification(b)
 
 		// Always write aknowledgement for an indication, even it was an invalid request.
 		if b[0] == HandleValueIndicationCode {

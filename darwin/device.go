@@ -442,7 +442,7 @@ func (d *Device) HandleXpcEvent(event xpc.Dict, err error) {
 				log.Printf("notified by unsubscribed handle")
 				// FIXME: should terminate the connection?
 			} else {
-				go sub.fn(args.data())
+				sub.fn(args.data())
 			}
 			break
 		}
