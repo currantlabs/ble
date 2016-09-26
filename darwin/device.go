@@ -328,6 +328,7 @@ func (d *Device) Dial(ctx context.Context, a ble.Addr) (ble.Client, error) {
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	case c := <-d.chConn:
+		c.SetContext(ctx)
 		return NewClient(c)
 	}
 }
@@ -430,8 +431,15 @@ func (d *Device) HandleXpcEvent(event xpc.Dict, err error) {
 		d.chConn <- d.conn(args)
 
 	case evtPeripheralDisconnected:
-		d.conn(args).rspc <- m
-		delete(d.conns, d.conn(args).RemoteAddr().String())
+		c := d.conn(args)
+		select {
+		case c.rspc <- m:
+			// Canceled by local central synchronously
+		default:
+			// Canceled by remote peripheral asynchronously.
+		}
+		delete(d.conns, c.RemoteAddr().String())
+		close(c.done)
 
 	case evtCharacteristicRead:
 		// Notification

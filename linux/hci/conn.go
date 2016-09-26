@@ -2,11 +2,12 @@ package hci
 
 import (
 	"bytes"
-	"golang.org/x/net/context"
 	"encoding/binary"
 	"fmt"
 	"io"
 	"net"
+
+	"golang.org/x/net/context"
 
 	"github.com/currantlabs/ble"
 	"github.com/currantlabs/ble/linux/hci/cmd"
@@ -63,7 +64,7 @@ type Conn struct {
 	// chSentBufs tracks the HCI buffer occupied by this connection.
 	txBuffer *Client
 
-	chDone chan bool
+	chDone chan struct{}
 }
 
 func newConn(h *HCI, param evt.LEConnectionComplete) *Conn {
@@ -85,7 +86,7 @@ func newConn(h *HCI, param evt.LEConnectionComplete) *Conn {
 
 		txBuffer: NewClient(h.pool),
 
-		chDone: make(chan bool),
+		chDone: make(chan struct{}),
 	}
 
 	go func() {
@@ -271,6 +272,11 @@ func (c *Conn) recombine() error {
 	return nil
 }
 
+// Disconnected returns a receiving channel, which is closed when the connection disconnects.
+func (c *Conn) Disconnected() <-chan struct{} {
+	return c.chDone
+}
+
 // Close disconnects the connection by sending hci disconnect command to the device.
 func (c *Conn) Close() error {
 	select {
@@ -282,7 +288,6 @@ func (c *Conn) Close() error {
 			ConnectionHandle: c.param.ConnectionHandle(),
 			Reason:           0x13,
 		}, nil)
-		close(c.chDone)
 		return nil
 	}
 }

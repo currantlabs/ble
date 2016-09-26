@@ -271,6 +271,11 @@ func (cln *Client) CancelConnection() error {
 	return rsp.err()
 }
 
+// Disconnected returns a receiving channel, which is closed when the client disconnects.
+func (cln *Client) Disconnected() <-chan struct{} {
+	return cln.conn.Disconnected()
+}
+
 type sub struct {
 	fn   ble.NotificationHandler
 	char *ble.Characteristic

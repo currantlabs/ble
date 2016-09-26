@@ -15,6 +15,7 @@ func newConn(d *Device, a ble.Addr) *conn {
 		rxMTU: 23,
 		txMTU: 23,
 		addr:  a,
+		done:  make(chan struct{}),
 
 		notifiers: make(map[uint16]ble.Notifier),
 		subs:      make(map[uint16]*sub),
@@ -32,6 +33,7 @@ type conn struct {
 	rxMTU int
 	txMTU int
 	addr  ble.Addr
+	done  chan struct{}
 
 	rspc chan msg
 
@@ -87,6 +89,11 @@ func (c *conn) Write(b []byte) (int, error) {
 
 func (c *conn) Close() error {
 	return nil
+}
+
+// Disconnected returns a receiving channel, which is closed when the connection disconnects.
+func (c *conn) Disconnected() <-chan struct{} {
+	return c.done
 }
 
 // server (peripheral)

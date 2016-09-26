@@ -51,6 +51,11 @@ func main() {
 		log.Fatalf("can't connect : %s", err)
 	}
 
+	go func() {
+		cln.Disconnected()
+		fmt.Printf("[ %s ] is disconnected \n", cln.Address())
+	}()
+
 	fmt.Printf("Discovering profile...\n")
 	p, err := cln.DiscoverProfile(true)
 	if err != nil {

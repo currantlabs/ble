@@ -335,6 +335,13 @@ func (p *Client) CancelConnection() error {
 	return p.conn.Close()
 }
 
+// Disconnected returns a receiving channel, which is closed when the client disconnects.
+func (p *Client) Disconnected() <-chan struct{} {
+	p.Lock()
+	defer p.Unlock()
+	return p.conn.Disconnected()
+}
+
 // HandleNotification ...
 func (p *Client) HandleNotification(req []byte) {
 	p.Lock()

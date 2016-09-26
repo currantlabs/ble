@@ -63,4 +63,7 @@ type Client interface {
 
 	// CancelConnection disconnects the connection.
 	CancelConnection() error
+
+	// Disconnected returns a receiving channel, which is closed when the client disconnects.
+	Disconnected() <-chan struct{}
 }

@@ -480,7 +480,8 @@ func (h *HCI) handleDisconnectionComplete(b []byte) error {
 		}
 		h.params.RUnlock()
 	} else {
-		// log.Printf("peripheral disconnected")
+		// remote peripheral disconnected
+		close(c.chDone)
 	}
 	// When a connection disconnects, all the sent packets and weren't acked yet
 	// will be recycled. [Vol2, Part E 4.1.1]
