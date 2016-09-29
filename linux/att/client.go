@@ -510,6 +510,20 @@ func (c *Client) sendReq(b []byte) (rsp []byte, err error) {
 
 // Loop ...
 func (c *Client) Loop() {
+
+	type asyncWork struct {
+		handle func([]byte)
+		data   []byte
+	}
+
+	ch := make(chan asyncWork, 16)
+	defer close(ch)
+	go func() {
+		for w := range ch {
+			w.handle(w.data)
+		}
+	}()
+
 	confirmation := []byte{HandleValueConfirmationCode}
 	for {
 		n, err := c.l2c.Read(c.rxBuf)
@@ -530,7 +544,12 @@ func (c *Client) Loop() {
 		}
 
 		// Deliver the full request to upper layer.
-		c.handler.HandleNotification(b)
+		select {
+		case ch <- asyncWork{handle: c.handler.HandleNotification, data: b}:
+		default:
+			// If this really happens, especially on a slow machine, enlarge the channel buffer.
+			logger.Error("client", "req", "can't enqueue incoming notification.")
+		}
 
 		// Always write aknowledgement for an indication, even it was an invalid request.
 		if b[0] == HandleValueIndicationCode {
