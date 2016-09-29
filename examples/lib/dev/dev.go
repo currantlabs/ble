@@ -1,14 +1,8 @@
 package dev
 
-import (
-	"github.com/currantlabs/ble"
-	"github.com/currantlabs/ble/bled"
-)
+import "github.com/currantlabs/ble"
 
 // NewDevice ...
 func NewDevice(impl string) (d ble.Device, err error) {
-	if impl == "bled" {
-		return bled.NewDevice()
-	}
 	return DefaultDevice()
 }

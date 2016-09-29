@@ -28,7 +28,6 @@ COMMANDS:
      help, h        Shows a list of commands or help for one command
 
 GLOBAL OPTIONS:
-   --device value  implementation of ble (default / bled) (default: "default")
    --help, -h      show help
    --version, -v   print the version
 ```

@@ -44,13 +44,6 @@ func main() {
 	app.Usage = "A CLI tool for ble"
 	app.Version = "0.0.1"
 	app.Action = cli.ShowAppHelp
-	app.Flags = []cli.Flag{
-		cli.StringFlag{
-			Name:  "device",
-			Value: "default",
-			Usage: "implementation of ble (default / bled)",
-		},
-	}
 
 	app.Commands = []cli.Command{
 		{
@@ -164,7 +157,7 @@ func setup(c *cli.Context) error {
 		return nil
 	}
 	fmt.Printf("Initializing device ...\n")
-	d, err := dev.NewDevice("device")
+	d, err := dev.NewDevice("default")
 	if err != nil {
 		return errors.Wrap(err, "can't new device")
 	}
