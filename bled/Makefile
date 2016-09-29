@@ -1,2 +1,0 @@
-protobuf:
-	make -C proto
