@@ -174,7 +174,7 @@ func (p *Packet) Field(typ byte) []byte {
 			return nil
 		}
 		l, t := b[0], b[1]
-		if len(b) < int(1+l) {
+		if int(l) < 1 || len(b) < int(1+l) {
 			return nil
 		}
 		if t == typ {
