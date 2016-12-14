@@ -119,9 +119,11 @@ func (d *Device) Init() error {
 }
 
 // AdvertiseMfgData ...
-func (d *Device) AdvertiseMfgData(ctx context.Context, b []byte) error {
+func (d *Device) AdvertiseMfgData(ctx context.Context, id uint16, md []byte) error {
+	l := len(md)
+	b := []byte{byte(l + 3), 0xFF, uint8(id), uint8(id >> 8)}
 	if err := d.sendReq(d.pm, 8, xpc.Dict{
-		"kCBAdvDataAppleMfgData": b,
+		"kCBAdvDataAppleMfgData": append(b, md...),
 	}).err(); err != nil {
 		return errors.Wrap(err, "can't advertise")
 	}
@@ -148,9 +150,8 @@ func (d *Device) AdvertiseIBeaconData(ctx context.Context, md []byte) error {
 	xpc.Uname(&utsname)
 
 	if utsname.Release >= "14." {
-		l := len(md)
-		b := []byte{byte(l + 5), 0xFF, 0x4C, 0x00, 0x02, byte(l)}
-		return d.AdvertiseMfgData(ctx, append(b, md...))
+		ibeaconCode := []byte{0x02, 0x15}
+		return d.AdvertiseMfgData(ctx, 0x004C, append(ibeaconCode, md...))
 	}
 	if err := d.sendReq(d.pm, 8, xpc.Dict{"kCBAdvDataAppleBeaconKey": md}).err(); err != nil {
 		return err

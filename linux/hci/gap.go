@@ -78,6 +78,18 @@ func (h *HCI) AdvertiseNameAndServices(name string, uuids ...ble.UUID) error {
 	return h.Advertise()
 }
 
+// AdvertiseMfgData avertises the given manufacturer data.
+func (h *HCI) AdvertiseMfgData(id uint16, md []byte) error {
+	ad, err := adv.NewPacket(adv.ManufacturerData(id, md))
+	if err != nil {
+		return err
+	}
+	if err := h.SetAdvertisement(ad.Bytes(), nil); err != nil {
+		return nil
+	}
+	return h.Advertise()
+}
+
 // AdvertiseIBeaconData advertise iBeacon with given manufacturer data.
 func (h *HCI) AdvertiseIBeaconData(md []byte) error {
 	ad, err := adv.NewPacket(adv.IBeaconData(md))

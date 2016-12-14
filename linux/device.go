@@ -98,6 +98,16 @@ func (d *Device) AdvertiseNameAndServices(ctx context.Context, name string, uuid
 	return ctx.Err()
 }
 
+// AdvertiseMfgData avertises the given manufacturer data.
+func (d *Device) AdvertiseMfgData(ctx context.Context, id uint16, b []byte) error {
+	if err := d.HCI.AdvertiseMfgData(id, b); err != nil {
+		return err
+	}
+	<-ctx.Done()
+	d.HCI.StopAdvertising()
+	return ctx.Err()
+}
+
 // AdvertiseIBeaconData advertise iBeacon with given manufacturer data.
 func (d *Device) AdvertiseIBeaconData(ctx context.Context, b []byte) error {
 	if err := d.HCI.AdvertiseIBeaconData(b); err != nil {
