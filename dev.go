@@ -25,6 +25,9 @@ type Device interface {
 	// AdvertiseMfgData avertises the given manufacturer data.
 	AdvertiseMfgData(ctx context.Context, id uint16, b []byte) error
 
+	// AdvertiseServiceData16 advertises data associated with a 16bit service uuid
+	AdvertiseServiceData16(ctx context.Context, id uint16, b []byte) error
+
 	// AdvertiseIBeaconData advertise iBeacon with given manufacturer data.
 	AdvertiseIBeaconData(ctx context.Context, b []byte) error
 
