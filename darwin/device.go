@@ -131,6 +131,22 @@ func (d *Device) AdvertiseMfgData(ctx context.Context, id uint16, md []byte) err
 	return ctx.Err()
 }
 
+// AdvertiseServiceData16 advertises data associated with a 16bit service uuid
+func (d *Device) AdvertiseServiceData16(ctx context.Context, id uint16, b []byte) error {
+	l := len(b)
+	prefix := []byte{
+		0x03, 0x03, uint8(id), uint8(id >> 8),
+		byte(l + 3), 0x16, uint8(id), uint8(id >> 8),
+	}
+	if err := d.sendReq(d.pm, 8, xpc.Dict{
+		"kCBAdvDataAppleMfgData": append(prefix, b...),
+	}).err(); err != nil {
+		return errors.Wrap(err, "can't advertise")
+	}
+	<-ctx.Done()
+	return ctx.Err()
+}
+
 // AdvertiseNameAndServices advertises name and specifid service UUIDs.
 func (d *Device) AdvertiseNameAndServices(ctx context.Context, name string, ss ...ble.UUID) error {
 	if err := d.sendReq(d.pm, 8, xpc.Dict{

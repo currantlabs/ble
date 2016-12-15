@@ -90,6 +90,18 @@ func (h *HCI) AdvertiseMfgData(id uint16, md []byte) error {
 	return h.Advertise()
 }
 
+// AdvertiseServiceData16 advertises data associated with a 16bit service uuid
+func (h *HCI) AdvertiseServiceData16(id uint16, b []byte) error {
+	ad, err := adv.NewPacket(adv.ServiceData16(id, b))
+	if err != nil {
+		return err
+	}
+	if err := h.SetAdvertisement(ad.Bytes(), nil); err != nil {
+		return nil
+	}
+	return h.Advertise()
+}
+
 // AdvertiseIBeaconData advertise iBeacon with given manufacturer data.
 func (h *HCI) AdvertiseIBeaconData(md []byte) error {
 	ad, err := adv.NewPacket(adv.IBeaconData(md))
