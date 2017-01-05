@@ -104,7 +104,7 @@ func (s *Server) indicate(h uint16, data []byte) (int, error) {
 		return n, err
 	}
 	select {
-	case ok := <-s.chConfirm:
+	case _, ok := <-s.chConfirm:
 		if !ok {
 			return 0, io.ErrClosedPipe
 		}
@@ -131,7 +131,8 @@ func (s *Server) Loop() {
 			n, err := s.conn.Read(b.buf)
 			if n == 0 || err != nil {
 				close(seq)
-				s.close()
+				close(s.chConfirm)
+				_ = s.conn.Close()
 				return
 			}
 			if b.buf[0] == HandleValueConfirmationCode {
@@ -166,11 +167,6 @@ func (s *Server) Loop() {
 			s.conn.nn[h].Close()
 		}
 	}
-}
-
-func (s *Server) close() error {
-	s.chConfirm <- false
-	return s.conn.Close()
 }
 
 func (s *Server) handleRequest(b []byte) []byte {
