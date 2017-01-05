@@ -91,7 +91,7 @@ func IBeacon(u ble.UUID, major, minor uint16, pwr int8) Field {
 		md := make([]byte, 23)
 		md[0] = 0x02                               // Data type: iBeacon
 		md[1] = 0x15                               // Data length: 21 bytes
-		copy(md[2:], ble.Reverse(u))                // Big endian
+		copy(md[2:], ble.Reverse(u))               // Big endian
 		binary.BigEndian.PutUint16(md[18:], major) // Big endian
 		binary.BigEndian.PutUint16(md[20:], minor) // Big endian
 		md[22] = uint8(pwr)                        // Measured Tx Power
@@ -151,6 +151,17 @@ func SomeUUID(u ble.UUID) Field {
 			return p.append(someUUID32, u)
 		}
 		return p.append(someUUID128, u)
+	}
+}
+
+// ServiceData16 is service data for a 16bit service uuid
+func ServiceData16(id uint16, b []byte) Field {
+	return func(p *Packet) error {
+		uuid := ble.UUID16(id)
+		if err := p.append(allUUID16, uuid); err != nil {
+			return err
+		}
+		return p.append(serviceData16, append(uuid, b...))
 	}
 }
 
