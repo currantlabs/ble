@@ -135,9 +135,6 @@ func (h *HCI) Init() error {
 	// evt.LEReadRemoteUsedFeaturesCompleteSubCode:   todo),
 	// evt.LERemoteConnectionParameterRequestSubCode: todo),
 
-	time.Sleep(time.Second)
-	logger.Info("Creating socket")
-
 	skt, err := socket.NewSocket(h.id)
 	if err != nil {
 		return err
@@ -146,13 +143,7 @@ func (h *HCI) Init() error {
 
 	h.chCmdBufs <- make([]byte, 64)
 
-	time.Sleep(time.Second)
-	logger.Info("Creating sktloop")
-
 	go h.sktLoop()
-
-	time.Sleep(time.Second)
-	logger.Info("Send init seq")
 	h.init()
 
 	// Pre-allocate buffers with additional head room for lower layer headers.

@@ -3,148 +3,160 @@
 package socket
 
 import (
-	"fmt"
+	"log"
 	"sync"
-	"time"
+	"syscall"
 	"unsafe"
 
-	"github.com/mgutz/logxi/v1"
 	"github.com/pkg/errors"
-	"golang.org/x/sys/unix"
+
+	"github.com/currantlabs/gatt/linux/gioctl"
+	"github.com/currantlabs/gatt/linux/socket"
 )
 
-var logger = log.New("socket")
-
-func ioR(t, nr, size uintptr) uintptr {
-	return (2 << 30) | (t << 8) | nr | (size << 16)
+type device struct {
+	fd   int
+	dev  int
+	name string
+	rmu  *sync.Mutex
+	wmu  *sync.Mutex
 }
 
-func ioW(t, nr, size uintptr) uintptr {
-	return (1 << 30) | (t << 8) | nr | (size << 16)
-}
-
-func ioctl(fd, op, arg uintptr) error {
-	if _, _, ep := unix.Syscall(unix.SYS_IOCTL, fd, op, arg); ep != 0 {
-		return ep
+func NewSocket(n int) (*device, error) {
+	fd, err := socket.Socket(socket.AF_BLUETOOTH, syscall.SOCK_RAW, socket.BTPROTO_HCI)
+	if err != nil {
+		return nil, err
 	}
-	return nil
+	if n != -1 {
+		return newSocketHelper(fd, n)
+	}
+
+	req := devListRequest{devNum: hciMaxDevices}
+	if err := gioctl.Ioctl(uintptr(fd), hciGetDeviceList, uintptr(unsafe.Pointer(&req))); err != nil {
+		return nil, err
+	}
+	for i := 0; i < int(req.devNum); i++ {
+		d, err := newSocketHelper(fd, i)
+		if err == nil {
+			log.Printf("dev: %s opened", d.name)
+			return d, err
+		}
+	}
+	return nil, errors.New("no supported devices available")
+}
+
+func newSocketHelper(fd, n int) (*device, error) {
+	i := hciDevInfo{id: uint16(n)}
+	if err := gioctl.Ioctl(uintptr(fd), hciGetDeviceInfo, uintptr(unsafe.Pointer(&i))); err != nil {
+		return nil, err
+	}
+	name := string(i.name[:])
+	// Check the feature list returned feature list.
+	log.Printf("dev: %s up", name)
+	if err := gioctl.Ioctl(uintptr(fd), hciUpDevice, uintptr(n)); err != nil {
+		if err != syscall.EALREADY {
+			return nil, err
+		}
+		log.Printf("dev: %s reset", name)
+		if err := gioctl.Ioctl(uintptr(fd), hciResetDevice, uintptr(n)); err != nil {
+			return nil, err
+		}
+	}
+	log.Printf("dev: %s down", name)
+	if err := gioctl.Ioctl(uintptr(fd), hciDownDevice, uintptr(n)); err != nil {
+		return nil, err
+	}
+
+	// Attempt to use the linux 3.14 feature, if this fails with EINVAL fall back to raw access
+	// on older kernels.
+	sa := socket.SockaddrHCI{Dev: n, Channel: socket.HCI_CHANNEL_USER}
+	if err := socket.Bind(fd, &sa); err != nil {
+		if err != syscall.EINVAL {
+			return nil, err
+		}
+		log.Printf("dev: %s can't bind to hci user channel, err: %s.", name, err)
+		sa := socket.SockaddrHCI{Dev: n, Channel: socket.HCI_CHANNEL_RAW}
+		if err := socket.Bind(fd, &sa); err != nil {
+			log.Printf("dev: %s can't bind to hci raw channel, err: %s.", name, err)
+			return nil, err
+		}
+	}
+	return &device{
+		fd:   fd,
+		dev:  n,
+		name: name,
+		rmu:  &sync.Mutex{},
+		wmu:  &sync.Mutex{},
+	}, nil
+}
+
+func (d device) Read(b []byte) (int, error) {
+	d.rmu.Lock()
+	defer d.rmu.Unlock()
+	return syscall.Read(d.fd, b)
+}
+
+func (d device) Write(b []byte) (int, error) {
+	d.wmu.Lock()
+	defer d.wmu.Unlock()
+	return syscall.Write(d.fd, b)
+}
+
+func (d device) Close() error {
+	return syscall.Close(d.fd)
 }
 
 const (
-	ioctlSize     = 4
+	ioctlSize     = uintptr(4)
 	hciMaxDevices = 16
 	typHCI        = 72 // 'H'
 )
 
 var (
-	hciUpDevice      = ioW(typHCI, 201, ioctlSize) // HCIDEVUP
-	hciDownDevice    = ioW(typHCI, 202, ioctlSize) // HCIDEVDOWN
-	hciResetDevice   = ioW(typHCI, 203, ioctlSize) // HCIDEVRESET
-	hciGetDeviceList = ioR(typHCI, 210, ioctlSize) // HCIGETDEVLIST
-	hciGetDeviceInfo = ioR(typHCI, 211, ioctlSize) // HCIGETDEVINFO
+	hciUpDevice      = gioctl.IoW(typHCI, 201, ioctlSize) // HCIDEVUP
+	hciDownDevice    = gioctl.IoW(typHCI, 202, ioctlSize) // HCIDEVDOWN
+	hciResetDevice   = gioctl.IoW(typHCI, 203, ioctlSize) // HCIDEVRESET
+	hciGetDeviceList = gioctl.IoR(typHCI, 210, ioctlSize) // HCIGETDEVLIST
+	hciGetDeviceInfo = gioctl.IoR(typHCI, 211, ioctlSize) // HCIGETDEVINFO
 )
+
+type devRequest struct {
+	id  uint16
+	opt uint32
+}
 
 type devListRequest struct {
 	devNum     uint16
-	devRequest [hciMaxDevices]struct {
-		id  uint16
-		opt uint32
-	}
+	devRequest [hciMaxDevices]devRequest
 }
 
-// Socket implements a HCI User Channel as ReadWriteCloser.
-type Socket struct {
-	fd  int
-	rmu sync.Mutex
-	wmu sync.Mutex
+type hciDevInfo struct {
+	id         uint16
+	name       [8]byte
+	bdaddr     [6]byte
+	flags      uint32
+	devType    uint8
+	features   [8]uint8
+	pktType    uint32
+	linkPolicy uint32
+	linkMode   uint32
+	aclMtu     uint16
+	aclPkts    uint16
+	scoMtu     uint16
+	scoPkts    uint16
+
+	stats hciDevStats
 }
 
-// NewSocket returns a HCI User Channel of specified device id.
-// If id is -1, the first available HCI device is returned.
-func NewSocket(id int) (*Socket, error) {
-	var err error
-	// Create RAW HCI Socket.
-	fd, err := unix.Socket(unix.AF_BLUETOOTH, unix.SOCK_RAW, unix.BTPROTO_HCI)
-	if err != nil {
-		return nil, errors.Wrap(err, "can't create socket")
-	}
-
-	if id != -1 {
-		return open(fd, id)
-	}
-
-	req := devListRequest{devNum: hciMaxDevices}
-	if err = ioctl(uintptr(fd), hciGetDeviceList, uintptr(unsafe.Pointer(&req))); err != nil {
-		return nil, errors.Wrap(err, "can't get device list")
-	}
-	var msg string
-	for id := 0; id < int(req.devNum); id++ {
-		s, err := open(fd, id)
-		if err == nil {
-			return s, nil
-		}
-		msg = msg + fmt.Sprintf("(hci%d: %s)", id, err)
-	}
-	return nil, errors.Errorf("no devices available: %s", msg)
-}
-
-func open(fd, id int) (*Socket, error) {
-	// Reset the device in case previous session didn't cleanup properly.
-	time.Sleep(time.Second)
-	logger.Debug("down hci")
-	if err := ioctl(uintptr(fd), hciDownDevice, uintptr(id)); err != nil {
-		return nil, errors.Wrap(err, "can't down device")
-	}
-	time.Sleep(time.Second)
-	logger.Debug("up hci")
-	if err := ioctl(uintptr(fd), hciUpDevice, uintptr(id)); err != nil {
-		return nil, errors.Wrap(err, "can't up device")
-	}
-
-	// HCI User Channel requires exclusive access to the device.
-	// The device has to be down at the time of binding.
-	time.Sleep(time.Second)
-	logger.Debug("down2 hci")
-	if err := ioctl(uintptr(fd), hciDownDevice, uintptr(id)); err != nil {
-		return nil, errors.Wrap(err, "can't down device")
-	}
-
-	time.Sleep(time.Second)
-	logger.Debug("bind hci user_channel")
-	// Bind the RAW socket to HCI User Channel
-	sa := unix.SockaddrHCI{Dev: uint16(id), Channel: unix.HCI_CHANNEL_USER}
-	if err := unix.Bind(fd, &sa); err != nil {
-		return nil, errors.Wrap(err, "can't bind socket to hci user channel")
-	}
-
-	time.Sleep(time.Second)
-	logger.Debug("poll previous left over")
-	// poll for 20ms to see if any data becomes available, then clear it
-	pfds := []unix.PollFd{unix.PollFd{Fd: int32(fd), Events: unix.POLLIN}}
-	unix.Poll(pfds, 20)
-	if pfds[0].Revents&unix.POLLIN > 0 {
-		b := make([]byte, 100)
-		unix.Read(fd, b)
-	}
-
-	return &Socket{fd: fd}, nil
-}
-
-func (s *Socket) Read(p []byte) (int, error) {
-	s.rmu.Lock()
-	defer s.rmu.Unlock()
-	n, err := unix.Read(s.fd, p)
-	return n, errors.Wrap(err, "can't read hci socket")
-}
-
-func (s *Socket) Write(p []byte) (int, error) {
-	s.wmu.Lock()
-	defer s.wmu.Unlock()
-	logger.Debug("Write", "raw", fmt.Sprintf("[% X]", p))
-	n, err := unix.Write(s.fd, p)
-	return n, errors.Wrap(err, "can't write hci socket")
-}
-
-func (s *Socket) Close() error {
-	return errors.Wrap(unix.Close(s.fd), "can't close hci socket")
+type hciDevStats struct {
+	errRx  uint32
+	errTx  uint32
+	cmdTx  uint32
+	evtRx  uint32
+	aclTx  uint32
+	aclRx  uint32
+	scoTx  uint32
+	scoRx  uint32
+	byteRx uint32
+	byteTx uint32
 }
