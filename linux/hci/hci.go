@@ -175,6 +175,8 @@ func (h *HCI) Option(opts ...Option) error {
 }
 
 func (h *HCI) init() error {
+	h.Send(&cmd.Reset{}, nil)
+
 	ReadBDADDRRP := cmd.ReadBDADDRRP{}
 	h.Send(&cmd.ReadBDADDR{}, &ReadBDADDRRP)
 
