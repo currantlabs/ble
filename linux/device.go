@@ -83,7 +83,7 @@ func (d *Device) SetServices(svcs []*ble.Service) error {
 
 // Stop stops gatt server.
 func (d *Device) Stop() error {
-	return d.HCI.Close()
+	return d.HCI.Stop()
 }
 
 // AdvertiseNameAndServices advertises device name, and specified service UUIDs.
