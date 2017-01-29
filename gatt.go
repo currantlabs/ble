@@ -50,7 +50,7 @@ func Stop() error {
 	if defaultDevice == nil {
 		return ErrDefaultDevice
 	}
-	return nil
+	return defaultDevice.Stop()
 }
 
 // AdvertiseNameAndServices advertises device name, and specified service UUIDs.

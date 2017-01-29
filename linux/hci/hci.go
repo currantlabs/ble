@@ -155,9 +155,9 @@ func (h *HCI) Init() error {
 	return nil
 }
 
-// Stop ...
-func (h *HCI) Stop() error {
-	return h.stop(nil)
+// Close ...
+func (h *HCI) Close() error {
+	return h.close(nil)
 }
 
 // Error ...
@@ -242,14 +242,14 @@ func (h *HCI) send(c Command) ([]byte, error) {
 	b[2] = byte(c.OpCode() >> 8)
 	b[3] = byte(c.Len())
 	if err := c.Marshal(b[4:]); err != nil {
-		h.stop(fmt.Errorf("hci: failed to marshal cmd"))
+		h.close(fmt.Errorf("hci: failed to marshal cmd"))
 	}
 
 	h.sent[c.OpCode()] = p // TODO: lock
 	if n, err := h.skt.Write(b[:4+c.Len()]); err != nil {
-		h.stop(fmt.Errorf("hci: failed to send cmd"))
+		h.close(fmt.Errorf("hci: failed to send cmd"))
 	} else if n != 4+c.Len() {
-		h.stop(fmt.Errorf("hci: failed to send whole cmd pkt to hci socket"))
+		h.close(fmt.Errorf("hci: failed to send whole cmd pkt to hci socket"))
 	}
 
 	select {
@@ -278,7 +278,7 @@ func (h *HCI) sktLoop() {
 	}
 }
 
-func (h *HCI) stop(err error) error {
+func (h *HCI) close(err error) error {
 	h.err = err
 	return h.skt.Close()
 }

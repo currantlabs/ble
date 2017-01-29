@@ -187,14 +187,6 @@ func (h *HCI) Dial(ctx context.Context, a ble.Addr) (ble.Client, error) {
 	}
 }
 
-// Close ...
-func (h *HCI) Close() error {
-	if h.err != nil {
-		return h.err
-	}
-	return nil
-}
-
 // Advertise starts advertising.
 func (h *HCI) Advertise() error {
 	h.params.advEnable.AdvertisingEnable = 1
