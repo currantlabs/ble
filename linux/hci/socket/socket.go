@@ -131,5 +131,11 @@ func (s *Socket) Write(p []byte) (int, error) {
 }
 
 func (s *Socket) Close() error {
+	// Any pending reference to the socket prevents the underlying HCI device from being released.
+	// This most likely happens due to a blocked Read() in the kernel.
+	// The Close() syscall does not unblock the Read(), and the HCI socket does not support
+	// Shutdown() syscall, which can be used for a TCP socket.
+	// In this case we send a HCI Reset Command, which results a HCI response that subsequently unblocks the Read().
+	s.Write([]byte{0x01, 0x09, 0x10, 0x00})
 	return errors.Wrap(unix.Close(s.fd), "can't close hci socket")
 }
