@@ -4,6 +4,7 @@ package socket
 
 import (
 	"fmt"
+	"io"
 	"sync"
 	"unsafe"
 
@@ -50,9 +51,10 @@ type devListRequest struct {
 
 // Socket implements a HCI User Channel as ReadWriteCloser.
 type Socket struct {
-	fd  int
-	rmu sync.Mutex
-	wmu sync.Mutex
+	fd     int
+	closed chan struct{}
+	rmu    sync.Mutex
+	wmu    sync.Mutex
 }
 
 // NewSocket returns a HCI User Channel of specified device id.
@@ -113,10 +115,15 @@ func open(fd, id int) (*Socket, error) {
 		unix.Read(fd, b)
 	}
 
-	return &Socket{fd: fd}, nil
+	return &Socket{fd: fd, closed: make(chan struct{})}, nil
 }
 
 func (s *Socket) Read(p []byte) (int, error) {
+	select {
+	case <-s.closed:
+		return 0, io.EOF
+	default:
+	}
 	s.rmu.Lock()
 	defer s.rmu.Unlock()
 	n, err := unix.Read(s.fd, p)
@@ -131,5 +138,9 @@ func (s *Socket) Write(p []byte) (int, error) {
 }
 
 func (s *Socket) Close() error {
+	close(s.closed)
+	s.Write([]byte{0x01, 0x09, 0x10, 0x00})
+	s.rmu.Lock()
+	defer s.rmu.Unlock()
 	return errors.Wrap(unix.Close(s.fd), "can't close hci socket")
 }
