@@ -51,9 +51,15 @@ func main() {
 		log.Fatalf("can't connect : %s", err)
 	}
 
+	// Make sure we had the chance to print out the message.
+	done := make(chan struct{})
+	// Normally, the connection is disconnected by us after our exploration.
+	// However, it can be asynchronously disconnected by the remote peripheral.
+	// So we wait(detect) the disconnection in the go routine.
 	go func() {
-		cln.Disconnected()
+		<-cln.Disconnected()
 		fmt.Printf("[ %s ] is disconnected \n", cln.Address())
+		close(done)
 	}()
 
 	fmt.Printf("Discovering profile...\n")
@@ -68,6 +74,8 @@ func main() {
 	// Disconnect the connection. (On OS X, this might take a while.)
 	fmt.Printf("Disconnecting [ %s ]... (this might take up to few seconds on OS X)\n", cln.Address())
 	cln.CancelConnection()
+
+	<-done
 }
 
 func explore(cln ble.Client, p *ble.Profile) error {
