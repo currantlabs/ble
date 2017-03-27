@@ -50,7 +50,7 @@ GOOS=linux go build -o blesh_lnx *.go
 Start a GATT server on the Linux platform (with a usb ble dongle) for 1 hour.
 (We'll leave it sit there for the rest of tutoruial)
 ```
-sudo ./blesh_lnx srv -tmo 1h
+sudo ./blesh_lnx sv -tmo 1h
 
 Initializing device ...
 Serving GATT Server for 1h0m0s...
