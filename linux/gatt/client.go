@@ -223,8 +223,7 @@ func (p *Client) WriteCharacteristic(c *ble.Characteristic, v []byte, noRsp bool
 	p.Lock()
 	defer p.Unlock()
 	if noRsp {
-		p.ac.WriteCommand(c.ValueHandle, v)
-		return nil
+		return p.ac.WriteCommand(c.ValueHandle, v)
 	}
 	return p.ac.Write(c.ValueHandle, v)
 }
