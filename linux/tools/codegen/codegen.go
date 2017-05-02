@@ -62,7 +62,7 @@ var funcMap = template.FuncMap{
 			s += fmt.Sprintf("func (r %s) Set%s (v %s) { copy(r[%d:], v)}", n, k, v, cnt)
 		case "[6]byte":
 			s += fmt.Sprintf("// %s ...\n", k)
-			s = fmt.Sprintf(`func (r %s) %s () %s {
+			s += fmt.Sprintf(`func (r %s) %s () %s {
 				 b:=[6]byte{}
 				 copy(b[:], r[%d:])
 				 return b
