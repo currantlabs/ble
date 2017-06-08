@@ -179,7 +179,7 @@ func (cln *Client) WriteCharacteristic(c *ble.Characteristic, b []byte, noRsp bo
 		cln.conn.sendCmd(66, args)
 		return nil
 	}
-	return cln.conn.sendReq(65, args).err()
+	return cln.conn.sendReq(66, args).err()
 }
 
 // ReadDescriptor reads a characteristic descriptor from a server. [Vol 3, Part G, 4.12.1]
