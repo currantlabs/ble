@@ -24,7 +24,7 @@ This package implement Generic Attribute Profile (GATT) [Vol 3, Part G]
 #### Characteristic Value Read [4.8]
   - [ ] Read Characteristic Value [4.8.1]
   - [ ] Read Using Characteristic UUID [4.8.2]
-  - [ ] Read Long Characteristic Values [4.8.3]
+  - [x] Read Long Characteristic Values [4.8.3]
   - [ ] Read Multiple Characteristic Values [4.8.4]
 
 #### Characteristic Value Write [4.9]

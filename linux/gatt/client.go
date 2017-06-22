@@ -212,10 +212,30 @@ func (p *Client) ReadCharacteristic(c *ble.Characteristic) ([]byte, error) {
 }
 
 // ReadLongCharacteristic reads a characteristic value which is longer than the MTU. [Vol 3, Part G, 4.8.3]
-func (p *Client) ReadLongCharacteristic(c *ble.Characteristic) ([]byte, error) {
+func (p *Client) ReadLongCharacteristic(c *ble.Characteristic) ([]byte,error) {
 	p.Lock()
 	defer p.Unlock()
-	return nil, nil
+
+	buffer := make([]byte,512)
+	size := 0
+	part := 0
+
+	read, err := p.ac.Read(c.ValueHandle)
+	for {
+		if err != nil {
+			return nil, err
+		}
+		part = len(read)
+		copy(buffer[size:],read)
+		size += part
+
+		if part < p.conn.TxMTU()-1	{
+			break
+		}
+
+		read, err = p.ac.ReadBlob(c.ValueHandle,uint16(size))
+	}
+	return buffer[:size], nil
 }
 
 // WriteCharacteristic writes a characteristic value to a server. [Vol 3, Part G, 4.9.3]
