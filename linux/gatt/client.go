@@ -216,26 +216,22 @@ func (p *Client) ReadLongCharacteristic(c *ble.Characteristic) ([]byte,error) {
 	p.Lock()
 	defer p.Unlock()
 
-	buffer := make([]byte,512)
-	size := 0
-	part := 0
+	// The maximum length of an attribute value shall be 512 octects [Vol 3, 3.2.9]
+	buffer := make([]byte,0,512)
 
 	read, err := p.ac.Read(c.ValueHandle)
-	for {
-		if err != nil {
-			return nil, err
-		}
-		part = len(read)
-		copy(buffer[size:],read)
-		size += part
-
-		if part < p.conn.TxMTU()-1	{
-			break
-		}
-
-		read, err = p.ac.ReadBlob(c.ValueHandle,uint16(size))
+	if err != nil {
+		return nil, err
 	}
-	return buffer[:size], nil
+	buffer = append(buffer,read...)
+
+	for len(read) >= p.conn.TxMTU()-1 {
+		if read, err = p.ac.ReadBlob(c.ValueHandle,uint16(len(buffer))); err != nil {
+                        return nil, err
+                }
+		buffer = append(buffer,read...)
+	}
+	return buffer, nil
 }
 
 // WriteCharacteristic writes a characteristic value to a server. [Vol 3, Part G, 4.9.3]
