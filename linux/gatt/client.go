@@ -212,24 +212,24 @@ func (p *Client) ReadCharacteristic(c *ble.Characteristic) ([]byte, error) {
 }
 
 // ReadLongCharacteristic reads a characteristic value which is longer than the MTU. [Vol 3, Part G, 4.8.3]
-func (p *Client) ReadLongCharacteristic(c *ble.Characteristic) ([]byte,error) {
+func (p *Client) ReadLongCharacteristic(c *ble.Characteristic) ([]byte, error) {
 	p.Lock()
 	defer p.Unlock()
 
 	// The maximum length of an attribute value shall be 512 octects [Vol 3, 3.2.9]
-	buffer := make([]byte,0,512)
+	buffer := make([]byte, 0, 512)
 
 	read, err := p.ac.Read(c.ValueHandle)
 	if err != nil {
 		return nil, err
 	}
-	buffer = append(buffer,read...)
+	buffer = append(buffer, read...)
 
 	for len(read) >= p.conn.TxMTU()-1 {
-		if read, err = p.ac.ReadBlob(c.ValueHandle,uint16(len(buffer))); err != nil {
-                        return nil, err
-                }
-		buffer = append(buffer,read...)
+		if read, err = p.ac.ReadBlob(c.ValueHandle, uint16(len(buffer))); err != nil {
+			return nil, err
+		}
+		buffer = append(buffer, read...)
 	}
 	return buffer, nil
 }
