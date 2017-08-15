@@ -332,6 +332,9 @@ func (h *HCI) handleEvt(b []byte) error {
 		h.err = f(b[2:])
 		return nil
 	}
+	if code == 0xff { // Ignore vendor events
+		return nil
+	}
 	return fmt.Errorf("unsupported event packet: % X", b)
 }
 
