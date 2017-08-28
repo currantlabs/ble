@@ -9,16 +9,23 @@ import (
 )
 
 // NewServer ...
-func NewServer() (*Server, error) {
+func NewServerWithName(name string) (*Server, error) {
 	return &Server{
-		svcs: defaultServices("Gopher"),
-		db:   att.NewDB(defaultServices("Gopher"), uint16(1)),
+		name:name,
+		svcs: defaultServices(name),
+		db:   att.NewDB(defaultServices(name), uint16(1)),
 	}, nil
+}
+
+// NewServer ...
+func NewServer() (*Server, error) {
+	return NewServerWithName("Gopher")
 }
 
 // Server ...
 type Server struct {
 	sync.Mutex
+	name string
 
 	svcs []*ble.Service
 	db   *att.DB
@@ -37,7 +44,7 @@ func (s *Server) AddService(svc *ble.Service) error {
 func (s *Server) RemoveAllServices() error {
 	s.Lock()
 	defer s.Unlock()
-	s.svcs = defaultServices("Gopher")
+	s.svcs = defaultServices(s.name)
 	s.db = att.NewDB(s.svcs, uint16(1)) // ble attrs start at 1
 	return nil
 }
@@ -46,7 +53,7 @@ func (s *Server) RemoveAllServices() error {
 func (s *Server) SetServices(svcs []*ble.Service) error {
 	s.Lock()
 	defer s.Unlock()
-	s.svcs = append(defaultServices("Gopher"), svcs...)
+	s.svcs = append(defaultServices(s.name), svcs...)
 	s.db = att.NewDB(s.svcs, uint16(1)) // ble attrs start at 1
 	return nil
 }
