@@ -14,6 +14,11 @@ import (
 
 // NewDevice returns the default HCI device.
 func NewDevice() (*Device, error) {
+	return NewDeviceWithName("Gopher")
+}
+
+// NewDeviceWithName returns the default HCI device.
+func NewDeviceWithName(name string) (*Device, error) {
 	dev, err := hci.NewHCI()
 	if err != nil {
 		return nil, errors.Wrap(err, "can't create hci")
@@ -22,7 +27,7 @@ func NewDevice() (*Device, error) {
 		return nil, errors.Wrap(err, "can't init hci")
 	}
 
-	s, err := gatt.NewServer()
+	s, err := gatt.NewServerWithName(name)
 	if err != nil {
 		return nil, errors.Wrap(err, "can't create server")
 	}
