@@ -256,13 +256,13 @@ func cmdConnect(c *cli.Context) error {
 	if err == nil {
 		curr.client = cln
 		curr.clients[cln.Address().String()] = cln
+		go func() {
+			<-cln.Disconnected()
+			delete(curr.clients, cln.Address().String())
+			curr.client = nil
+			fmt.Printf("\n%s disconnected\n", cln.Address().String())
+		}()
 	}
-	go func() {
-		<-cln.Disconnected()
-		delete(curr.clients, cln.Address().String())
-		curr.client = nil
-		fmt.Printf("\n%s disconnected\n", cln.Address().String())
-	}()
 	return err
 }
 
