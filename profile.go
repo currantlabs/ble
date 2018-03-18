@@ -1,5 +1,9 @@
 package ble
 
+import (
+	"strconv"
+)
+
 // NewService creates and initialize a new Service using u as it's UUID.
 func NewService(u UUID) *Service {
 	return &Service{UUID: u}
@@ -65,6 +69,111 @@ func (p *Profile) Find(target interface{}) interface{} {
 		}
 	}
 	return nil
+}
+
+// FindWithUUID searches discovered profile for the specified UUID.
+// The target must has the type of *Service, *Characteristic, or *Descriptor.
+func (p *Profile) FindWithUUID(uuidVal UUID) interface{} {
+	for _, s := range p.Services {
+		if s.UUID.Equal(uuidVal) {
+			return s
+		}
+		for _, c := range s.Characteristics {
+			if c.UUID.Equal(uuidVal) {
+				return c
+			}
+			for _, d := range c.Descriptors {
+				if d.UUID.Equal(uuidVal) {
+					return d
+				}
+			}
+		}
+	}
+	return nil
+}
+
+// FindByHandle searches discovered profile for the specified target's type and handle.
+// The target must has the type of *Service, *Characteristic, or *Descriptor.
+// It also must have the Handle property set to the the right value.
+//
+// Example:
+//	dummyCharacteristic := ble.NewCharacteristic((ble.UUID)(nil))
+//	dummyCharacteristic.Handle = curr.handle
+//	if u := curr.profile.FindByHandle(dummyCharacteristic); u != nil {
+//	...
+//	}
+func (p *Profile) FindByHandle(target interface{}) interface{} {
+	var handle uint16
+
+	switch t := target.(type) {
+	case *Service:
+		handle = t.Handle
+	case *Characteristic:
+		handle = t.Handle
+	case *Descriptor:
+		handle = t.Handle
+	default:
+		return nil
+	}
+	return p.FindWithHandle(handle)
+}
+
+// FindWithHandle searches the discovered profile for the item the matches
+// the given handle, in the following order: services, characteristics, descriptors.
+//
+// Example:
+//	if u := curr.profile.FindWithHandle(1024); u != nil {
+//	...
+//	}
+func (p *Profile) FindWithHandle(handle uint16) interface{} {
+	for _, s := range p.Services {
+		if s.Handle == handle {
+			return s
+		}
+		for _, c := range s.Characteristics {
+			if c.Handle == handle {
+				return c
+			}
+			for _, d := range c.Descriptors {
+				if d.Handle == handle {
+					return d
+				}
+			}
+		}
+	}
+	return nil
+}
+
+// FindWithHandleStr searches the discovered profile for the item whose handle
+// matches the handleHexOrDec string value.
+// When handleHexOrDec is converted to uint16, and is prefixed by "0x", it is
+// assumed to be in base 16; otherwise, it is assumed to be in base 10.
+// The search is performedin the following order: services, characteristics, descriptors.
+//
+// Example using a hexadecimal value
+//	if u, err := curr.profile.FindWithHandleStr("0x10B4"); u != nil {
+//	...
+//	}
+// Example using a decimal value
+//	if u, err := curr.profile.FindWithHandleStr("2048"); u != nil {
+//	...
+//	}
+func (p *Profile) FindWithHandleStr(handleHexOrDec string) (r interface{}, err error) {
+	if handleHexOrDec == "" {
+		return nil, nil
+	}
+	hStr := handleHexOrDec
+	base := 10
+	if len(hStr) > 2 && hStr[0] == '0' && (hStr[1] == 'x' || hStr[1] == 'X') {
+		// Base 16
+		hStr = hStr[2:]
+		base = 16
+	}
+	h, err := strconv.ParseUint(hStr, base, 16)
+	if err != nil {
+		return nil, err
+	}
+	return p.FindWithHandle(uint16(h)), nil
 }
 
 // A Service is a BLE service.
