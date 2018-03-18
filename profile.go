@@ -67,6 +67,38 @@ func (p *Profile) Find(target interface{}) interface{} {
 	return nil
 }
 
+// FindByHandle searches discovered profile for the specified target's type and handle.
+// The target must has the type of *Service, *Characteristic, or *Descriptor.
+func (p *Profile) FindByHandle(target interface{}) interface{} {
+	switch target.(type) {
+	case *Service:
+	case *Characteristic:
+	case *Descriptor:
+	default:
+		return nil
+	}
+	for _, s := range p.Services {
+		ts, ok := target.(*Service)
+		if ok && s.Handle == ts.Handle {
+			target = s
+			return s
+		}
+		for _, c := range s.Characteristics {
+			tc, ok := target.(*Characteristic)
+			if ok && c.Handle == tc.Handle {
+				return c
+			}
+			for _, d := range c.Descriptors {
+				td, ok := target.(*Descriptor)
+				if ok && d.Handle == td.Handle {
+					return d
+				}
+			}
+		}
+	}
+	return nil
+}
+
 // A Service is a BLE service.
 type Service struct {
 	UUID            UUID

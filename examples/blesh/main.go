@@ -24,15 +24,20 @@ var curr struct {
 	client  ble.Client
 	clients map[string]ble.Client
 	uuid    ble.UUID
+	handle  uint16
 	addr    ble.Addr
 	profile *ble.Profile
+	val     *string
 }
 
 var (
-	errNotConnected = fmt.Errorf("not connected")
-	errNoProfile    = fmt.Errorf("no profile")
-	errNoUUID       = fmt.Errorf("no UUID")
-	errInvalidUUID  = fmt.Errorf("invalid UUID")
+	errNotConnected  = fmt.Errorf("not connected")
+	errNoProfile     = fmt.Errorf("no profile")
+	errNoUUID        = fmt.Errorf("no UUID")
+	errInvalidUUID   = fmt.Errorf("invalid UUID")
+	errInvalidHandle = fmt.Errorf("invalid handle")
+	errNoHandle      = fmt.Errorf("no handle")
+	errNoVal         = fmt.Errorf("no value")
 )
 
 func main() {
@@ -115,7 +120,7 @@ func main() {
 			Usage:   "Read value from a characteristic or descriptor",
 			Before:  setup,
 			Action:  cmdRead,
-			Flags:   []cli.Flag{flgUUID, flgTimeout, flgName, flgAddr},
+			Flags:   []cli.Flag{flgUUID, flgHandle, flgTimeout, flgName, flgAddr},
 		},
 		{
 			Name:    "write",
@@ -123,7 +128,7 @@ func main() {
 			Usage:   "Write value to a characteristic or descriptor",
 			Before:  setup,
 			Action:  cmdWrite,
-			Flags:   []cli.Flag{flgUUID, flgTimeout, flgName, flgAddr},
+			Flags:   []cli.Flag{flgUUID, flgHandle, flgVal, flgTimeout, flgName, flgAddr},
 		},
 		{
 			Name:   "sub",
@@ -316,8 +321,15 @@ func cmdExplore(c *cli.Context) error {
 }
 
 func cmdRead(c *cli.Context) error {
+	curr.uuid = nil
 	if err := doGetUUID(c); err != nil {
-		return err
+		if err.Error() == errNoUUID.Error() {
+			if err := doGetHandle(c); err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
 	}
 	if err := doConnect(c); err != nil {
 		return err
@@ -325,27 +337,62 @@ func cmdRead(c *cli.Context) error {
 	if err := doDiscover(c); err != nil {
 		return err
 	}
-	if u := curr.profile.Find(ble.NewCharacteristic(curr.uuid)); u != nil {
-		b, err := curr.client.ReadCharacteristic(u.(*ble.Characteristic))
-		if err != nil {
-			return errors.Wrap(err, "can't read characteristic")
+	if curr.uuid != nil {
+		if u := curr.profile.Find(ble.NewCharacteristic(curr.uuid)); u != nil {
+			b, err := curr.client.ReadCharacteristic(u.(*ble.Characteristic))
+			if err != nil {
+				return errors.Wrap(err, "can't read characteristic")
+			}
+			fmt.Printf("    Value         %x | %q\n", b, b)
+			return nil
 		}
-		fmt.Printf("    Value         %x | %q\n", b, b)
-		return nil
-	}
-	if u := curr.profile.Find(ble.NewDescriptor(curr.uuid)); u != nil {
-		b, err := curr.client.ReadDescriptor(u.(*ble.Descriptor))
-		if err != nil {
-			return errors.Wrap(err, "can't read descriptor")
+		if u := curr.profile.Find(ble.NewDescriptor(curr.uuid)); u != nil {
+			b, err := curr.client.ReadDescriptor(u.(*ble.Descriptor))
+			if err != nil {
+				return errors.Wrap(err, "can't read descriptor")
+			}
+			fmt.Printf("    Value         %x | %q\n", b, b)
+			return nil
 		}
-		fmt.Printf("    Value         %x | %q\n", b, b)
-		return nil
+	} else {
+		dummyCharacteristic := ble.NewCharacteristic(ble.UUID16(curr.handle))
+		dummyCharacteristic.Handle = curr.handle
+		if u := curr.profile.FindByHandle(dummyCharacteristic); u != nil {
+			b, err := curr.client.ReadCharacteristic(u.(*ble.Characteristic))
+			if err != nil {
+				return errors.Wrap(err, "can't read characteristic")
+			}
+			fmt.Printf("    Value         %x | %q\n", b, b)
+			return nil
+		}
+		dummyDescriptor := ble.NewDescriptor(ble.UUID16(curr.handle))
+		dummyDescriptor.Handle = curr.handle
+		if u := curr.profile.FindByHandle(dummyDescriptor); u != nil {
+			b, err := curr.client.ReadDescriptor(u.(*ble.Descriptor))
+			if err != nil {
+				return errors.Wrap(err, "can't read descriptor")
+			}
+			fmt.Printf("    Value         %x | %q\n", b, b)
+			return nil
+		}
 	}
+
 	return errNoUUID
 }
 
 func cmdWrite(c *cli.Context) error {
+	curr.uuid = nil
+	curr.val = nil
 	if err := doGetUUID(c); err != nil {
+		if err.Error() == errNoUUID.Error() {
+			if err := doGetHandle(c); err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+	}
+	if err := doGetVal(c); err != nil {
 		return err
 	}
 	if err := doConnect(c); err != nil {
@@ -354,13 +401,28 @@ func cmdWrite(c *cli.Context) error {
 	if err := doDiscover(c); err != nil {
 		return err
 	}
-	if u := curr.profile.Find(ble.NewCharacteristic(curr.uuid)); u != nil {
-		err := curr.client.WriteCharacteristic(u.(*ble.Characteristic), []byte("hello"), true)
-		return errors.Wrap(err, "can't write characteristic")
-	}
-	if u := curr.profile.Find(ble.NewDescriptor(curr.uuid)); u != nil {
-		err := curr.client.WriteDescriptor(u.(*ble.Descriptor), []byte("fixme"))
-		return errors.Wrap(err, "can't write descriptor")
+	if curr.uuid != nil {
+		if u := curr.profile.Find(ble.NewCharacteristic(curr.uuid)); u != nil {
+			err := curr.client.WriteCharacteristic(u.(*ble.Characteristic), []byte(*curr.val), true)
+			return errors.Wrap(err, "can't write characteristic")
+		}
+		if u := curr.profile.Find(ble.NewDescriptor(curr.uuid)); u != nil {
+			err := curr.client.WriteDescriptor(u.(*ble.Descriptor), []byte(*curr.val))
+			return errors.Wrap(err, "can't write descriptor")
+		}
+	} else {
+		dummyCharacteristic := ble.NewCharacteristic(ble.UUID16(curr.handle))
+		dummyCharacteristic.Handle = curr.handle
+		if u := curr.profile.FindByHandle(dummyCharacteristic); u != nil {
+			err := curr.client.WriteCharacteristic(u.(*ble.Characteristic), []byte(*curr.val), true)
+			return errors.Wrap(err, "can't write characteristic")
+		}
+		dummyDescriptor := ble.NewDescriptor(ble.UUID16(curr.handle))
+		dummyDescriptor.Handle = curr.handle
+		if u := curr.profile.FindByHandle(dummyDescriptor); u != nil {
+			err := curr.client.WriteDescriptor(u.(*ble.Descriptor), []byte(*curr.val))
+			return errors.Wrap(err, "can't write descriptor")
+		}
 	}
 	return errNoUUID
 }
@@ -419,7 +481,89 @@ func cmdShell(app *cli.App) {
 		if text == "quit" || text == "q" {
 			break
 		}
-		app.Run(append(os.Args[1:], strings.Split(text, " ")...))
+		innerArgs, err := parseCommandLine(text)
+		if err != nil {
+			fmt.Printf("\nPre-parser error: %s", err.Error())
+			break
+		}
+		app.Run(append(os.Args[1:], innerArgs...))
 	}
 	signal.Stop(sigs)
+}
+
+// Correctly takes into consideration spaces passed inside strings
+// (e.g. when using --value="this has spaces" to write to characteristics / descriptors).
+// Originally from:
+// https://stackoverflow.com/questions/34118732/parse-a-command-line-string-into-flags-and-arguments-in-golang
+// Adapted and a space-bug fix, for the first space after the first character.
+func parseCommandLine(command string) ([]string, error) {
+	var args []string
+	state := "start"
+	current := ""
+	quote := "\""
+	escapeNext := true
+	for i := 0; i < len(command); i++ {
+		c := command[i]
+
+		if state == "quotes" {
+			if string(c) != quote {
+				current += string(c)
+			} else {
+				args = append(args, current)
+				current = ""
+				state = "start"
+			}
+			continue
+		}
+
+		if escapeNext {
+			current += string(c)
+			escapeNext = false
+			continue
+		}
+
+		if c == '\\' {
+			escapeNext = true
+			continue
+		}
+
+		if c == '"' || c == '\'' {
+			state = "quotes"
+			quote = string(c)
+			continue
+		}
+
+		if state == "arg" {
+			if c == ' ' || c == '\t' {
+				args = append(args, current)
+				current = ""
+				state = "start"
+			} else {
+				current += string(c)
+			}
+			continue
+		}
+
+		if c != ' ' && c != '\t' {
+			state = "arg"
+			current += string(c)
+			continue
+		}
+
+		if c == ' ' || c == '\t' && current != "" {
+			args = append(args, current)
+			current = ""
+			state = "start"
+		}
+	}
+
+	if state == "quotes" {
+		return []string{}, errors.New(fmt.Sprintf("Unclosed quote in command line: %s", command))
+	}
+
+	if current != "" {
+		args = append(args, current)
+	}
+
+	return args, nil
 }
