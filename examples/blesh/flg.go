@@ -13,5 +13,7 @@ var (
 	flgSvc      = cli.StringFlag{Name: "svc, s", Usage: "Services of remote device"}
 	flgAllowDup = cli.BoolFlag{Name: "dup", Usage: "Allow duplicate in scanning result"}
 	flgUUID     = cli.StringFlag{Name: "uuid, u", Usage: "UUID"}
+	flgHandle   = cli.StringFlag{Name: "handle, hd", Usage: "Item handle"}
+	flgVal      = cli.StringFlag{Name: "value, v", Usage: "Item value"}
 	flgInd      = cli.BoolFlag{Name: "ind", Usage: "Indication"}
 )
