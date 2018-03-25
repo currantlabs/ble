@@ -1,6 +1,7 @@
 package ble
 
 import (
+	"fmt"
 	"strconv"
 )
 
@@ -92,6 +93,16 @@ func (p *Profile) FindWithUUID(uuidVal UUID) interface{} {
 	return nil
 }
 
+// FindWithUUIDStr searches discovered profile for a service, characteristic,
+// or descriptor with an UUID that matches uuidval.
+func (p *Profile) FindWithUUIDStr(uuidVal string) (interface{}, error) {
+	uuid, err := Parse(uuidVal)
+	if err != nil {
+		return nil, err
+	}
+	return p.FindWithUUID(uuid), nil
+}
+
 // FindByHandle searches discovered profile for the specified target's type and handle.
 // The target must has the type of *Service, *Characteristic, or *Descriptor.
 // It also must have the Handle property set to the the right value.
@@ -107,11 +118,11 @@ func (p *Profile) FindByHandle(target interface{}) interface{} {
 
 	switch t := target.(type) {
 	case *Service:
-		handle = t.Handle
+		return p.FindServiceWithHandle(t.Handle)
 	case *Characteristic:
-		handle = t.Handle
+		return p.FindCharacteristicWithHandle(t.Handle)
 	case *Descriptor:
-		handle = t.Handle
+		return p.FindDescriptorWithHandle(t.Handle)
 	default:
 		return nil
 	}
@@ -144,10 +155,51 @@ func (p *Profile) FindWithHandle(handle uint16) interface{} {
 	return nil
 }
 
+// FindServiceWithHandle searches discovered profile to find any matching *Service
+// for the specified handle. It returns nil if none found.
+func (p *Profile) FindServiceWithHandle(handle uint16) *Service {
+	for _, s := range p.Services {
+		if s.Handle == handle {
+			return s
+		}
+	}
+	return nil
+}
+
+// FindCharacteristicWithHandle searches discovered profile to find any
+// matching *Characteristic for the specified handle. It returns nil if none found.
+func (p *Profile) FindCharacteristicWithHandle(handle uint16) *Characteristic {
+	for _, s := range p.Services {
+		for _, c := range s.Characteristics {
+			if c.Handle == handle {
+				return c
+			}
+		}
+	}
+	return nil
+}
+
+// FindDescriptorWithHandle searches discovered profile to find any
+// matching *Descriptor for the specified handle. It returns nil if none found.
+func (p *Profile) FindDescriptorWithHandle(handle uint16) *Descriptor {
+	for _, s := range p.Services {
+		for _, c := range s.Characteristics {
+			for _, d := range c.Descriptors {
+				if d.Handle == handle {
+					return d
+				}
+			}
+		}
+	}
+	return nil
+}
+
 // FindWithHandleStr searches the discovered profile for the item whose handle
-// matches the handleHexOrDec string value.
+// matches the handleHexOrDec string value, with an optional base specified.
+//
 // When handleHexOrDec is converted to uint16, and is prefixed by "0x", it is
-// assumed to be in base 16; otherwise, it is assumed to be in base 10.
+// assumed to be in base 16; otherwise, it is assumed to be in base 10, unless the
+// optional base argument is explicitly passed.
 // The search is performedin the following order: services, characteristics, descriptors.
 //
 // Example using a hexadecimal value
@@ -158,18 +210,28 @@ func (p *Profile) FindWithHandle(handle uint16) interface{} {
 //	if u, err := curr.profile.FindWithHandleStr("2048"); u != nil {
 //	...
 //	}
-func (p *Profile) FindWithHandleStr(handleHexOrDec string) (r interface{}, err error) {
-	if handleHexOrDec == "" {
+// Example using a decimal value with explicit base 10
+//	if u, err := curr.profile.FindWithHandleStr("745", 10); u != nil {
+//	...
+//	}
+func (p *Profile) FindWithHandleStr(handleStr string, base ...int) (r interface{}, err error) {
+	if handleStr == "" {
 		return nil, nil
 	}
-	hStr := handleHexOrDec
-	base := 10
+	hStr := handleStr
+	convBase := 10
+	if len(base) > 0 {
+		if base[0] <= 0 {
+			return nil, fmt.Errorf("invalid base %d", base[0])
+		}
+		convBase = base[0]
+	}
 	if len(hStr) > 2 && hStr[0] == '0' && (hStr[1] == 'x' || hStr[1] == 'X') {
 		// Base 16
 		hStr = hStr[2:]
-		base = 16
+		convBase = 16
 	}
-	h, err := strconv.ParseUint(hStr, base, 16)
+	h, err := strconv.ParseUint(hStr, convBase, 16)
 	if err != nil {
 		return nil, err
 	}
