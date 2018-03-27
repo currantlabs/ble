@@ -67,6 +67,74 @@ func (p *Profile) Find(target interface{}) interface{} {
 	return nil
 }
 
+func (p *Profile) findWithUUID(uuidVal UUID) interface{} {
+	for _, s := range p.Services {
+		if s.UUID.Equal(uuidVal) {
+			return s
+		}
+		for _, c := range s.Characteristics {
+			if c.UUID.Equal(uuidVal) {
+				return c
+			}
+			for _, d := range c.Descriptors {
+				if d.UUID.Equal(uuidVal) {
+					return d
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func (p *Profile) findWithHandle(handle uint16) interface{} {
+	for _, s := range p.Services {
+		if s.Handle == handle {
+			return s
+		}
+		for _, c := range s.Characteristics {
+			if c.Handle == handle {
+				return c
+			}
+			for _, d := range c.Descriptors {
+				if d.Handle == handle {
+					return d
+				}
+			}
+		}
+	}
+	return nil
+}
+
+// FindBy takes any type that implements the Finder interface and delegates the
+// matching algorithm to it to return a *Service, *Characteristic, or *Descriptor.
+func (p *Profile) FindBy(f Finder) interface{} {
+	return f.Find(p)
+}
+
+type Finder interface {
+	Find(p *Profile) interface{}
+}
+
+// FindByHandle is a predefined type to quickly search for a matching uint16 handle value.
+type FindByHandle uint16
+
+// Finds a Service, Characteristic or Descriptor based on the intrinsic handle value.
+// Example:
+//  result := p.FindBy(FindByHandle(yourUint16Val))
+func (h FindByHandle) Find(p *Profile) interface{} {
+	return p.findWithHandle(uint16(h))
+}
+
+// FindByUUID is a predefined type to quickly search for a matching UUID value.
+type FindByUUID UUID
+
+// Finds a Service, Characteristic or Descriptor based on the intrinsic UUID value.
+// Example:
+//  result := p.FindBy(FindByUUID(yourUUIDVal))
+func (u FindByUUID) Find(p *Profile) interface{} {
+	return p.findWithUUID(UUID(u))
+}
+
 // A Service is a BLE service.
 type Service struct {
 	UUID            UUID
